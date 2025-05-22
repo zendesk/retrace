@@ -59,6 +59,7 @@ export interface SpanMatchDefinitionCombinator<
   occurrence?: number | ((occurrence: number) => boolean)
   isIdle?: boolean
   label?: string
+  renderCount?: number
   fn?: SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT>
   oneOf?: SpanMatchDefinition<
     SelectedRelationNameT,
@@ -100,11 +101,17 @@ export function withName<
 >(
   value: NameMatcher<RelationSchemasT[SelectedRelationNameT]>,
 ): SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT> {
-  return ({ span }, { input: { relatedTo } }) => {
+  const matcher: SpanMatcherFn<
+    SelectedRelationNameT,
+    RelationSchemasT,
+    VariantsT
+  > = ({ span }, { input: { relatedTo } }) => {
     if (typeof value === 'string') return span.name === value
     if (value instanceof RegExp) return value.test(span.name)
     return value(span.name, relatedTo)
   }
+  matcher.fromDefinition = { name: value }
+  return matcher
 }
 
 // DRAFT TODO: make test case if one doesnt exist yet
@@ -117,7 +124,13 @@ export function withLabel<
 >(
   value: string,
 ): SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT> {
-  return ({ annotation }) => annotation.labels?.includes(value) ?? false
+  const matcher: SpanMatcherFn<
+    SelectedRelationNameT,
+    RelationSchemasT,
+    VariantsT
+  > = ({ annotation }) => annotation.labels?.includes(value) ?? false
+  matcher.fromDefinition = { label: value }
+  return matcher
 }
 
 /**
@@ -130,13 +143,19 @@ export function withPerformanceEntryName<
 >(
   value: NameMatcher<RelationSchemasT[SelectedRelationNameT]>,
 ): SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT> {
-  return ({ span }, { input: { relatedTo } }) => {
+  const matcher: SpanMatcherFn<
+    SelectedRelationNameT,
+    RelationSchemasT,
+    VariantsT
+  > = ({ span }, { input: { relatedTo } }) => {
     const entryName = span.performanceEntry?.name
     if (!entryName) return false
     if (typeof value === 'string') return entryName === value
     if (value instanceof RegExp) return value.test(entryName)
     return value(entryName, relatedTo)
   }
+  matcher.fromDefinition = { performanceEntryName: value }
+  return matcher
 }
 
 export function withType<
@@ -146,7 +165,13 @@ export function withType<
 >(
   value: SpanType,
 ): SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT> {
-  return ({ span }) => span.type === value
+  const matcher: SpanMatcherFn<
+    SelectedRelationNameT,
+    RelationSchemasT,
+    VariantsT
+  > = ({ span }) => span.type === value
+  matcher.fromDefinition = { type: value }
+  return matcher
 }
 
 export function withStatus<
@@ -156,7 +181,13 @@ export function withStatus<
 >(
   value: SpanStatus,
 ): SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT> {
-  return ({ span }) => span.status === value
+  const matcher: SpanMatcherFn<
+    SelectedRelationNameT,
+    RelationSchemasT,
+    VariantsT
+  > = ({ span }) => span.status === value
+  matcher.fromDefinition = { status: value }
+  return matcher
 }
 
 /**
@@ -169,12 +200,18 @@ export function withAttributes<
 >(
   attrs: Attributes,
 ): SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT> {
-  return ({ span }) => {
+  const matcher: SpanMatcherFn<
+    SelectedRelationNameT,
+    RelationSchemasT,
+    VariantsT
+  > = ({ span }) => {
     if (!span.attributes) return false
     return Object.entries(attrs).every(
       ([key, value]) => span.attributes![key] === value,
     )
   }
+  matcher.fromDefinition = { attributes: attrs }
+  return matcher
 }
 
 /**
@@ -191,7 +228,11 @@ export function withMatchingRelations<
       >[]
     | true = true,
 ): SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT> {
-  return (
+  const matcher: SpanMatcherFn<
+    SelectedRelationNameT,
+    RelationSchemasT,
+    VariantsT
+  > = (
     { span },
     { input: { relatedTo: r }, definition: { relationSchema } },
   ) => {
@@ -212,6 +253,8 @@ export function withMatchingRelations<
         key in spanRelatedTo && spanRelatedTo[key] === relatedToInput[key],
     )
   }
+  matcher.fromDefinition = { matchingRelations: keys }
+  return matcher
 }
 
 /**
@@ -224,10 +267,16 @@ export function withOccurrence<
 >(
   value: number | ((occurrence: number) => boolean),
 ): SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT> {
-  return ({ annotation }) => {
+  const matcher: SpanMatcherFn<
+    SelectedRelationNameT,
+    RelationSchemasT,
+    VariantsT
+  > = ({ annotation }) => {
     if (typeof value === 'number') return annotation.occurrence === value
     return value(annotation.occurrence)
   }
+  matcher.fromDefinition = { occurrence: value }
+  return matcher
 }
 
 export function withComponentRenderCount<
@@ -235,13 +284,29 @@ export function withComponentRenderCount<
   const RelationSchemasT,
   const VariantsT extends string,
 >(
-  name: string,
+  name: NameMatcher<RelationSchemasT[SelectedRelationNameT]>,
   renderCount: number,
 ): SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT> {
-  return ({ span }) => {
-    if (!('renderCount' in span)) return false
-    return span.name === name && span.renderCount === renderCount
+  const nameMatcher = withName<
+    SelectedRelationNameT,
+    RelationSchemasT,
+    VariantsT
+  >(name)
+
+  const matcher: SpanMatcherFn<
+    SelectedRelationNameT,
+    RelationSchemasT,
+    VariantsT
+  > = (spanAndAnnotation, context) => {
+    if (!('renderCount' in spanAndAnnotation.span)) return false
+    return (
+      nameMatcher(spanAndAnnotation, context) &&
+      spanAndAnnotation.span.renderCount === renderCount
+    )
   }
+
+  matcher.fromDefinition = { name, renderCount }
+  return matcher
 }
 
 /**
@@ -259,11 +324,13 @@ export function whenIdle<
     RelationSchemasT,
     VariantsT
   > = ({ span }) => ('isIdle' in span ? span.isIdle === value : false)
-  return Object.assign(
+  const result = Object.assign(
     matcherFn,
     // add a tag to the function if set to true
     value ? ({ idleCheck: value } satisfies SpanMatcherTags) : {},
   )
+  result.fromDefinition = { isIdle: value }
+  return result
 }
 
 /**
@@ -275,11 +342,17 @@ export function continueWithErrorStatus<
   const RelationSchemasT,
   const VariantsT extends string,
 >(): SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT> {
-  return Object.assign(
-    () => true,
+  const matcherFn: SpanMatcherFn<
+    SelectedRelationNameT,
+    RelationSchemasT,
+    VariantsT
+  > = () => true
+  const result = Object.assign(
+    matcherFn,
     // add a tag to the function if set to true
     { continueWithErrorStatus: true } satisfies SpanMatcherTags,
   )
+  return result
 }
 
 // logical combinators:
@@ -369,13 +442,21 @@ export function fromDefinition<
     RelationSchemasT,
     VariantsT
   >[] = []
-  if (definition.name) {
+
+  // Handle special case: if both name and renderCount are present, use withComponentRenderCount
+  // instead of separate withName and other matchers
+  if (definition.renderCount !== undefined && definition.name) {
+    matchers.push(
+      withComponentRenderCount(definition.name, definition.renderCount),
+    )
+  } else if (definition.name) {
     matchers.push(
       withName<SelectedRelationNameT, RelationSchemasT, VariantsT>(
         definition.name,
       ),
     )
   }
+
   if (definition.performanceEntryName) {
     matchers.push(withPerformanceEntryName(definition.performanceEntryName))
   }
