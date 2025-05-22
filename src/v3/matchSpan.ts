@@ -66,6 +66,7 @@ export interface SpanMatchDefinitionCombinator<
     RelationSchemasT,
     VariantsT
   >[]
+  not?: SpanMatchDefinition<SelectedRelationNameT, RelationSchemasT, VariantsT>
   /**
    * This only has an effect on startSpan and endSpan for defining computed spans
    * It must be defined on the top level matcher definition
@@ -422,8 +423,19 @@ export function not<
 >(
   matcher: SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT>,
 ): SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT> {
-  // since not is a negation, we don't carry over tags
-  return (...args) => !matcher(...args)
+  // Create a new matcher function that negates the input matcher
+  const notMatcher: SpanMatcherFn<
+    SelectedRelationNameT,
+    RelationSchemasT,
+    VariantsT
+  > = (...args) => !matcher(...args)
+
+  // If the original matcher has a fromDefinition property, create a new one for the negated matcher
+  if (matcher.fromDefinition) {
+    notMatcher.fromDefinition = { not: matcher.fromDefinition }
+  }
+
+  return notMatcher
 }
 
 export function fromDefinition<
@@ -501,12 +513,28 @@ export function fromDefinition<
       ...matchers,
       withOneOfConditions(...oneOfMatchers),
     )
+  } else if (definition.not) {
+    // Handle the negation case
+    const notMatcher = fromDefinition<
+      SelectedRelationNameT,
+      RelationSchemasT,
+      VariantsT
+    >(definition.not)
+    // If there are other matchers, combine them with AND and then negate the result
+    // eslint-disable-next-line unicorn/prefer-ternary
+    if (matchers.length > 0) {
+      combined = withAllConditions(...matchers, not(notMatcher))
+    } else {
+      // If there are no other matchers, just negate the single matcher
+      combined = not(notMatcher)
+    }
   } else {
     combined = withAllConditions(...matchers)
   }
 
   combined.fromDefinition = definition
 
+  // Set matchingIndex if it's defined in the definition
   if (typeof definition.matchingIndex === 'number') {
     combined.matchingIndex = definition.matchingIndex
   }
