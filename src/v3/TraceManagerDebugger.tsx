@@ -136,11 +136,11 @@ const CSS_STYLES = /* language=CSS */ `
   --tmdb-color-tti-border: #e1bee7;
 
   /* Spans Count Colors */
-  --tmdb-color-spans-primary: #546e7a; /* Blue gray */
-  --tmdb-color-spans-primary-hover: #607d8b;
-  --tmdb-color-spans-bg: #eceff1;
-  --tmdb-color-spans-bg-hover: #cfd8dc;
-  --tmdb-color-spans-border: #cfd8dc;
+  --tmdb-color-items-primary: #546e7a; /* Blue gray */
+  --tmdb-color-items-primary-hover: #607d8b;
+  --tmdb-color-items-bg: #eceff1;
+  --tmdb-color-items-bg-hover: #cfd8dc;
+  --tmdb-color-items-border: #cfd8dc;
 
   --tmdb-color-draft-primary: #616161;
   --tmdb-color-draft-primary-hover: #757575; /* Added for hover states */
@@ -333,7 +333,7 @@ const CSS_STYLES = /* language=CSS */ `
   align-items: center; /* Added for vertical alignment */
 }
 
-.tmdb-required-span {
+.tmdb-required-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -343,10 +343,10 @@ const CSS_STYLES = /* language=CSS */ `
   margin-bottom: var(--tmdb-space-m);
   font-size: var(--tmdb-font-size-s);
 }
-.tmdb-required-span-matched {
+.tmdb-required-item-matched {
   border-left: 4px solid var(--tmdb-color-completed-primary);
 }
-.tmdb-required-span-unmatched {
+.tmdb-required-item-unmatched {
   border-left: 4px solid var(--tmdb-color-text-muted);
 }
 
@@ -505,6 +505,8 @@ const CSS_STYLES = /* language=CSS */ `
 }
 
 .tmdb-expanded-history {
+  display: flex;
+  flex-direction: column;
   margin-top: var(--tmdb-space-xl);
   padding-top: var(--tmdb-space-xl);
   border-top: 1px dashed var(--tmdb-color-border-dark);
@@ -565,6 +567,7 @@ const CSS_STYLES = /* language=CSS */ `
   overflow: hidden;
   border-radius: var(--tmdb-border-radius-pill);
   transition: all var(--tmdb-transition-fast);
+  margin: 0;
 }
 .tmdb-chip-group-label {
   padding: var(--tmdb-space-xs) var(--tmdb-space-m);
@@ -594,7 +597,7 @@ const CSS_STYLES = /* language=CSS */ `
   }
 }
 
-.tmdb-spans-group {
+.tmdb-items-group {
   border: 1px solid var(--tmdb-color-warning-border);
   background-color: var(--tmdb-color-warning-bg);
   & .tmdb-chip-group-label {
@@ -604,7 +607,7 @@ const CSS_STYLES = /* language=CSS */ `
     background-color: var(--tmdb-color-warning-primary);
   }
 }
-.tmdb-spans-group:hover {
+.tmdb-items-group:hover {
   background-color: var(--tmdb-color-warning-bg-hover);
   & .tmdb-chip-group-value {
     background-color: var(--tmdb-color-warning-primary-hover);
@@ -709,20 +712,20 @@ const CSS_STYLES = /* language=CSS */ `
   }
 }
 
-.tmdb-span-count-group {
-  border: 1px solid var(--tmdb-color-spans-border);
-  background-color: var(--tmdb-color-spans-bg);
+.tmdb-item-count-group {
+  border: 1px solid var(--tmdb-color-items-border);
+  background-color: var(--tmdb-color-items-bg);
   & .tmdb-chip-group-label {
-    color: var(--tmdb-color-spans-primary);
+    color: var(--tmdb-color-items-primary);
   }
   & .tmdb-chip-group-value {
-    background-color: var(--tmdb-color-spans-primary);
+    background-color: var(--tmdb-color-items-primary);
   }
 }
-.tmdb-span-count-group:hover {
-  background-color: var(--tmdb-color-spans-bg-hover);
+.tmdb-item-count-group:hover {
+  background-color: var(--tmdb-color-items-bg-hover);
   & .tmdb-chip-group-value {
-    background-color: var(--tmdb-color-spans-primary-hover);
+    background-color: var(--tmdb-color-items-primary-hover);
   }
 }
 
@@ -933,7 +936,7 @@ const CSS_STYLES = /* language=CSS */ `
   visibility: visible;
 }
 
-.tmdb-span-content { /* In RequiredSpansList */
+.tmdb-item-content { /* In RequiredSpansList */
   display: flex;
   align-items: center;
   flex: 1;
@@ -1028,12 +1031,12 @@ const CSS_STYLES = /* language=CSS */ `
   font-size: var(--tmdb-font-size-xxl); /* 18px */
 }
 
-.tmdb-computed-span-missing {
+.tmdb-computed-item-missing {
   margin-left: var(--tmdb-space-m);
   color: red; /* Kept direct red */
   font-weight: var(--tmdb-font-weight-medium);
 }
-.tmdb-computed-span-pending,
+.tmdb-computed-item-pending,
 .tmdb-computed-value-pending {
   margin-left: var(--tmdb-space-m);
   color: var(--tmdb-color-text-muted);
@@ -1292,13 +1295,13 @@ function RequiredSpansList<RelationSchemasT>({
         {requiredSpans.map((span, i) => (
           <div
             key={i}
-            className={`tmdb-required-span ${
+            className={`tmdb-required-item ${
               span.isMatched
-                ? 'tmdb-required-span-matched'
-                : 'tmdb-required-span-unmatched'
+                ? 'tmdb-required-item-matched'
+                : 'tmdb-required-item-unmatched'
             }`}
           >
-            <div className="tmdb-span-content">
+            <div className="tmdb-item-content">
               <span
                 className={`tmdb-matched-indicator ${
                   span.isMatched
@@ -2016,7 +2019,7 @@ function TraceItem<
             <span className="tmdb-chip-group-value">{trace.variant}</span>
           </div>
 
-          <div className="tmdb-chip-group tmdb-spans-group">
+          <div className="tmdb-chip-group tmdb-items-group">
             <span className="tmdb-chip-group-label">Required</span>
             <span className="tmdb-chip-group-value">
               {trace.requiredSpans.filter((s) => s.isMatched).length}/
@@ -2082,7 +2085,7 @@ function TraceItem<
             </div>
           )}
 
-          <div className="tmdb-chip-group tmdb-span-count-group">
+          <div className="tmdb-chip-group tmdb-item-count-group">
             <span className="tmdb-chip-group-label">Spans</span>
             <span className="tmdb-chip-group-value">
               {trace.totalSpanCount ?? 0}
@@ -2169,12 +2172,12 @@ function TraceItem<
                         value ? (
                           <RenderComputedSpan value={value} />
                         ) : (
-                          <span className="tmdb-computed-span-missing">
+                          <span className="tmdb-computed-item-missing">
                             missing
                           </span>
                         )
                       ) : (
-                        <span className="tmdb-computed-span-pending">
+                        <span className="tmdb-computed-item-pending">
                           pending
                         </span>
                       )}
