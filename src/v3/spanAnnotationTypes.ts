@@ -8,7 +8,7 @@ export interface SpanAnnotation {
    */
   id: string
   /**
-   * The occurrence of the span with the same name within the operation.
+   * The occurrence of the span with the same name and type within the operation.
    * Usually 1 (first span)
    */
   occurrence: number

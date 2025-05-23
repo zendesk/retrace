@@ -259,7 +259,7 @@ export function withMatchingRelations<
 }
 
 /**
- * The occurrence of the span with the same name within the operation.
+ * The occurrence of the span with the same name and type within the operation.
  */
 export function withOccurrence<
   const SelectedRelationNameT extends keyof RelationSchemasT,
