@@ -977,6 +977,14 @@ export class TraceStateMachine<
         stateTransition: onEnterStateEvent,
       })
 
+      // Complete all event observables when reaching a terminal state
+      if (isTerminalState(onEnterStateEvent.transitionToState)) {
+        this.#context.eventSubjects['state-transition'].complete()
+        this.#context.eventSubjects['required-span-seen'].complete()
+        this.#context.eventSubjects['add-span-to-recording'].complete()
+        this.#context.eventSubjects['definition-modified'].complete()
+      }
+
       return this.emit('onEnterState', onEnterStateEvent) ?? onEnterStateEvent
     }
     return undefined
