@@ -1216,7 +1216,8 @@ export class Trace<
     // all requiredSpans implicitly interrupt the trace if they error, unless explicitly ignored
     // creates interruptOnSpans for the source definition of requiredSpans
     const interruptOnRequiredErrored =
-      this.mapRequiredSpanMatchersToInterruptOnMatchers(
+      // eslint-disable-next-line @typescript-eslint/no-use-before-define
+      mapRequiredSpanMatchersToInterruptOnMatchers(
         this.definition.requiredSpans,
       )
 
@@ -1283,34 +1284,6 @@ export class Trace<
     }
   }
 
-  /**
-   * all requiredSpans implicitly interrupt the trace if they error, unless explicitly ignored
-   */
-  mapRequiredSpanMatchersToInterruptOnMatchers(
-    requiredSpans: readonly SpanMatcherFn<
-      SelectedRelationNameT,
-      RelationSchemasT,
-      VariantsT
-    >[],
-  ): readonly SpanMatcherFn<
-    SelectedRelationNameT,
-    RelationSchemasT,
-    VariantsT
-  >[] {
-    return requiredSpans.flatMap((matcher) =>
-      matcher.continueWithErrorStatus
-        ? []
-        : withAllConditions<SelectedRelationNameT, RelationSchemasT, VariantsT>(
-            matcher,
-            requiredSpanWithErrorStatus<
-              SelectedRelationNameT,
-              RelationSchemasT,
-              VariantsT
-            >(),
-          ),
-    )
-  }
-
   sideEffectFns: TraceStateMachineSideEffectHandlers<RelationSchemasT> = {
     addSpanToRecording: (spanAndAnnotation) => {
       if (!this.recordedItems.has(spanAndAnnotation)) {
@@ -1353,7 +1326,7 @@ export class Trace<
     },
   }
 
-  onEnd(
+  private onEnd(
     traceRecording: TraceRecording<SelectedRelationNameT, RelationSchemasT>,
   ): void {
     this.traceUtilities.onEndTrace(this)
@@ -1505,7 +1478,8 @@ export class Trace<
       ]
       definition.interruptOnSpans = [
         ...(definition.interruptOnSpans ?? []),
-        ...this.mapRequiredSpanMatchersToInterruptOnMatchers(
+        // eslint-disable-next-line @typescript-eslint/no-use-before-define
+        ...mapRequiredSpanMatchersToInterruptOnMatchers(
           additionalRequiredSpans,
         ),
       ]
@@ -1661,6 +1635,38 @@ export type AllPossibleTraces<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   any
 >
+
+/**
+ * all requiredSpans implicitly interrupt the trace if they error, unless explicitly ignored
+ */
+function mapRequiredSpanMatchersToInterruptOnMatchers<
+  const SelectedRelationNameT extends keyof RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+  const VariantsT extends string,
+>(
+  requiredSpans: readonly SpanMatcherFn<
+    SelectedRelationNameT,
+    RelationSchemasT,
+    VariantsT
+  >[],
+): readonly SpanMatcherFn<
+  SelectedRelationNameT,
+  RelationSchemasT,
+  VariantsT
+>[] {
+  return requiredSpans.flatMap((matcher) =>
+    matcher.continueWithErrorStatus
+      ? []
+      : withAllConditions<SelectedRelationNameT, RelationSchemasT, VariantsT>(
+          matcher,
+          requiredSpanWithErrorStatus<
+            SelectedRelationNameT,
+            RelationSchemasT,
+            VariantsT
+          >(),
+        ),
+  )
+}
 
 // TODO: if typescript gets smarter in the future, this would be a better representation of AllPossibleTraces:
 // {
