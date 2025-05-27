@@ -99,6 +99,10 @@ export const INVALID_TRACE_INTERRUPTION_REASONS = [
   'timeout',
   'draft-cancelled',
   'invalid-state-transition',
+  'parent-interrupted',
+  'child-interrupted',
+  'child-timeout',
+  'child-swap',
 ] as const
 
 export type TraceInterruptionReasonForInvalidTraces =
@@ -309,6 +313,12 @@ export interface TraceDefinition<
     RelationSchemasT,
     VariantsT
   >
+
+  /**
+   * A list of trace names that instead of interrupting the current trace,
+   * will be adopted as children of this trace.
+   */
+  adoptAsChildren?: readonly string[]
 
   /**
    * This may include renders spans of components that have to be rendered with all data

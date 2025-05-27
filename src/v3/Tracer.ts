@@ -3,7 +3,7 @@ import { ensureTimestamp } from './ensureTimestamp'
 import type { SpanMatch, SpanMatcherFn } from './matchSpan'
 import type { SpanAndAnnotation } from './spanAnnotationTypes'
 import type { DraftTraceConfig, StartTraceConfig } from './spanTypes'
-import { Trace } from './Trace'
+import { type AllPossibleTraces, Trace } from './Trace'
 import {
   type CompleteTraceDefinition,
   type ComputedSpanDefinitionInput,
@@ -15,6 +15,62 @@ import {
   type TraceModifications,
   type TransitionDraftOptions,
 } from './types'
+
+
+/**
+ * Look for an adopting parent for the given trace definition
+ */
+function lookForAdoptingParent<
+  SelectedRelationNameT extends keyof RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+  VariantsT extends string,
+>(
+  tracerDef: CompleteTraceDefinition<
+    SelectedRelationNameT,
+    RelationSchemasT,
+    VariantsT
+  >,
+  globalUtils: TraceManagerUtilities<RelationSchemasT>
+): AllPossibleTraces<RelationSchemasT> | undefined {
+  const maybeParent = globalUtils.getCurrentTrace()
+  if (!maybeParent) return undefined
+
+  return maybeParent.definition.adoptAsChildren?.includes(tracerDef.name)
+    ? maybeParent
+    : undefined
+}
+
+/**
+ * Build child-scoped trace utilities that delegate getCurrentTrace and replaceCurrentTrace
+ * to work properly with child traces while maintaining parent-child relationships
+ */
+function buildChildUtilities<RelationSchemasT extends RelationSchemasBase<RelationSchemasT>>(
+  getChildTrace: () => AllPossibleTraces<RelationSchemasT> | undefined,
+  parent: AllPossibleTraces<RelationSchemasT>,
+  globalUtils: TraceManagerUtilities<RelationSchemasT>
+): TraceManagerUtilities<RelationSchemasT> {
+  return {
+    // reporting and errors continue to use the original functions
+    ...globalUtils,
+
+    // redirect "current trace" queries to return the CHILD when asked
+    getCurrentTrace: getChildTrace,
+
+    // handle replacing the current trace in the context of parent-child relationships
+    replaceCurrentTrace(newTrace, reason) {
+      if (reason === 'another-trace-started') {
+        parent.adoptChild(newTrace) // adds to children
+      } else {
+        // For other reasons, interrupt the current child and adopt the new one
+        const currentChild = getChildTrace()
+        if (currentChild) {
+          currentChild.interrupt('child-swap') // special type of interruption that doesn't propagate up
+        }
+        parent.adoptChild(newTrace) // adds to children
+      }
+    },
+  }
+}
 
 /**
  * Tracer can create draft traces and start traces
@@ -77,22 +133,57 @@ export class Tracer<
   ): string | undefined => {
     const id = input.id ?? this.traceUtilities.generateId()
 
-    const trace = new Trace<SelectedRelationNameT, RelationSchemasT, VariantsT>(
-      {
-        definition: this.definition,
-        input: {
-          ...input,
-          // relatedTo will be overwritten later during initialization of the trace
-          relatedTo: undefined,
-          startTime: ensureTimestamp(input.startTime),
-          id,
-        },
-        definitionModifications,
-        traceUtilities: this.traceUtilities,
-      },
-    )
+    // Look for an adopting parent according to the nested proposal
+    const parent = lookForAdoptingParent(this.definition, this.traceUtilities)
 
-    this.traceUtilities.replaceCurrentTrace(trace, 'another-trace-started')
+    let trace: Trace<SelectedRelationNameT, RelationSchemasT, VariantsT>
+
+    if (parent) {
+      // Create child utilities with a getter function that will return the child trace
+      let childTrace: Trace<SelectedRelationNameT, RelationSchemasT, VariantsT> | undefined
+      const getChildTrace = () => childTrace
+      const utilities = buildChildUtilities(getChildTrace, parent, this.traceUtilities)
+
+      // Create the trace with child utilities
+      trace = new Trace<SelectedRelationNameT, RelationSchemasT, VariantsT>(
+        {
+          definition: this.definition,
+          input: {
+            ...input,
+            // relatedTo will be overwritten later during initialization of the trace
+            relatedTo: undefined,
+            startTime: ensureTimestamp(input.startTime),
+            id,
+          },
+          definitionModifications,
+          traceUtilities: utilities,
+        },
+      )
+
+      // Store reference for the getter function
+      childTrace = trace
+      
+      parent.adoptChild(trace) // F-1/F-2 behaviour
+      // trace does NOT call global replaceCurrentTrace
+    } else {
+      // Create the trace with normal utilities
+      trace = new Trace<SelectedRelationNameT, RelationSchemasT, VariantsT>(
+        {
+          definition: this.definition,
+          input: {
+            ...input,
+            // relatedTo will be overwritten later during initialization of the trace
+            relatedTo: undefined,
+            startTime: ensureTimestamp(input.startTime),
+            id,
+          },
+          definitionModifications,
+          traceUtilities: this.traceUtilities,
+        },
+      )
+
+      this.traceUtilities.replaceCurrentTrace(trace, 'another-trace-started')
+    }
 
     return id
   }
