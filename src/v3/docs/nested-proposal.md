@@ -173,3 +173,7 @@ Edge-cases:
   This can be checked when instantiating the Tracer - the definition's `adoptAsChildren` list should not include the definition's own name. Otherwise - report an error and filter out the self-nested trace name from `adoptAsChildren`.
 
 - children traces always skip the `waiting-for-interactive` state, and do not setup any timeouts for it. Children traces do not support `captureInteractive` (and if it's defined, the setting is not respected).
+
+## Other
+
+While I acknowledge that `createTraceRecording` would have to be updated to add the children, we're not going to be doing that just yet.
