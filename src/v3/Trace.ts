@@ -380,11 +380,19 @@ export class TraceStateMachine<
         return undefined
       },
 
-      onInterrupt: (reason: TraceInterruptionReason) => ({
-        transitionToState: 'interrupted',
-        interruptionReason: reason,
-        lastRelevantSpanAndAnnotation: undefined,
-      }),
+      onInterrupt: (reason: TraceInterruptionReason) => {
+        // Interrupt all children first (F-4)
+        for (const child of this.#context.children) {
+          child.interrupt('parent-interrupted')
+        }
+        this.#context.children.clear()
+
+        return {
+          transitionToState: 'interrupted',
+          interruptionReason: reason,
+          lastRelevantSpanAndAnnotation: undefined,
+        }
+      },
 
       onDeadline: (deadlineType: DeadlineType) => {
         if (deadlineType === 'global') {
@@ -395,6 +403,37 @@ export class TraceStateMachine<
           }
         }
         // other cases should never happen
+        return undefined
+      },
+
+      onChildEnd: (childTrace: AllPossibleTraces<RelationSchemasT>) => {
+        // Remove child from active children
+        this.#context.children.delete(childTrace)
+        this.#context.completedChildren.add(childTrace)
+
+        // Check if child was interrupted and handle accordingly
+        if (childTrace.stateMachine.currentState === 'interrupted') {
+          const { lastTransition } = childTrace.stateMachine
+          if (lastTransition && 'interruptionReason' in lastTransition) {
+            // Special case: child-swap doesn't propagate up
+            if (lastTransition.interruptionReason === 'child-swap') {
+              return undefined
+            }
+            
+            // Interrupt parent based on child interruption
+            const parentInterruptionReason = 
+              lastTransition.interruptionReason === 'timeout' 
+                ? 'child-timeout' 
+                : 'child-interrupted'
+            
+            return {
+              transitionToState: 'interrupted',
+              interruptionReason: parentInterruptionReason,
+              lastRelevantSpanAndAnnotation: undefined,
+            }
+          }
+        }
+
         return undefined
       },
     },
@@ -484,11 +523,19 @@ export class TraceStateMachine<
         return undefined
       },
 
-      onInterrupt: (reason: TraceInterruptionReason) => ({
-        transitionToState: 'interrupted',
-        interruptionReason: reason,
-        lastRelevantSpanAndAnnotation: this.lastRelevant,
-      }),
+      onInterrupt: (reason: TraceInterruptionReason) => {
+        // Interrupt all children first (F-4)
+        for (const child of this.#context.children) {
+          child.interrupt('parent-interrupted')
+        }
+        this.#context.children.clear()
+
+        return {
+          transitionToState: 'interrupted',
+          interruptionReason: reason,
+          lastRelevantSpanAndAnnotation: this.lastRelevant,
+        }
+      },
 
       onDeadline: (deadlineType: DeadlineType) => {
         if (deadlineType === 'global') {
@@ -499,6 +546,37 @@ export class TraceStateMachine<
           }
         }
         // other cases should never happen
+        return undefined
+      },
+
+      onChildEnd: (childTrace: AllPossibleTraces<RelationSchemasT>) => {
+        // Remove child from active children
+        this.#context.children.delete(childTrace)
+        this.#context.completedChildren.add(childTrace)
+
+        // Check if child was interrupted and handle accordingly
+        if (childTrace.stateMachine.currentState === 'interrupted') {
+          const { lastTransition } = childTrace.stateMachine
+          if (lastTransition && 'interruptionReason' in lastTransition) {
+            // Special case: child-swap doesn't propagate up
+            if (lastTransition.interruptionReason === 'child-swap') {
+              return undefined
+            }
+            
+            // Interrupt parent based on child interruption
+            const parentInterruptionReason = 
+              lastTransition.interruptionReason === 'timeout' 
+                ? 'child-timeout' 
+                : 'child-interrupted'
+            
+            return {
+              transitionToState: 'interrupted',
+              interruptionReason: parentInterruptionReason,
+              lastRelevantSpanAndAnnotation: this.lastRelevant,
+            }
+          }
+        }
+
         return undefined
       },
     },
@@ -549,6 +627,12 @@ export class TraceStateMachine<
           }
         }
         if (deadlineType === 'debounce') {
+          // Check if we have children before transitioning to complete
+          if (this.#context.children.size > 0) {
+            return {
+              transitionToState: 'waiting-for-children',
+            }
+          }
           return {
             transitionToState: 'waiting-for-interactive',
           }
@@ -650,11 +734,50 @@ export class TraceStateMachine<
         return undefined
       },
 
-      onInterrupt: (reason: TraceInterruptionReason) => ({
-        transitionToState: 'interrupted',
-        interruptionReason: reason,
-        lastRelevantSpanAndAnnotation: this.lastRelevant,
-      }),
+      onInterrupt: (reason: TraceInterruptionReason) => {
+        // Interrupt all children first (F-4)
+        for (const child of this.#context.children) {
+          child.interrupt('parent-interrupted')
+        }
+        this.#context.children.clear()
+
+        return {
+          transitionToState: 'interrupted',
+          interruptionReason: reason,
+          lastRelevantSpanAndAnnotation: this.lastRelevant,
+        }
+      },
+
+      onChildEnd: (childTrace: AllPossibleTraces<RelationSchemasT>) => {
+        // Remove child from active children
+        this.#context.children.delete(childTrace)
+        this.#context.completedChildren.add(childTrace)
+
+        // Check if child was interrupted and handle accordingly
+        if (childTrace.stateMachine.currentState === 'interrupted') {
+          const { lastTransition } = childTrace.stateMachine
+          if (lastTransition && 'interruptionReason' in lastTransition) {
+            // Special case: child-swap doesn't propagate up
+            if (lastTransition.interruptionReason === 'child-swap') {
+              return undefined
+            }
+            
+            // Interrupt parent based on child interruption
+            const parentInterruptionReason = 
+              lastTransition.interruptionReason === 'timeout' 
+                ? 'child-timeout' 
+                : 'child-interrupted'
+            
+            return {
+              transitionToState: 'interrupted',
+              interruptionReason: parentInterruptionReason,
+              lastRelevantSpanAndAnnotation: this.lastRelevant,
+            }
+          }
+        }
+
+        return undefined
+      },
     },
 
     'waiting-for-interactive': {
@@ -671,7 +794,12 @@ export class TraceStateMachine<
         this.completeSpan = this.lastRelevant
         const interactiveConfig = this.#context.definition.captureInteractive
         if (!interactiveConfig) {
-          // nothing to do in this state, move to 'complete'
+          // nothing to do in this state, check if we have children
+          if (this.#context.children.size > 0) {
+            return {
+              transitionToState: 'waiting-for-children',
+            }
+          }
           return {
             transitionToState: 'complete',
             completeSpanAndAnnotation: this.completeSpan,
@@ -733,6 +861,13 @@ export class TraceStateMachine<
 
       onDeadline: (deadlineType: DeadlineType) => {
         if (deadlineType === 'global') {
+          // Check if we have children before transitioning to complete
+          if (this.#context.children.size > 0) {
+            return {
+              transitionToState: 'waiting-for-children',
+              interruptionReason: 'timeout',
+            }
+          }
           return {
             transitionToState: 'complete',
             interruptionReason: 'timeout',
@@ -760,8 +895,12 @@ export class TraceStateMachine<
               cpuIdleMatch.entry.span.duration
 
           if (cpuIdleTimestamp && cpuIdleTimestamp <= this.#timeoutDeadline) {
-            // if we match the interactive criteria, transition to complete
-            // reference https://docs.google.com/document/d/1GGiI9-7KeY3TPqS3YT271upUVimo-XiL5mwWorDUD4c/edit
+            // if we match the interactive criteria, check if we have children
+            if (this.#context.children.size > 0) {
+              return {
+                transitionToState: 'waiting-for-children',
+              }
+            }
             return {
               transitionToState: 'complete',
               lastRequiredSpanAndAnnotation: this.lastRequiredSpan,
@@ -771,8 +910,13 @@ export class TraceStateMachine<
             }
           }
           if (deadlineType === 'interactive') {
-            // we consider this complete, because we have a complete trace
-            // it's just missing the bonus data from when the browser became "interactive"
+            // we consider this complete, but check if we have children
+            if (this.#context.children.size > 0) {
+              return {
+                transitionToState: 'waiting-for-children',
+                interruptionReason: 'timeout',
+              }
+            }
             return {
               interruptionReason: 'timeout',
               transitionToState: 'complete',
@@ -815,8 +959,12 @@ export class TraceStateMachine<
             cpuIdleMatch.entry.span.duration
 
         if (cpuIdleTimestamp && cpuIdleTimestamp <= this.#timeoutDeadline) {
-          // if we match the interactive criteria, transition to complete
-          // reference https://docs.google.com/document/d/1GGiI9-7KeY3TPqS3YT271upUVimo-XiL5mwWorDUD4c/edit
+          // if we match the interactive criteria, check if we have children
+          if (this.#context.children.size > 0) {
+            return {
+              transitionToState: 'waiting-for-children',
+            }
+          }
           return {
             transitionToState: 'complete',
             lastRequiredSpanAndAnnotation: this.lastRequiredSpan,
@@ -830,8 +978,13 @@ export class TraceStateMachine<
           spanAndAnnotation.span.startTime.epoch +
           spanAndAnnotation.span.duration
         if (spanEndTimeEpoch > this.#timeoutDeadline) {
-          // we consider this complete, because we have a complete trace
-          // it's just missing the bonus data from when the browser became "interactive"
+          // we consider this complete, but check if we have children
+          if (this.#context.children.size > 0) {
+            return {
+              transitionToState: 'waiting-for-children',
+              interruptionReason: 'timeout',
+            }
+          }
           return {
             transitionToState: 'complete',
             interruptionReason: 'timeout',
@@ -843,8 +996,13 @@ export class TraceStateMachine<
         }
 
         if (spanEndTimeEpoch > this.#interactiveDeadline) {
-          // we consider this complete, because we have a complete trace
-          // it's just missing the bonus data from when the browser became "interactive"
+          // we consider this complete, but check if we have children
+          if (this.#context.children.size > 0) {
+            return {
+              transitionToState: 'waiting-for-children',
+              interruptionReason: 'waiting-for-interactive-timeout',
+            }
+          }
           return {
             transitionToState: 'complete',
             interruptionReason: 'waiting-for-interactive-timeout',
@@ -861,6 +1019,15 @@ export class TraceStateMachine<
           for (const doesSpanMatch of this.#context.definition
             .interruptOnSpans) {
             if (doesSpanMatch(spanAndAnnotation, this.#context)) {
+              // Check if we have children before transitioning to complete
+              if (this.#context.children.size > 0) {
+                return {
+                  transitionToState: 'waiting-for-children',
+                  interruptionReason: doesSpanMatch.requiredSpan
+                    ? 'matched-on-required-span-with-error'
+                    : 'matched-on-interrupt',
+                }
+              }
               return {
                 transitionToState: 'complete',
                 interruptionReason: doesSpanMatch.requiredSpan
@@ -884,16 +1051,53 @@ export class TraceStateMachine<
         return undefined
       },
 
-      onInterrupt: (reason: TraceInterruptionReason) =>
-        // we captured a complete trace, however the interactive data is missing
-        ({
+      onInterrupt: (reason: TraceInterruptionReason) => {
+        // Interrupt all children first (F-4)
+        for (const child of this.#context.children) {
+          child.interrupt('parent-interrupted')
+        }
+        this.#context.children.clear()
+
+        return {
           transitionToState: 'complete',
           interruptionReason: reason,
           lastRequiredSpanAndAnnotation: this.lastRequiredSpan,
           completeSpanAndAnnotation: this.completeSpan,
           lastRelevantSpanAndAnnotation: this.lastRelevant,
           cpuIdleSpanAndAnnotation: undefined,
-        }),
+        }
+      },
+
+      onChildEnd: (childTrace: AllPossibleTraces<RelationSchemasT>) => {
+        // Remove child from active children
+        this.#context.children.delete(childTrace)
+        this.#context.completedChildren.add(childTrace)
+
+        // Check if child was interrupted and handle accordingly
+        if (childTrace.stateMachine.currentState === 'interrupted') {
+          const { lastTransition } = childTrace.stateMachine
+          if (lastTransition && 'interruptionReason' in lastTransition) {
+            // Special case: child-swap doesn't propagate up
+            if (lastTransition.interruptionReason === 'child-swap') {
+              return undefined
+            }
+            
+            // Interrupt parent based on child interruption
+            const parentInterruptionReason = 
+              lastTransition.interruptionReason === 'timeout' 
+                ? 'child-timeout' 
+                : 'child-interrupted'
+            
+            return {
+              transitionToState: 'interrupted',
+              interruptionReason: parentInterruptionReason,
+              lastRelevantSpanAndAnnotation: this.lastRelevant,
+            }
+          }
+        }
+
+        return undefined
+      },
     },
 
     'waiting-for-children': {
@@ -1768,6 +1972,11 @@ export class Trace<
       'onProcessSpan',
       spanAndAnnotation,
     )
+
+    // Forward span to all still-running children (F-7)
+    for (const child of this.children) {
+      child.processSpan(span)
+    }
 
     const shouldRecord =
       !transition || transition.transitionToState !== 'interrupted'
