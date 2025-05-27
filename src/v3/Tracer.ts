@@ -45,6 +45,7 @@ function lookForAdoptingParent<
  * to work properly with child traces while maintaining parent-child relationships
  */
 function buildChildUtilities<RelationSchemasT extends RelationSchemasBase<RelationSchemasT>>(
+  getChildTrace: () => AllPossibleTraces<RelationSchemasT> | undefined,
   parent: AllPossibleTraces<RelationSchemasT>,
   globalUtils: TraceManagerUtilities<RelationSchemasT>
 ): TraceManagerUtilities<RelationSchemasT> {
@@ -53,16 +54,15 @@ function buildChildUtilities<RelationSchemasT extends RelationSchemasBase<Relati
     ...globalUtils,
 
     // redirect "current trace" queries to return the CHILD when asked
-    // this allows child traces to be the "current" trace for their scope
-    getCurrentTrace: () => [...parent.children].pop() ?? parent,
+    getCurrentTrace: getChildTrace,
 
     // handle replacing the current trace in the context of parent-child relationships
     replaceCurrentTrace(newTrace, reason) {
       if (reason === 'another-trace-started') {
         parent.adoptChild(newTrace) // adds to children
       } else {
-        // For other reasons, we need to handle the replacement more carefully
-        const currentChild = [...parent.children].pop()
+        // For other reasons, interrupt the current child and adopt the new one
+        const currentChild = getChildTrace()
         if (currentChild) {
           currentChild.interrupt('child-swap') // special type of interruption that doesn't propagate up
         }
@@ -136,30 +136,52 @@ export class Tracer<
     // Look for an adopting parent according to the nested proposal
     const parent = lookForAdoptingParent(this.definition, this.traceUtilities)
 
-    // Create child utilities if this trace will be adopted
-    const utilities = parent
-      ? buildChildUtilities(parent, this.traceUtilities)
-      : this.traceUtilities
-
-    const trace = new Trace<SelectedRelationNameT, RelationSchemasT, VariantsT>(
-      {
-        definition: this.definition,
-        input: {
-          ...input,
-          // relatedTo will be overwritten later during initialization of the trace
-          relatedTo: undefined,
-          startTime: ensureTimestamp(input.startTime),
-          id,
-        },
-        definitionModifications,
-        traceUtilities: utilities,
-      },
-    )
+    let trace: Trace<SelectedRelationNameT, RelationSchemasT, VariantsT>
 
     if (parent) {
+      // Create child utilities with a getter function that will return the child trace
+      let childTrace: Trace<SelectedRelationNameT, RelationSchemasT, VariantsT> | undefined
+      const getChildTrace = () => childTrace
+      const utilities = buildChildUtilities(getChildTrace, parent, this.traceUtilities)
+
+      // Create the trace with child utilities
+      trace = new Trace<SelectedRelationNameT, RelationSchemasT, VariantsT>(
+        {
+          definition: this.definition,
+          input: {
+            ...input,
+            // relatedTo will be overwritten later during initialization of the trace
+            relatedTo: undefined,
+            startTime: ensureTimestamp(input.startTime),
+            id,
+          },
+          definitionModifications,
+          traceUtilities: utilities,
+        },
+      )
+
+      // Store reference for the getter function
+      childTrace = trace
+      
       parent.adoptChild(trace) // F-1/F-2 behaviour
       // trace does NOT call global replaceCurrentTrace
     } else {
+      // Create the trace with normal utilities
+      trace = new Trace<SelectedRelationNameT, RelationSchemasT, VariantsT>(
+        {
+          definition: this.definition,
+          input: {
+            ...input,
+            // relatedTo will be overwritten later during initialization of the trace
+            relatedTo: undefined,
+            startTime: ensureTimestamp(input.startTime),
+            id,
+          },
+          definitionModifications,
+          traceUtilities: this.traceUtilities,
+        },
+      )
+
       this.traceUtilities.replaceCurrentTrace(trace, 'another-trace-started')
     }
 

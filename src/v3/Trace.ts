@@ -150,6 +150,12 @@ interface StateHandlersBase<RelationSchemasT> {
     | (Transition<RelationSchemasT> & { transitionFromState?: never })
 }
 
+interface ChildEndEvent<RelationSchemasT extends RelationSchemasBase<RelationSchemasT>> {
+  childTrace: AllPossibleTraces<RelationSchemasT>
+  endReason: 'complete' | 'interrupted'
+  interruptionReason?: TraceInterruptionReason
+}
+
 type StatesBase<RelationSchemasT> = Record<
   TraceStates,
   StateHandlersBase<RelationSchemasT>
@@ -406,31 +412,28 @@ export class TraceStateMachine<
         return undefined
       },
 
-      onChildEnd: (childTrace: AllPossibleTraces<RelationSchemasT>) => {
+      onChildEnd: (event: ChildEndEvent<RelationSchemasT>) => {
         // Remove child from active children
-        this.#context.children.delete(childTrace)
-        this.#context.completedChildren.add(childTrace)
+        this.#context.children.delete(event.childTrace)
+        this.#context.completedChildren.add(event.childTrace)
 
         // Check if child was interrupted and handle accordingly
-        if (childTrace.stateMachine.currentState === 'interrupted') {
-          const { lastTransition } = childTrace.stateMachine
-          if (lastTransition && 'interruptionReason' in lastTransition) {
-            // Special case: child-swap doesn't propagate up
-            if (lastTransition.interruptionReason === 'child-swap') {
-              return undefined
-            }
-            
-            // Interrupt parent based on child interruption
-            const parentInterruptionReason = 
-              lastTransition.interruptionReason === 'timeout' 
-                ? 'child-timeout' 
-                : 'child-interrupted'
-            
-            return {
-              transitionToState: 'interrupted',
-              interruptionReason: parentInterruptionReason,
-              lastRelevantSpanAndAnnotation: undefined,
-            }
+        if (event.endReason === 'interrupted' && event.interruptionReason) {
+          // Special case: child-swap doesn't propagate up
+          if (event.interruptionReason === 'child-swap') {
+            return undefined
+          }
+          
+          // Interrupt parent based on child interruption
+          const parentInterruptionReason = 
+            event.interruptionReason === 'timeout' 
+              ? 'child-timeout' 
+              : 'child-interrupted'
+          
+          return {
+            transitionToState: 'interrupted',
+            interruptionReason: parentInterruptionReason,
+            lastRelevantSpanAndAnnotation: undefined,
           }
         }
 
@@ -549,31 +552,28 @@ export class TraceStateMachine<
         return undefined
       },
 
-      onChildEnd: (childTrace: AllPossibleTraces<RelationSchemasT>) => {
+      onChildEnd: (event: ChildEndEvent<RelationSchemasT>) => {
         // Remove child from active children
-        this.#context.children.delete(childTrace)
-        this.#context.completedChildren.add(childTrace)
+        this.#context.children.delete(event.childTrace)
+        this.#context.completedChildren.add(event.childTrace)
 
         // Check if child was interrupted and handle accordingly
-        if (childTrace.stateMachine.currentState === 'interrupted') {
-          const { lastTransition } = childTrace.stateMachine
-          if (lastTransition && 'interruptionReason' in lastTransition) {
-            // Special case: child-swap doesn't propagate up
-            if (lastTransition.interruptionReason === 'child-swap') {
-              return undefined
-            }
-            
-            // Interrupt parent based on child interruption
-            const parentInterruptionReason = 
-              lastTransition.interruptionReason === 'timeout' 
-                ? 'child-timeout' 
-                : 'child-interrupted'
-            
-            return {
-              transitionToState: 'interrupted',
-              interruptionReason: parentInterruptionReason,
-              lastRelevantSpanAndAnnotation: this.lastRelevant,
-            }
+        if (event.endReason === 'interrupted' && event.interruptionReason) {
+          // Special case: child-swap doesn't propagate up
+          if (event.interruptionReason === 'child-swap') {
+            return undefined
+          }
+          
+          // Interrupt parent based on child interruption
+          const parentInterruptionReason = 
+            event.interruptionReason === 'timeout' 
+              ? 'child-timeout' 
+              : 'child-interrupted'
+          
+          return {
+            transitionToState: 'interrupted',
+            interruptionReason: parentInterruptionReason,
+            lastRelevantSpanAndAnnotation: this.lastRelevant,
           }
         }
 
@@ -748,31 +748,28 @@ export class TraceStateMachine<
         }
       },
 
-      onChildEnd: (childTrace: AllPossibleTraces<RelationSchemasT>) => {
+      onChildEnd: (event: ChildEndEvent<RelationSchemasT>) => {
         // Remove child from active children
-        this.#context.children.delete(childTrace)
-        this.#context.completedChildren.add(childTrace)
+        this.#context.children.delete(event.childTrace)
+        this.#context.completedChildren.add(event.childTrace)
 
         // Check if child was interrupted and handle accordingly
-        if (childTrace.stateMachine.currentState === 'interrupted') {
-          const { lastTransition } = childTrace.stateMachine
-          if (lastTransition && 'interruptionReason' in lastTransition) {
-            // Special case: child-swap doesn't propagate up
-            if (lastTransition.interruptionReason === 'child-swap') {
-              return undefined
-            }
-            
-            // Interrupt parent based on child interruption
-            const parentInterruptionReason = 
-              lastTransition.interruptionReason === 'timeout' 
-                ? 'child-timeout' 
-                : 'child-interrupted'
-            
-            return {
-              transitionToState: 'interrupted',
-              interruptionReason: parentInterruptionReason,
-              lastRelevantSpanAndAnnotation: this.lastRelevant,
-            }
+        if (event.endReason === 'interrupted' && event.interruptionReason) {
+          // Special case: child-swap doesn't propagate up
+          if (event.interruptionReason === 'child-swap') {
+            return undefined
+          }
+          
+          // Interrupt parent based on child interruption
+          const parentInterruptionReason = 
+            event.interruptionReason === 'timeout' 
+              ? 'child-timeout' 
+              : 'child-interrupted'
+          
+          return {
+            transitionToState: 'interrupted',
+            interruptionReason: parentInterruptionReason,
+            lastRelevantSpanAndAnnotation: this.lastRelevant,
           }
         }
 
@@ -1068,31 +1065,28 @@ export class TraceStateMachine<
         }
       },
 
-      onChildEnd: (childTrace: AllPossibleTraces<RelationSchemasT>) => {
+      onChildEnd: (event: ChildEndEvent<RelationSchemasT>) => {
         // Remove child from active children
-        this.#context.children.delete(childTrace)
-        this.#context.completedChildren.add(childTrace)
+        this.#context.children.delete(event.childTrace)
+        this.#context.completedChildren.add(event.childTrace)
 
         // Check if child was interrupted and handle accordingly
-        if (childTrace.stateMachine.currentState === 'interrupted') {
-          const { lastTransition } = childTrace.stateMachine
-          if (lastTransition && 'interruptionReason' in lastTransition) {
-            // Special case: child-swap doesn't propagate up
-            if (lastTransition.interruptionReason === 'child-swap') {
-              return undefined
-            }
-            
-            // Interrupt parent based on child interruption
-            const parentInterruptionReason = 
-              lastTransition.interruptionReason === 'timeout' 
-                ? 'child-timeout' 
-                : 'child-interrupted'
-            
-            return {
-              transitionToState: 'interrupted',
-              interruptionReason: parentInterruptionReason,
-              lastRelevantSpanAndAnnotation: this.lastRelevant,
-            }
+        if (event.endReason === 'interrupted' && event.interruptionReason) {
+          // Special case: child-swap doesn't propagate up
+          if (event.interruptionReason === 'child-swap') {
+            return undefined
+          }
+          
+          // Interrupt parent based on child interruption
+          const parentInterruptionReason = 
+            event.interruptionReason === 'timeout' 
+              ? 'child-timeout' 
+              : 'child-interrupted'
+          
+          return {
+            transitionToState: 'interrupted',
+            interruptionReason: parentInterruptionReason,
+            lastRelevantSpanAndAnnotation: this.lastRelevant,
           }
         }
 
@@ -1116,32 +1110,29 @@ export class TraceStateMachine<
         return undefined
       },
 
-      onChildEnd: (childTrace: AllPossibleTraces<RelationSchemasT>) => {
+      onChildEnd: (event: ChildEndEvent<RelationSchemasT>) => {
         // Remove child from active children
-        this.#context.children.delete(childTrace)
-        this.#context.completedChildren.add(childTrace)
+        this.#context.children.delete(event.childTrace)
+        this.#context.completedChildren.add(event.childTrace)
 
         // Check if child was interrupted and handle accordingly
-        if (childTrace.stateMachine.currentState === 'interrupted') {
-          const { lastTransition } = childTrace.stateMachine
-          if (lastTransition && 'interruptionReason' in lastTransition) {
-            // Special case: child-swap doesn't propagate up
-            if (lastTransition.interruptionReason === 'child-swap') {
-              // No-op, just remove the child
-              return undefined
-            }
-            
-            // Interrupt parent based on child interruption
-            const parentInterruptionReason = 
-              lastTransition.interruptionReason === 'timeout' 
-                ? 'child-timeout' 
-                : 'child-interrupted'
-            
-            return {
-              transitionToState: 'interrupted',
-              interruptionReason: parentInterruptionReason,
-              lastRelevantSpanAndAnnotation: this.lastRelevant,
-            }
+        if (event.endReason === 'interrupted' && event.interruptionReason) {
+          // Special case: child-swap doesn't propagate up
+          if (event.interruptionReason === 'child-swap') {
+            // No-op, just remove the child
+            return undefined
+          }
+          
+          // Interrupt parent based on child interruption
+          const parentInterruptionReason = 
+            event.interruptionReason === 'timeout' 
+              ? 'child-timeout' 
+              : 'child-interrupted'
+          
+          return {
+            transitionToState: 'interrupted',
+            interruptionReason: parentInterruptionReason,
+            lastRelevantSpanAndAnnotation: this.lastRelevant,
           }
         }
 
@@ -1164,20 +1155,7 @@ export class TraceStateMachine<
       ) => {
         this.sideEffectFns.addSpanToRecording(spanAndAnnotation)
 
-        // Update lastRelevant if this span ends later
-        const spanEndTime =
-          spanAndAnnotation.span.startTime.epoch +
-          spanAndAnnotation.span.duration
-        const lastRelevantEndTime = this.lastRelevant
-          ? this.lastRelevant.span.startTime.epoch +
-            this.lastRelevant.span.duration
-          : 0
-
-        if (spanEndTime > lastRelevantEndTime) {
-          this.lastRelevant = spanAndAnnotation
-        }
-
-        // Forward span to all children
+        // Forward span to all children (but don't update lastRelevant in waiting-for-children)
         for (const child of this.#context.children) {
           child.processSpan(spanAndAnnotation.span)
         }
@@ -1416,14 +1394,26 @@ export class Trace<
     childTrace.when('state-transition').subscribe((event) => {
       if (event.stateTransition.transitionToState === 'complete' || 
           event.stateTransition.transitionToState === 'interrupted') {
-        this.onChildEnd(childTrace)
+        const endReason = event.stateTransition.transitionToState
+        const interruptionReason = endReason === 'interrupted' && 'interruptionReason' in event.stateTransition 
+          ? event.stateTransition.interruptionReason 
+          : undefined
+        this.onChildEnd(childTrace, endReason, interruptionReason)
       }
     })
   }
 
-  private onChildEnd(childTrace: AllPossibleTraces<RelationSchemasT>): void {
+  private onChildEnd(
+    childTrace: AllPossibleTraces<RelationSchemasT>, 
+    endReason: 'complete' | 'interrupted',
+    interruptionReason?: TraceInterruptionReason
+  ): void {
     // Emit the onChildEnd event to the state machine
-    this.stateMachine.emit('onChildEnd', childTrace)
+    this.stateMachine.emit('onChildEnd', {
+      childTrace,
+      endReason,
+      interruptionReason,
+    })
   }
 
   // Method to check if this trace can adopt a child with the given name

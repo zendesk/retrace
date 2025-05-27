@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { States, TraceStates } from './Trace'
+import type { RelationSchemasBase } from './types'
 
 export type DistributiveOmit<T, K extends keyof any> = T extends T
   ? Omit<T, K>
@@ -115,7 +116,7 @@ export type UnionToIntersection<U> = (
 
 type HandlerToPayloadTuples<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
   State extends TraceStates = TraceStates,
 > = State extends State
@@ -144,7 +145,7 @@ type TupleToObject2<T extends [PropertyKey, any, any]> = Prettify<{
 
 export type StateHandlerPayloads<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > = TupleToObject<
   HandlerToPayloadTuples<SelectedRelationNameT, RelationSchemasT, VariantsT>
@@ -152,7 +153,7 @@ export type StateHandlerPayloads<
 
 export type StateHandlerReturnTypes<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > = TupleToObject2<
   HandlerToPayloadTuples<SelectedRelationNameT, RelationSchemasT, VariantsT>
@@ -160,7 +161,7 @@ export type StateHandlerReturnTypes<
 
 export type MergedStateHandlerMethods<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > = {
   [K in keyof StateHandlerPayloads<
