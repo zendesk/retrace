@@ -66,6 +66,7 @@ export type NonTerminalTraceStates =
   | 'active'
   | 'debouncing'
   | 'waiting-for-interactive'
+  | 'waiting-for-children'
 export const TERMINAL_STATES = ['interrupted', 'complete'] as const
 type TerminalTraceStates = (typeof TERMINAL_STATES)[number]
 export type TraceStates = NonTerminalTraceStates | TerminalTraceStates
@@ -106,6 +107,11 @@ interface OnEnterWaitingForInteractive {
   transitionFromState: NonTerminalTraceStates
 }
 
+interface OnEnterWaitingForChildren {
+  transitionToState: 'waiting-for-children'
+  transitionFromState: NonTerminalTraceStates
+}
+
 interface OnEnterDebouncing {
   transitionToState: 'debouncing'
   transitionFromState: NonTerminalTraceStates
@@ -117,6 +123,7 @@ export type OnEnterStatePayload<RelationSchemasT> =
   | OnEnterComplete<RelationSchemasT>
   | OnEnterDebouncing
   | OnEnterWaitingForInteractive
+  | OnEnterWaitingForChildren
 
 export type Transition<RelationSchemasT> = DistributiveOmit<
   OnEnterStatePayload<RelationSchemasT>,
@@ -125,7 +132,7 @@ export type Transition<RelationSchemasT> = DistributiveOmit<
 
 export type States<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > = TraceStateMachine<
   SelectedRelationNameT,
@@ -163,7 +170,7 @@ type EntryType<RelationSchemasT> = PerformanceEntryLike & {
 
 interface StateMachineContext<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > extends DraftTraceContext<
     SelectedRelationNameT,
@@ -171,6 +178,8 @@ interface StateMachineContext<
     VariantsT
   > {
   sideEffectFns: TraceStateMachineSideEffectHandlers<RelationSchemasT>
+  children: Set<AllPossibleTraces<RelationSchemasT>>
+  completedChildren: Set<AllPossibleTraces<RelationSchemasT>>
   eventSubjects: {
     'state-transition': Subject<
       StateTransitionEvent<SelectedRelationNameT, RelationSchemasT, VariantsT>
@@ -199,7 +208,7 @@ type DeadlineType = 'global' | 'debounce' | 'interactive' | 'next-quiet-window'
 
 export class TraceStateMachine<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 > {
   constructor(
@@ -222,6 +231,7 @@ export class TraceStateMachine<
     RelationSchemasT,
     VariantsT
   >
+  lastTransition: OnEnterStatePayload<RelationSchemasT> | undefined
   get sideEffectFns() {
     return this.#context.sideEffectFns
   }
@@ -886,6 +896,123 @@ export class TraceStateMachine<
         }),
     },
 
+    'waiting-for-children': {
+      onEnterState: (_payload: OnEnterWaitingForChildren) => {
+        // If we have no children, transition to complete immediately
+        if (this.#context.children.size === 0) {
+          return {
+            transitionToState: 'complete',
+            completeSpanAndAnnotation: this.completeSpan,
+            cpuIdleSpanAndAnnotation: undefined,
+            lastRequiredSpanAndAnnotation: this.lastRequiredSpan,
+            lastRelevantSpanAndAnnotation: this.lastRelevant,
+          }
+        }
+        // Otherwise, wait for children to complete
+        return undefined
+      },
+
+      onChildEnd: (childTrace: AllPossibleTraces<RelationSchemasT>) => {
+        // Remove child from active children
+        this.#context.children.delete(childTrace)
+        this.#context.completedChildren.add(childTrace)
+
+        // Check if child was interrupted and handle accordingly
+        if (childTrace.stateMachine.currentState === 'interrupted') {
+          const { lastTransition } = childTrace.stateMachine
+          if (lastTransition && 'interruptionReason' in lastTransition) {
+            // Special case: child-swap doesn't propagate up
+            if (lastTransition.interruptionReason === 'child-swap') {
+              // No-op, just remove the child
+              return undefined
+            }
+            
+            // Interrupt parent based on child interruption
+            const parentInterruptionReason = 
+              lastTransition.interruptionReason === 'timeout' 
+                ? 'child-timeout' 
+                : 'child-interrupted'
+            
+            return {
+              transitionToState: 'interrupted',
+              interruptionReason: parentInterruptionReason,
+              lastRelevantSpanAndAnnotation: this.lastRelevant,
+            }
+          }
+        }
+
+        // If all children are done, transition to complete
+        if (this.#context.children.size === 0) {
+          return {
+            transitionToState: 'complete',
+            completeSpanAndAnnotation: this.completeSpan,
+            cpuIdleSpanAndAnnotation: undefined,
+            lastRequiredSpanAndAnnotation: this.lastRequiredSpan,
+            lastRelevantSpanAndAnnotation: this.lastRelevant,
+          }
+        }
+
+        return undefined
+      },
+
+      onProcessSpan: (
+        spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>,
+      ) => {
+        this.sideEffectFns.addSpanToRecording(spanAndAnnotation)
+
+        // Update lastRelevant if this span ends later
+        const spanEndTime =
+          spanAndAnnotation.span.startTime.epoch +
+          spanAndAnnotation.span.duration
+        const lastRelevantEndTime = this.lastRelevant
+          ? this.lastRelevant.span.startTime.epoch +
+            this.lastRelevant.span.duration
+          : 0
+
+        if (spanEndTime > lastRelevantEndTime) {
+          this.lastRelevant = spanAndAnnotation
+        }
+
+        // Forward span to all children
+        for (const child of this.#context.children) {
+          child.processSpan(spanAndAnnotation.span)
+        }
+
+        return undefined
+      },
+
+      onInterrupt: (reason: TraceInterruptionReason) => {
+        // Interrupt all children first
+        for (const child of this.#context.children) {
+          child.interrupt('parent-interrupted')
+        }
+        this.#context.children.clear()
+
+        return {
+          transitionToState: 'interrupted',
+          interruptionReason: reason,
+          lastRelevantSpanAndAnnotation: this.lastRelevant,
+        }
+      },
+
+      onDeadline: (deadlineType: DeadlineType) => {
+        if (deadlineType === 'global') {
+          // Interrupt all children first
+          for (const child of this.#context.children) {
+            child.interrupt('parent-interrupted')
+          }
+          this.#context.children.clear()
+
+          return {
+            transitionToState: 'interrupted',
+            interruptionReason: 'timeout',
+            lastRelevantSpanAndAnnotation: this.lastRelevant,
+          }
+        }
+        return undefined
+      },
+    },
+
     // terminal states:
     interrupted: {
       onEnterState: (transition: OnEnterInterrupted<RelationSchemasT>) => {
@@ -970,6 +1097,9 @@ export class TraceStateMachine<
         ...transitionPayload,
         transitionFromState,
       }
+
+      // Store the transition for child trace management
+      this.lastTransition = onEnterStateEvent
 
       // Emit state transition event for debugging
       this.#context.eventSubjects['state-transition'].next({
@@ -1068,6 +1198,34 @@ export class Trace<
     RelationSchemasT,
     VariantsT
   >
+
+  // Child trace management
+  children: Set<AllPossibleTraces<RelationSchemasT>> = new Set()
+  completedChildren: Set<AllPossibleTraces<RelationSchemasT>> = new Set()
+
+  // Child trace management methods
+  adoptChild(childTrace: AllPossibleTraces<RelationSchemasT>): void {
+    // Add child to the children set
+    this.children.add(childTrace)
+    
+    // Set up child end handler to notify parent when child completes
+    childTrace.when('state-transition').subscribe((event) => {
+      if (event.stateTransition.transitionToState === 'complete' || 
+          event.stateTransition.transitionToState === 'interrupted') {
+        this.onChildEnd(childTrace)
+      }
+    })
+  }
+
+  private onChildEnd(childTrace: AllPossibleTraces<RelationSchemasT>): void {
+    // Emit the onChildEnd event to the state machine
+    this.stateMachine.emit('onChildEnd', childTrace)
+  }
+
+  // Method to check if this trace can adopt a child with the given name
+  canAdoptChild(childTraceName: string): boolean {
+    return this.definition.adoptAsChildren?.includes(childTraceName) ?? false
+  }
 
   // debugging observables
   eventSubjects = {
@@ -1276,6 +1434,9 @@ export class Trace<
     )
 
     // definition is now set, we can initialize the state machine
+    // note that TraceStateMachine constructor is being called with `this` for a reason 
+    // we want to pass in the whole `Trace` object, but actually expose only some of its properties 
+    // that's what the `StateMachineContext` interface is if you look carefully
     this.stateMachine = new TraceStateMachine(this)
 
     if ('importFrom' in data) {
@@ -1329,6 +1490,9 @@ export class Trace<
         this.processedPerformanceEntries = new WeakMap()
         // @ts-expect-error memory cleanup force override the otherwise readonly property
         this.recordedItemsByLabel = {}
+        // Clear child references for garbage collection
+        this.children.clear()
+        this.completedChildren.clear()
         this.traceUtilities.performanceEntryDeduplicationStrategy?.reset()
       }
     },
