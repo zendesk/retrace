@@ -1,4 +1,4 @@
-import React from 'react'
+import * as React from 'react'
 import type { Meta, StoryObj } from '@storybook/react'
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { useScreenSize } from '@visx/responsive'
