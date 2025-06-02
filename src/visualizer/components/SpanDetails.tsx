@@ -1,5 +1,5 @@
 /* eslint-disable import/no-extraneous-dependencies */
-import React from 'react'
+import * as React from 'react'
 import styled from 'styled-components'
 import { Sheet } from '@zendeskgarden/react-chrome'
 import { getColor } from '@zendeskgarden/react-theming'

@@ -1,7 +1,7 @@
 /* eslint-disable no-magic-numbers */
 /* eslint-disable import/no-extraneous-dependencies */
 
-import React from 'react'
+import * as React from 'react'
 import styled, { useTheme } from 'styled-components'
 import { Annotation, Label } from '@visx/annotation'
 import { localPoint } from '@visx/event'
