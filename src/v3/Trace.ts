@@ -165,7 +165,7 @@ interface TraceStateMachineSideEffectHandlers<RelationSchemasT> {
   readonly addSpanToRecording: (
     spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>,
   ) => void
-  readonly prepareAndEmitRecording: (
+  readonly onTerminalStateReached: (
     transition: OnEnterStatePayload<RelationSchemasT>,
   ) => void
 }
@@ -185,7 +185,7 @@ interface StateMachineContext<
   > {
   sideEffectFns: TraceStateMachineSideEffectHandlers<RelationSchemasT>
   children: Set<AllPossibleTraces<RelationSchemasT>>
-  completedChildren: Set<AllPossibleTraces<RelationSchemasT>>
+  terminalStateChildren: Set<AllPossibleTraces<RelationSchemasT>>
   eventSubjects: {
     'state-transition': Subject<
       StateTransitionEvent<SelectedRelationNameT, RelationSchemasT, VariantsT>
@@ -385,19 +385,11 @@ export class TraceStateMachine<
         return undefined
       },
 
-      onInterrupt: (reason: TraceInterruptionReason) => {
-        // Interrupt all children first (F-4)
-        for (const child of this.#context.children) {
-          child.interrupt('parent-interrupted')
-        }
-        this.#context.children.clear()
-
-        return {
-          transitionToState: 'interrupted',
-          interruptionReason: reason,
-          lastRelevantSpanAndAnnotation: undefined,
-        }
-      },
+      onInterrupt: (reason: TraceInterruptionReason) => ({
+        transitionToState: 'interrupted',
+        interruptionReason: reason,
+        lastRelevantSpanAndAnnotation: undefined,
+      }),
 
       onDeadline: (deadlineType: DeadlineType) => {
         if (deadlineType === 'global') {
@@ -414,7 +406,7 @@ export class TraceStateMachine<
       onChildEnd: (event: ChildEndEvent<RelationSchemasT>) => {
         // Remove child from active children
         this.#context.children.delete(event.childTrace)
-        this.#context.completedChildren.add(event.childTrace)
+        this.#context.terminalStateChildren.add(event.childTrace)
 
         // Check if child was interrupted and handle accordingly
         if (event.endReason === 'interrupted' && event.interruptionReason) {
@@ -554,7 +546,7 @@ export class TraceStateMachine<
       onChildEnd: (event: ChildEndEvent<RelationSchemasT>) => {
         // Remove child from active children
         this.#context.children.delete(event.childTrace)
-        this.#context.completedChildren.add(event.childTrace)
+        this.#context.terminalStateChildren.add(event.childTrace)
 
         // Check if child was interrupted and handle accordingly
         if (event.endReason === 'interrupted' && event.interruptionReason) {
@@ -738,6 +730,7 @@ export class TraceStateMachine<
         for (const child of this.#context.children) {
           child.interrupt('parent-interrupted')
         }
+        // TODO: maybe not needed to clear here?
         this.#context.children.clear()
 
         return {
@@ -750,7 +743,7 @@ export class TraceStateMachine<
       onChildEnd: (event: ChildEndEvent<RelationSchemasT>) => {
         // Remove child from active children
         this.#context.children.delete(event.childTrace)
-        this.#context.completedChildren.add(event.childTrace)
+        this.#context.terminalStateChildren.add(event.childTrace)
 
         // Check if child was interrupted and handle accordingly
         if (event.endReason === 'interrupted' && event.interruptionReason) {
@@ -857,13 +850,7 @@ export class TraceStateMachine<
 
       onDeadline: (deadlineType: DeadlineType) => {
         if (deadlineType === 'global') {
-          // Check if we have children before transitioning to complete
-          if (this.#context.children.size > 0) {
-            return {
-              transitionToState: 'waiting-for-children',
-              interruptionReason: 'timeout',
-            }
-          }
+          // a global timeout will interrupt any children traces
           return {
             transitionToState: 'complete',
             interruptionReason: 'timeout',
@@ -891,12 +878,6 @@ export class TraceStateMachine<
               cpuIdleMatch.entry.span.duration
 
           if (cpuIdleTimestamp && cpuIdleTimestamp <= this.#timeoutDeadline) {
-            // check if we have children
-            if (this.#context.children.size > 0) {
-              return {
-                transitionToState: 'waiting-for-children',
-              }
-            }
             // if we match the interactive criteria, transition to complete
             // reference https://docs.google.com/document/d/1GGiI9-7KeY3TPqS3YT271upUVimo-XiL5mwWorDUD4c/edit
             return {
@@ -908,13 +889,6 @@ export class TraceStateMachine<
             }
           }
           if (deadlineType === 'interactive') {
-            // check if we have children
-            if (this.#context.children.size > 0) {
-              return {
-                transitionToState: 'waiting-for-children',
-                interruptionReason: 'timeout',
-              }
-            }
             // we consider this complete, because we have a complete trace
             // it's just missing the bonus data from when the browser became "interactive"
             return {
@@ -1078,7 +1052,7 @@ export class TraceStateMachine<
       onChildEnd: (event: ChildEndEvent<RelationSchemasT>) => {
         // Remove child from active children
         this.#context.children.delete(event.childTrace)
-        this.#context.completedChildren.add(event.childTrace)
+        this.#context.terminalStateChildren.add(event.childTrace)
 
         // Check if child was interrupted and handle accordingly
         if (event.endReason === 'interrupted' && event.interruptionReason) {
@@ -1123,7 +1097,7 @@ export class TraceStateMachine<
       onChildEnd: (event: ChildEndEvent<RelationSchemasT>) => {
         // Remove child from active children
         this.#context.children.delete(event.childTrace)
-        this.#context.completedChildren.add(event.childTrace)
+        this.#context.terminalStateChildren.add(event.childTrace)
 
         // Check if child was interrupted and handle accordingly
         if (event.endReason === 'interrupted' && event.interruptionReason) {
@@ -1229,7 +1203,13 @@ export class TraceStateMachine<
           return
         }
 
-        this.sideEffectFns.prepareAndEmitRecording(transition)
+        // Interrupt all children
+        for (const child of this.#context.children) {
+          child.interrupt('parent-interrupted')
+        }
+        // TODO: ensure all children are ended/terminal in case of interruption?
+
+        this.sideEffectFns.onTerminalStateReached(transition)
       },
     },
 
@@ -1252,7 +1232,7 @@ export class TraceStateMachine<
           cpuIdleSpanAndAnnotation.annotation.markedPageInteractive = true
         }
 
-        this.sideEffectFns.prepareAndEmitRecording(transition)
+        this.sideEffectFns.onTerminalStateReached(transition)
       },
     },
   } satisfies StatesBase<RelationSchemasT>
@@ -1390,7 +1370,7 @@ export class Trace<
 
   // Child trace management
   children: Set<AllPossibleTraces<RelationSchemasT>> = new Set()
-  completedChildren: Set<AllPossibleTraces<RelationSchemasT>> = new Set()
+  terminalStateChildren: Set<AllPossibleTraces<RelationSchemasT>> = new Set()
 
   // Child trace management methods
   adoptChild(childTrace: AllPossibleTraces<RelationSchemasT>): void {
@@ -1642,6 +1622,13 @@ export class Trace<
       this.occurrenceCounters = data.importFrom.occurrenceCounters
       this.processedPerformanceEntries =
         data.importFrom.processedPerformanceEntries
+
+      // transplant children:
+      for (const child of data.importFrom.children) {
+        this.adoptChild(child)
+      }
+      // transplant the record of terminal state children:
+      this.terminalStateChildren = data.importFrom.terminalStateChildren
     }
   }
 
@@ -1658,7 +1645,7 @@ export class Trace<
         })
       }
     },
-    prepareAndEmitRecording: (transition) => {
+    onTerminalStateReached: (transition) => {
       if (
         transition.transitionToState === 'interrupted' ||
         transition.transitionToState === 'complete'
@@ -1682,9 +1669,10 @@ export class Trace<
         this.processedPerformanceEntries = new WeakMap()
         // @ts-expect-error memory cleanup force override the otherwise readonly property
         this.recordedItemsByLabel = {}
+
         // Clear child references for garbage collection
         this.children.clear()
-        this.completedChildren.clear()
+        this.terminalStateChildren.clear()
         this.traceUtilities.performanceEntryDeduplicationStrategy?.reset()
       }
     },

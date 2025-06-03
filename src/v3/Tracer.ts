@@ -74,6 +74,36 @@ function buildChildUtilities<
 }
 
 /**
+ * Recursively search for a child trace with the specified definition
+ */
+function findChildWithDefinition<
+  SelectedRelationNameT extends keyof RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+  VariantsT extends string,
+>(
+  trace: AllPossibleTraces<RelationSchemasT>,
+  targetDefinition: CompleteTraceDefinition<
+    SelectedRelationNameT,
+    RelationSchemasT,
+    VariantsT
+  >,
+): Trace<SelectedRelationNameT, RelationSchemasT, VariantsT> | undefined {
+  for (const child of trace.children) {
+    if (child.sourceDefinition === targetDefinition) {
+      return child as Trace<SelectedRelationNameT, RelationSchemasT, VariantsT>
+    }
+
+    // Recursively search in grandchildren
+    const found = findChildWithDefinition(child, targetDefinition)
+    if (found) {
+      return found
+    }
+  }
+
+  return undefined
+}
+
+/**
  * Tracer can create draft traces and start traces
  */
 export class Tracer<
@@ -173,6 +203,7 @@ export class Tracer<
           relatedTo: undefined,
           startTime: ensureTimestamp(input.startTime),
           id,
+          parentId: parent.input.id,
         },
         definitionModifications,
         traceUtilities: utilities,
@@ -275,25 +306,48 @@ export class Tracer<
     trace.transitionDraftToActive(inputAndDefinitionModifications, opts)
   }
 
-  getCurrentTrace = ():
-    | DraftTraceContext<SelectedRelationNameT, RelationSchemasT, VariantsT>
+  private getCurrentTraceInternal = ():
+    | Trace<SelectedRelationNameT, RelationSchemasT, VariantsT>
     | undefined => {
-    const trace = this.traceUtilities.getCurrentTrace()
-    if (!trace || trace.sourceDefinition !== this.definition) {
+    const rootTrace = this.traceUtilities.getCurrentTrace()
+    if (!rootTrace) {
       return undefined
     }
-    return trace
+
+    // verify that trace is the same definition as the Tracer's definition
+    if (rootTrace.sourceDefinition === this.definition) {
+      return rootTrace
+    }
+
+    const foundChild = findChildWithDefinition(rootTrace, this.definition)
+    if (foundChild) {
+      return foundChild
+    }
+
+    return undefined
   }
+
+  /**
+   * @returns The current Trace's context if it exists anywhere in the trace tree,
+   * and matches the Tracer's definition.
+   */
+  getCurrentTrace = ():
+    | DraftTraceContext<SelectedRelationNameT, RelationSchemasT, VariantsT>
+    | undefined => this.getCurrentTraceInternal()
 
   // same as getCurrentTrace, but with a warning if no trace or a different trace is found
   private getCurrentTraceOrWarn = ():
     | Trace<SelectedRelationNameT, RelationSchemasT, VariantsT>
     | undefined => {
-      const rootTrace:
-        | Trace<SelectedRelationNameT, RelationSchemasT, VariantsT>
-        | undefined = this.traceUtilities.getCurrentTrace()
+      const trace = this.getCurrentTraceInternal()
 
+      if (trace) {
+        return trace
+      }
+
+      const rootTrace = this.traceUtilities.getCurrentTrace()
       if (!rootTrace) {
+        // No active trace at all
         this.traceUtilities.reportWarningFn(
           new Error(
             `No current active trace when initializing a trace. Call tracer.start(...) or tracer.createDraft(...) beforehand.`,
@@ -306,20 +360,9 @@ export class Tracer<
         return undefined
       }
 
-      // verify that trace is the same definition as the Tracer's definition
-      if (rootTrace.sourceDefinition === this.definition) {
-        return rootTrace
-      }
-
-      for (const child of rootTrace.children) {
-        if (child.sourceDefinition === this.definition) {
-          return child
-        }
-      }
-
       this.traceUtilities.reportWarningFn(
         new Error(
-          `Trying to interrupt '${this.definition.name}' trace, however the started trace (${rootTrace.sourceDefinition.name}) has a different definition`,
+          `Trying to find an active '${this.definition.name}' trace, however the started root trace (${rootTrace.sourceDefinition.name}) has a different definition`,
         ),
         { definition: this.definition } as Partial<
           // eslint-disable-next-line @typescript-eslint/no-explicit-any

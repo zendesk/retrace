@@ -207,7 +207,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
 
   describe('Memory Management (F-8)', () => {
     it.todo(
-      'should clear children and completedChildren sets in prepareAndEmitRecording',
+      'should clear children and completedChildren sets in onTerminalStateReached',
     )
 
     it.todo('should not create memory leaks with parent-child references')
