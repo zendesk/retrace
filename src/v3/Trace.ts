@@ -237,7 +237,6 @@ export class TraceStateMachine<
     RelationSchemasT,
     VariantsT
   >
-  lastTransition: OnEnterStatePayload<RelationSchemasT> | undefined
   get sideEffectFns() {
     return this.#context.sideEffectFns
   }
@@ -423,13 +422,13 @@ export class TraceStateMachine<
           if (event.interruptionReason === 'child-swap') {
             return undefined
           }
-          
+
           // Interrupt parent based on child interruption
-          const parentInterruptionReason = 
-            event.interruptionReason === 'timeout' 
-              ? 'child-timeout' 
+          const parentInterruptionReason =
+            event.interruptionReason === 'timeout'
+              ? 'child-timeout'
               : 'child-interrupted'
-          
+
           return {
             transitionToState: 'interrupted',
             interruptionReason: parentInterruptionReason,
@@ -563,13 +562,13 @@ export class TraceStateMachine<
           if (event.interruptionReason === 'child-swap') {
             return undefined
           }
-          
+
           // Interrupt parent based on child interruption
-          const parentInterruptionReason = 
-            event.interruptionReason === 'timeout' 
-              ? 'child-timeout' 
+          const parentInterruptionReason =
+            event.interruptionReason === 'timeout'
+              ? 'child-timeout'
               : 'child-interrupted'
-          
+
           return {
             transitionToState: 'interrupted',
             interruptionReason: parentInterruptionReason,
@@ -759,13 +758,13 @@ export class TraceStateMachine<
           if (event.interruptionReason === 'child-swap') {
             return undefined
           }
-          
+
           // Interrupt parent based on child interruption
-          const parentInterruptionReason = 
-            event.interruptionReason === 'timeout' 
-              ? 'child-timeout' 
+          const parentInterruptionReason =
+            event.interruptionReason === 'timeout'
+              ? 'child-timeout'
               : 'child-interrupted'
-          
+
           return {
             transitionToState: 'interrupted',
             interruptionReason: parentInterruptionReason,
@@ -892,12 +891,14 @@ export class TraceStateMachine<
               cpuIdleMatch.entry.span.duration
 
           if (cpuIdleTimestamp && cpuIdleTimestamp <= this.#timeoutDeadline) {
-            // if we match the interactive criteria, check if we have children
+            // check if we have children
             if (this.#context.children.size > 0) {
               return {
                 transitionToState: 'waiting-for-children',
               }
             }
+            // if we match the interactive criteria, transition to complete
+            // reference https://docs.google.com/document/d/1GGiI9-7KeY3TPqS3YT271upUVimo-XiL5mwWorDUD4c/edit
             return {
               transitionToState: 'complete',
               lastRequiredSpanAndAnnotation: this.lastRequiredSpan,
@@ -907,13 +908,15 @@ export class TraceStateMachine<
             }
           }
           if (deadlineType === 'interactive') {
-            // we consider this complete, but check if we have children
+            // check if we have children
             if (this.#context.children.size > 0) {
               return {
                 transitionToState: 'waiting-for-children',
                 interruptionReason: 'timeout',
               }
             }
+            // we consider this complete, because we have a complete trace
+            // it's just missing the bonus data from when the browser became "interactive"
             return {
               interruptionReason: 'timeout',
               transitionToState: 'complete',
@@ -956,12 +959,14 @@ export class TraceStateMachine<
             cpuIdleMatch.entry.span.duration
 
         if (cpuIdleTimestamp && cpuIdleTimestamp <= this.#timeoutDeadline) {
-          // if we match the interactive criteria, check if we have children
+          // check if we have children
           if (this.#context.children.size > 0) {
             return {
               transitionToState: 'waiting-for-children',
             }
           }
+          // if we match the interactive criteria, transition to complete
+          // reference https://docs.google.com/document/d/1GGiI9-7KeY3TPqS3YT271upUVimo-XiL5mwWorDUD4c/edit
           return {
             transitionToState: 'complete',
             lastRequiredSpanAndAnnotation: this.lastRequiredSpan,
@@ -982,6 +987,8 @@ export class TraceStateMachine<
               interruptionReason: 'timeout',
             }
           }
+          // we consider this complete, because we have a complete trace
+          // it's just missing the bonus data from when the browser became "interactive"
           return {
             transitionToState: 'complete',
             interruptionReason: 'timeout',
@@ -993,13 +1000,15 @@ export class TraceStateMachine<
         }
 
         if (spanEndTimeEpoch > this.#interactiveDeadline) {
-          // we consider this complete, but check if we have children
+          // check if we have children
           if (this.#context.children.size > 0) {
             return {
               transitionToState: 'waiting-for-children',
               interruptionReason: 'waiting-for-interactive-timeout',
             }
           }
+          // we consider this complete, because we have a complete trace
+          // it's just missing the bonus data from when the browser became "interactive"
           return {
             transitionToState: 'complete',
             interruptionReason: 'waiting-for-interactive-timeout',
@@ -1055,6 +1064,7 @@ export class TraceStateMachine<
         }
         this.#context.children.clear()
 
+        // we captured a complete trace, however the interactive data is missing
         return {
           transitionToState: 'complete',
           interruptionReason: reason,
@@ -1076,13 +1086,13 @@ export class TraceStateMachine<
           if (event.interruptionReason === 'child-swap') {
             return undefined
           }
-          
+
           // Interrupt parent based on child interruption
-          const parentInterruptionReason = 
-            event.interruptionReason === 'timeout' 
-              ? 'child-timeout' 
+          const parentInterruptionReason =
+            event.interruptionReason === 'timeout'
+              ? 'child-timeout'
               : 'child-interrupted'
-          
+
           return {
             transitionToState: 'interrupted',
             interruptionReason: parentInterruptionReason,
@@ -1122,13 +1132,13 @@ export class TraceStateMachine<
             // No-op, just remove the child
             return undefined
           }
-          
+
           // Interrupt parent based on child interruption
-          const parentInterruptionReason = 
-            event.interruptionReason === 'timeout' 
-              ? 'child-timeout' 
+          const parentInterruptionReason =
+            event.interruptionReason === 'timeout'
+              ? 'child-timeout'
               : 'child-interrupted'
-          
+
           return {
             transitionToState: 'interrupted',
             interruptionReason: parentInterruptionReason,
@@ -1280,9 +1290,6 @@ export class TraceStateMachine<
         transitionFromState,
       }
 
-      // Store the transition for child trace management
-      this.lastTransition = onEnterStateEvent
-
       // Emit state transition event for debugging
       this.#context.eventSubjects['state-transition'].next({
         traceContext: this.#context,
@@ -1314,7 +1321,7 @@ export class Trace<
     RelationSchemasT,
     VariantsT
   >
-  /** the final, mutable definition of this specific trace */
+  /** the source-of-truth - local copy of a final, mutable definition of this specific trace */
   definition: CompleteTraceDefinition<
     SelectedRelationNameT,
     RelationSchemasT,
@@ -1389,30 +1396,27 @@ export class Trace<
   adoptChild(childTrace: AllPossibleTraces<RelationSchemasT>): void {
     // Add child to the children set
     this.children.add(childTrace)
-    
-    // Set up child end handler to notify parent when child completes
-    childTrace.when('state-transition').subscribe((event) => {
-      if (event.stateTransition.transitionToState === 'complete' || 
-          event.stateTransition.transitionToState === 'interrupted') {
-        const endReason = event.stateTransition.transitionToState
-        const interruptionReason = endReason === 'interrupted' && 'interruptionReason' in event.stateTransition 
-          ? event.stateTransition.interruptionReason 
-          : undefined
-        this.onChildEnd(childTrace, endReason, interruptionReason)
-      }
-    })
-  }
 
-  private onChildEnd(
-    childTrace: AllPossibleTraces<RelationSchemasT>, 
-    endReason: 'complete' | 'interrupted',
-    interruptionReason?: TraceInterruptionReason
-  ): void {
-    // Emit the onChildEnd event to the state machine
-    this.stateMachine.emit('onChildEnd', {
-      childTrace,
-      endReason,
-      interruptionReason,
+    // Set up child end handler to notify parent when child completes
+    // TODO: do we need any cleanup of subscription here?
+    childTrace.when('state-transition').subscribe((event) => {
+      if (
+        event.stateTransition.transitionToState === 'complete' ||
+        event.stateTransition.transitionToState === 'interrupted'
+      ) {
+        const endReason = event.stateTransition.transitionToState
+        const interruptionReason =
+          endReason === 'interrupted' &&
+          'interruptionReason' in event.stateTransition
+            ? event.stateTransition.interruptionReason
+            : undefined
+        // Emit the onChildEnd event to the state machine
+        this.stateMachine.emit('onChildEnd', {
+          childTrace,
+          endReason,
+          interruptionReason,
+        })
+      }
     })
   }
 
@@ -1541,15 +1545,9 @@ export class Trace<
 
     this.sourceDefinition = definition
 
+    // any change or addition to any of the mutable properties of definition *must* update the copy here:
     this.definition = {
-      name: definition.name,
-      type: definition.type,
-      relationSchemaName: definition.relationSchemaName,
-      relationSchema: definition.relationSchema,
-      variants: definition.variants,
-      labelMatching: definition.labelMatching,
-      debounceWindow: definition.debounceWindow,
-      promoteSpanAttributes: definition.promoteSpanAttributes,
+      ...definition,
 
       // below props are potentially mutable elements of the definition, let's make local copies:
       requiredSpans: [...definition.requiredSpans],
@@ -1628,8 +1626,8 @@ export class Trace<
     )
 
     // definition is now set, we can initialize the state machine
-    // note that TraceStateMachine constructor is being called with `this` for a reason 
-    // we want to pass in the whole `Trace` object, but actually expose only some of its properties 
+    // note that TraceStateMachine constructor is being called with `this` for a reason
+    // we want to pass in the whole `Trace` object, but actually expose only some of its properties
     // that's what the `StateMachineContext` interface is if you look carefully
     this.stateMachine = new TraceStateMachine(this)
 
@@ -1963,9 +1961,10 @@ export class Trace<
       spanAndAnnotation,
     )
 
-    // Forward span to all still-running children (F-7)
+    const annotationRecord: SpanAnnotationRecord = {}
+    // Forward span to all still-running children (F-7), and merge result into annotation record
     for (const child of this.children) {
-      child.processSpan(span)
+      Object.assign(annotationRecord, child.processSpan(span))
     }
 
     const shouldRecord =
@@ -1974,6 +1973,7 @@ export class Trace<
     if (shouldRecord) {
       // the return value is used for reporting the annotation externally (e.g. to the RUM agent)
       return {
+        ...annotationRecord,
         [this.definition.name]: spanAndAnnotation.annotation,
       }
     }

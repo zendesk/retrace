@@ -95,6 +95,7 @@ export type TraceType = 'operation'
 
 export type TraceStatus = SpanStatus | 'interrupted'
 
+// trace interruptions that we consider 'invalid'
 export const INVALID_TRACE_INTERRUPTION_REASONS = [
   'timeout',
   'draft-cancelled',
@@ -102,24 +103,32 @@ export const INVALID_TRACE_INTERRUPTION_REASONS = [
   'parent-interrupted',
   'child-interrupted',
   'child-timeout',
+] as const
+
+export const TRACE_REPLACE_INTERRUPTION_REASONS = [
+  'another-trace-started',
+  // if definition changes, we need to recreate the Trace instance and replay the spans
+  'definition-changed',
   'child-swap',
+] as const
+
+export const VALID_TRACE_INTERRUPTION_REASONS = [
+  'waiting-for-interactive-timeout',
+  'aborted',
+  'idle-component-no-longer-idle',
+  'matched-on-interrupt',
+  'matched-on-required-span-with-error',
+  ...TRACE_REPLACE_INTERRUPTION_REASONS,
 ] as const
 
 export type TraceInterruptionReasonForInvalidTraces =
   (typeof INVALID_TRACE_INTERRUPTION_REASONS)[number]
 
 export type TraceReplaceInterruptionReason =
-  | 'another-trace-started'
-  // if definition changes, we need to recreate the Trace instance and replay the spans
-  | 'definition-changed'
+  (typeof TRACE_REPLACE_INTERRUPTION_REASONS)[number]
 
 export type TraceInterruptionReasonForValidTraces =
-  | 'waiting-for-interactive-timeout'
-  | 'aborted'
-  | 'idle-component-no-longer-idle'
-  | 'matched-on-interrupt'
-  | 'matched-on-required-span-with-error'
-  | TraceReplaceInterruptionReason
+  (typeof VALID_TRACE_INTERRUPTION_REASONS)[number]
 
 export type TraceInterruptionReason =
   | TraceInterruptionReasonForInvalidTraces
