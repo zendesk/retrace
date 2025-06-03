@@ -27,6 +27,7 @@ export type SpanType = NativePerformanceEntryType | ComponentLifecycleSpanType
 
 export interface DraftTraceConfig<RelationSchemaT, VariantsT extends string> {
   id?: string
+  parentId?: string
   startTime?: Partial<Timestamp>
   variant: VariantsT
   /**
@@ -39,8 +40,7 @@ export interface DraftTraceConfig<RelationSchemaT, VariantsT extends string> {
    * It will *not* be a part of the trace recording.
    */
   // TODO: add typing
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  baggage?: any
+  baggage?: unknown
 }
 
 export interface StartTraceConfig<RelationSchemaT, VariantsT extends string>

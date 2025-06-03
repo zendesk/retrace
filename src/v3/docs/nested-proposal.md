@@ -9,7 +9,7 @@ Children traces are instances of Trace, which means they have their own startTim
 If the parent is interrupted while children are present, we interrupt all children, with a new interruptionReason: 'parent-interrupted'
 If a child times out, the `onChildEnd` event will be emitted to the parent - every state must handle this event. If the parent is still in a non-terminal state - this should interrupt the parent with 'child-timeout' `interruptionReason`. The `onChildEnd` event might tell us the child was interrupted, which should interrupt the parent with interruptionReason 'child-interrupted'. The only exception to this is the case of of 'child-swap' interruptionReason, in which case we do not transition, but stay in the same state (noop), and delete the child instance from the children Set.
 There's no additional logic to handle nested grandchildren, but they're are allowed simply by the fact that they're all Trace objects, and those can hold their own children. The higher level child always has to wait for all their children to end.
-We clear the parent’s children Set in prepareAndEmitRecording for GC.
+We clear the parent’s children Set in onTerminalStateReached for GC.
 
 `onInterrupt` in non-terminal states additionally interrupts all unfinished children with `parent-interrupted` and clears the set.
 
@@ -35,7 +35,7 @@ The change preserves full backward-compatibility for tracers that do **not** opt
 | F-5 | If any child trace ends with a **terminal** state `interrupted`, the parent is also interrupted with reason:<br/>• `child-timeout` if the child timed-out<br/>• `child-interrupted` for all other child interruptions.                                                               |
 | F-6 | When a child ends, the parent receives an `onChildEnd(childTrace)` event, removes the child from its `children` set, and—if the child’s final status was `interrupted`—handles F-5.                                                                                                  |
 | F-7 | The parent’s call to `processSpan(span)` must forward the span to _all still-running_ children _after_ it performs its own 'onProcessSpan' emission.                                                                                                                                 |
-| F-8 | Parent GC: both `children` and `completedChildren` sets are cleared in `prepareAndEmitRecording`.                                                                                                                                                                                    |
+| F-8 | Parent GC: both `children` and `completedChildren` sets are cleared in `onTerminalStateReached`.                                                                                                                                                                                    |
 | F-9 | Existing behaviour (single active trace) is preserved for tracers that do **not** specify `adoptAsChildren`.                                                                                                                                                                         |
 
 ---
@@ -69,7 +69,7 @@ export const INVALID_TRACE_INTERRUPTION_REASONS = [
 ## Memory Management
 
 - `Trace.children` and `completedChildren` are `Set<Trace>` **without** back-pointers from child to parent (other than the utility closures) to avoid strong cycles.
-- In `prepareAndEmitRecording` (both `interrupted` & `complete`) parent executes:
+- In `onTerminalStateReached` (both `interrupted` & `complete`) parent executes:
 
 ```ts
 this.children.clear()
