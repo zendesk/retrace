@@ -25,9 +25,11 @@ describe('TraceManager', () => {
     now: 0,
   })
 
+  let id = 0
   beforeEach(() => {
     reportFn = jest.fn<AnyPossibleReportFn<TicketIdRelationSchemasFixture>>()
-    generateId = jest.fn().mockReturnValue('trace-id')
+    id = 0
+    generateId = jest.fn(() => `id-${id++}`)
     reportErrorFn = jest.fn()
     reportWarningFn = jest.fn()
   })
@@ -57,7 +59,7 @@ describe('TraceManager', () => {
     const traceId = tracer.createDraft({
       variant: 'cold_boot',
     })
-    expect(traceId).toBe('trace-id')
+    expect(traceId).toBe('id-0')
 
     // prettier-ignore
     const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
@@ -108,7 +110,7 @@ describe('TraceManager', () => {
       startTime: { now: 0, epoch: 0 },
       variant: 'cold_boot',
     })
-    expect(traceId).toBe('trace-id')
+    expect(traceId).toBe('id-0')
 
     tracer.transitionDraftToActive({ relatedTo: { ticketId: '1' } })
 

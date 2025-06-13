@@ -25,9 +25,11 @@ describe('Tracer', () => {
   let generateId: Mock
   let reportErrorFn: Mock
 
+  let id = 0
   beforeEach(() => {
     reportFn = jest.fn<AnyPossibleReportFn<TestRelationSchema>>()
-    generateId = jest.fn().mockReturnValue('trace-id')
+    id = 0
+    generateId = jest.fn(() => `id-${id++}`)
     reportErrorFn = jest.fn()
     jest.useFakeTimers({ now: 0 })
   })
@@ -343,7 +345,7 @@ describe('Tracer', () => {
           additionalRequiredSpans: [{ name: 'additional-end' }],
         },
       )
-      expect(traceId).toBe('trace-id')
+      expect(traceId).toBe('id-0')
 
       // @ts-expect-error internals
       const trace = tracer.traceUtilities.getCurrentTrace()
@@ -356,7 +358,7 @@ describe('Tracer', () => {
       // prettier-ignore
       const { spans } = getSpansFromTimeline<TestRelationSchema>`
         Events: ${Render('start', 0)}-----${Render('middle', 0)}-----${Render('orig-end', 0)}----${Render('additional-end', 0)}
-        Time:   ${0}                      ${50}                      ${100}                      ${150}               
+        Time:   ${0}                      ${50}                      ${100}                      ${150}
         `
 
       processSpans(spans, traceManager)

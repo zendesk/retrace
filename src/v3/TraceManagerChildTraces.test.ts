@@ -32,12 +32,11 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
     now: 0,
   })
 
+  let id = 0
   beforeEach(() => {
     reportFn = jest.fn()
-    generateId = jest.fn(() => 'default-generated-id')
-    // .mockReturnValueOnce('parent-trace-id')
-    // .mockReturnValueOnce('child-trace-id')
-    // .mockReturnValue('fallback-id')
+    id = 0
+    generateId = jest.fn(() => `id-${id++}`)
     reportErrorFn = jest.fn()
   })
 

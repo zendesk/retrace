@@ -41,9 +41,11 @@ describe('TraceManager with Capture Interactivity', () => {
     now: 0,
   })
 
+  let id = 0
   beforeEach(() => {
     reportFn = jest.fn<AnyPossibleReportFn<TicketIdRelationSchemasFixture>>()
-    generateId = jest.fn().mockReturnValue('trace-id')
+    id = 0
+    generateId = jest.fn(() => `id-${id++}`)
     reportErrorFn = jest.fn()
   })
 

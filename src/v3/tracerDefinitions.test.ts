@@ -32,9 +32,11 @@ describe('Trace Definitions', () => {
     now: 0,
   })
 
+  let id = 0
   beforeEach(() => {
     reportFn = jest.fn()
-    generateId = jest.fn().mockReturnValue('trace-id')
+    id = 0
+    generateId = jest.fn(() => `id-${id++}`)
     reportErrorFn = jest.fn()
   })
 
@@ -70,7 +72,7 @@ describe('Trace Definitions', () => {
         variant: 'cold_boot',
       })
 
-      expect(traceId).toBe('trace-id')
+      expect(traceId).toBe('id-0')
 
       // prettier-ignore
       const { spans } = getSpansFromTimeline<TicketAndUserAndGlobalRelationSchemasFixture>`
