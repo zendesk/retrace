@@ -32,9 +32,12 @@ describe('TraceManager', () => {
     now: 0,
   })
 
+  let id = 0
+
   beforeEach(() => {
     reportFn = jest.fn()
-    generateId = jest.fn().mockReturnValue('trace-id')
+    id = 0
+    generateId = jest.fn(() => `id-${id++}`)
     reportErrorFn = jest.fn()
   })
 
@@ -63,7 +66,7 @@ describe('TraceManager', () => {
       relatedTo: { ticketId: '1' },
       variant: 'cold_boot',
     })
-    expect(traceId).toBe('trace-id')
+    expect(traceId).toBe('id-0')
 
     // prettier-ignore
     const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
@@ -121,7 +124,7 @@ describe('TraceManager', () => {
     })
 
     // Start trace
-    expect(traceId).toBe('trace-id')
+    expect(traceId).toBe('id-0')
 
     // prettier-ignore
     const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
@@ -180,7 +183,7 @@ describe('TraceManager', () => {
     })
 
     // Start trace
-    expect(traceId).toBe('trace-id')
+    expect(traceId).toBe('id-0')
 
     // prettier-ignore
     const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
@@ -294,7 +297,7 @@ describe('TraceManager', () => {
       relatedTo,
       variant: 'cold_boot',
     })
-    expect(traceId).toBe('trace-id')
+    expect(traceId).toBe('id-0')
 
     // prettier-ignore
     const { spans } = getSpansFromTimeline<TicketAndUserAndGlobalRelationSchemasFixture>`
@@ -345,7 +348,7 @@ describe('TraceManager', () => {
         },
         variant: 'cold_boot',
       })
-      expect(traceId).toBe('trace-id')
+      expect(traceId).toBe('id-0')
 
       // prettier-ignore
       const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
@@ -505,7 +508,7 @@ describe('TraceManager', () => {
         },
         variant: 'cold_boot',
       })
-      expect(traceId).toBe('trace-id')
+      expect(traceId).toBe('id-0')
 
       // prettier-ignore
       const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
@@ -521,7 +524,7 @@ describe('TraceManager', () => {
         },
         variant: 'cold_boot',
       })
-      expect(newTraceId).toBe('trace-id')
+      expect(newTraceId).toBe('id-2')
       expect(reportFn).toHaveBeenCalled()
 
       const report: Parameters<
@@ -618,7 +621,7 @@ describe('TraceManager', () => {
           },
           variant: 'cold_boot',
         })
-        expect(traceId).toBe('trace-id')
+        expect(traceId).toBe('id-0')
 
         // prettier-ignore
         const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
@@ -676,7 +679,7 @@ describe('TraceManager', () => {
           },
           variant: 'cold_boot',
         })
-        expect(traceId).toBe('trace-id')
+        expect(traceId).toBe('id-0')
 
         // prettier-ignore
         const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
@@ -731,7 +734,7 @@ describe('TraceManager', () => {
           },
           variant: 'cold_boot',
         })
-        expect(traceId).toBe('trace-id')
+        expect(traceId).toBe('id-0')
 
         // prettier-ignore
         const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
