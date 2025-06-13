@@ -2380,7 +2380,7 @@ export default function TraceManagerDebugger<
           definition: trace.definition,
           input: trace.input,
           recordedItemsByLabel: trace.recordedItemsByLabel,
-          recordedItems: new Set(trace.recordedItems),
+          recordedItems: new Map(trace.recordedItems),
         },
         liveDuration: 0,
         totalSpanCount: 0,
@@ -2407,7 +2407,7 @@ export default function TraceManagerDebugger<
             definition: trace.definition,
             input: trace.input,
             recordedItemsByLabel: trace.recordedItemsByLabel,
-            recordedItems: new Set(trace.recordedItems),
+            recordedItems: new Map(trace.recordedItems),
           },
           state: transition.transitionToState,
           attributes: trace.input.attributes
@@ -2551,7 +2551,7 @@ export default function TraceManagerDebugger<
                     definition: trace.definition,
                     input: trace.input,
                     recordedItemsByLabel: trace.recordedItemsByLabel,
-                    recordedItems: new Set(trace.recordedItems),
+                    recordedItems: new Map(trace.recordedItems),
                   },
                   definitionModifications: [
                     ...(prevTrace.definitionModifications ?? []),

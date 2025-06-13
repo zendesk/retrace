@@ -1345,7 +1345,7 @@ export class Trace<
     return this.stateMachine.currentState === INITIAL_STATE
   }
 
-  recordedItems: Set<SpanAndAnnotation<RelationSchemasT>> = new Set()
+  recordedItems: Map<string, SpanAndAnnotation<RelationSchemasT>> = new Map()
   occurrenceCounters = new Map<string, number>()
   processedPerformanceEntries: WeakMap<
     PerformanceEntry,
@@ -1634,8 +1634,8 @@ export class Trace<
 
   sideEffectFns: TraceStateMachineSideEffectHandlers<RelationSchemasT> = {
     addSpanToRecording: (spanAndAnnotation) => {
-      if (!this.recordedItems.has(spanAndAnnotation)) {
-        this.recordedItems.add(spanAndAnnotation)
+      if (!this.recordedItems.has(spanAndAnnotation.span.id!)) {
+        this.recordedItems.set(spanAndAnnotation.span.id!, spanAndAnnotation)
         for (const label of spanAndAnnotation.annotation.labels) {
           this.recordedItemsByLabel[label]?.push(spanAndAnnotation)
         }
@@ -1664,7 +1664,7 @@ export class Trace<
         this.onEnd(traceRecording)
 
         // memory clean-up in case something retains the Trace instance
-        this.recordedItems = new Set()
+        this.recordedItems = new Map()
         this.occurrenceCounters = new Map()
         this.processedPerformanceEntries = new WeakMap()
         // @ts-expect-error memory cleanup force override the otherwise readonly property
@@ -1863,10 +1863,10 @@ export class Trace<
    * if the definition was modified
    */
   private replayItems(
-    spanAndAnnotations: Set<SpanAndAnnotation<RelationSchemasT>>,
+    spanAndAnnotations: Map<string, SpanAndAnnotation<RelationSchemasT>>,
   ) {
     // replay the spans in the order they were processed
-    for (const spanAndAnnotation of spanAndAnnotations) {
+    for (const spanAndAnnotation of spanAndAnnotations.values()) {
       const transition = this.stateMachine.emit(
         'onProcessSpan',
         spanAndAnnotation,

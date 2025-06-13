@@ -506,7 +506,7 @@ export interface SpanDeduplicationStrategy<RelationSchemasT> {
    */
   findDuplicate: (
     span: Span<RelationSchemasT>,
-    recordedItems: Set<SpanAndAnnotation<RelationSchemasT>>,
+    recordedItems: Map<string, SpanAndAnnotation<RelationSchemasT>>,
   ) => SpanAndAnnotation<RelationSchemasT> | undefined
 
   /**
@@ -671,5 +671,8 @@ export interface TraceContext<
   readonly recordedItemsByLabel: {
     readonly [label: string]: readonly SpanAndAnnotation<RelationSchemasT>[]
   }
-  readonly recordedItems: ReadonlySet<SpanAndAnnotation<RelationSchemasT>>
+  readonly recordedItems: ReadonlyMap<
+    string,
+    SpanAndAnnotation<RelationSchemasT>
+  >
 }

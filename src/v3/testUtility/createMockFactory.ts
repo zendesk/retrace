@@ -58,10 +58,14 @@ export const createMockSpanAndAnnotation = <TSpan extends Span<any>>(
   spanPartial: Partial<TSpan> = {},
   annotationPartial: Partial<SpanAnnotation> = {},
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): SpanAndAnnotation<any> => {
+): [string, SpanAndAnnotation<any>] => {
   const span = createMockSpan<TSpan>(startTimeNow, spanPartial)
-  return {
-    span,
-    annotation: createAnnotation(span, createTimestamp(0), annotationPartial),
-  }
+  span.id = `test-${startTimeNow}`
+  return [
+    span.id,
+    {
+      span,
+      annotation: createAnnotation(span, createTimestamp(0), annotationPartial),
+    },
+  ] as const
 }
