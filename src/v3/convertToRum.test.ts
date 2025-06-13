@@ -37,7 +37,7 @@ describe('convertTraceToRUM', () => {
       variant: 'origin',
     }
 
-    const recordedItems = new Set([
+    const recordedItems = new Map([
       createMockSpanAndAnnotation(100.501, {
         name: 'test-component',
         type: 'component-render',
@@ -133,7 +133,7 @@ describe('convertTraceToRUM', () => {
       variant: 'origin',
     }
 
-    const recordedItems = new Set([
+    const recordedItems = new Map([
       createMockSpanAndAnnotation(100.501, {
         name: 'test-component',
         type: 'component-render',
