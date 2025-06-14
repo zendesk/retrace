@@ -1,4 +1,4 @@
-import React from 'react'
+import * as React from 'react'
 
 const visuallyHiddenButRenderable: React.CSSProperties = {
   height: '1px',
