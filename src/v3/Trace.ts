@@ -18,6 +18,7 @@ import { ensureTimestamp } from './ensureTimestamp'
 import {
   type CPUIdleLongTaskProcessor,
   createCPUIdleProcessor,
+  isLongTask,
   type PerformanceEntryLike,
 } from './firstCPUIdle'
 import { getSpanKey } from './getSpanKey'
@@ -30,7 +31,6 @@ import type {
   SpanAnnotationRecord,
 } from './spanAnnotationTypes'
 import type { ActiveTraceConfig, DraftTraceInput, Span } from './spanTypes'
-import type { TraceRecording } from './traceRecordingTypes'
 import type {
   CompleteTraceDefinition,
   DraftTraceContext,
@@ -44,7 +44,10 @@ import type {
   TraceModifications,
   TransitionDraftOptions,
 } from './types'
-import { INVALID_TRACE_INTERRUPTION_REASONS } from './types'
+import {
+  INVALID_TRACE_INTERRUPTION_REASONS,
+  TRACE_REPLACE_INTERRUPTION_REASONS,
+} from './types'
 import type {
   DistributiveOmit,
   MergedStateHandlerMethods,
@@ -75,6 +78,18 @@ export const isTerminalState = (
   state: TraceStates,
 ): state is TerminalTraceStates =>
   (TERMINAL_STATES as readonly TraceStates[]).includes(state)
+
+export const isEnteringTerminalState = <RelationSchemasT>(
+  onEnterState: OnEnterStatePayload<RelationSchemasT>,
+): onEnterState is FinalTransition<RelationSchemasT> =>
+  isTerminalState(onEnterState.transitionToState)
+
+export const shouldPropagateChildInterruptToParent = (
+  childTraceInterruptionReason: TraceInterruptionReason,
+) =>
+  !(
+    TRACE_REPLACE_INTERRUPTION_REASONS as readonly TraceInterruptionReason[]
+  ).includes(childTraceInterruptionReason)
 
 interface OnEnterActive {
   transitionToState: 'active'
@@ -150,9 +165,11 @@ interface StateHandlersBase<RelationSchemasT> {
     | (Transition<RelationSchemasT> & { transitionFromState?: never })
 }
 
-interface ChildEndEvent<RelationSchemasT extends RelationSchemasBase<RelationSchemasT>> {
+interface ChildEndEvent<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> {
   childTrace: AllPossibleTraces<RelationSchemasT>
-  endReason: 'complete' | 'interrupted'
+  terminalState: 'complete' | 'interrupted'
   interruptionReason?: TraceInterruptionReason
 }
 
@@ -166,7 +183,7 @@ interface TraceStateMachineSideEffectHandlers<RelationSchemasT> {
     spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>,
   ) => void
   readonly onTerminalStateReached: (
-    transition: OnEnterStatePayload<RelationSchemasT>,
+    transition: FinalTransition<RelationSchemasT>,
   ) => void
 }
 
@@ -184,8 +201,8 @@ interface StateMachineContext<
     VariantsT
   > {
   sideEffectFns: TraceStateMachineSideEffectHandlers<RelationSchemasT>
-  children: Set<AllPossibleTraces<RelationSchemasT>>
-  terminalStateChildren: Set<AllPossibleTraces<RelationSchemasT>>
+  children: ReadonlySet<AllPossibleTraces<RelationSchemasT>>
+  terminalStateChildren: ReadonlySet<AllPossibleTraces<RelationSchemasT>>
   eventSubjects: {
     'state-transition': Subject<
       StateTransitionEvent<SelectedRelationNameT, RelationSchemasT, VariantsT>
@@ -249,6 +266,7 @@ export class TraceStateMachine<
   cpuIdleLongTaskProcessor:
     | CPUIdleLongTaskProcessor<EntryType<RelationSchemasT>>
     | undefined
+  #lastLongTaskEndTime: number | undefined
   #debounceDeadline: number = Number.POSITIVE_INFINITY
   #interactiveDeadline: number = Number.POSITIVE_INFINITY
   #timeoutDeadline: number = Number.POSITIVE_INFINITY
@@ -350,6 +368,10 @@ export class TraceStateMachine<
           spanAndAnnotation.span.startTime.epoch +
           spanAndAnnotation.span.duration
 
+        if (isLongTask(spanAndAnnotation.span.performanceEntry) && spanEndTimeEpoch > (this.#lastLongTaskEndTime ?? 0)) {
+          this.#lastLongTaskEndTime = spanEndTimeEpoch
+        }
+
         if (spanEndTimeEpoch > this.#timeoutDeadline) {
           // we consider this interrupted, because of the clamping of the total duration of the operation
           // as potential other events could have happened and prolonged the operation
@@ -404,14 +426,12 @@ export class TraceStateMachine<
       },
 
       onChildEnd: (event: ChildEndEvent<RelationSchemasT>) => {
-        // Remove child from active children
-        this.#context.children.delete(event.childTrace)
-        this.#context.terminalStateChildren.add(event.childTrace)
-
         // Check if child was interrupted and handle accordingly
-        if (event.endReason === 'interrupted' && event.interruptionReason) {
-          // Special case: child-swap doesn't propagate up
-          if (event.interruptionReason === 'child-swap') {
+        if (event.terminalState === 'interrupted' && event.interruptionReason) {
+          if (
+            !shouldPropagateChildInterruptToParent(event.interruptionReason)
+          ) {
+            // no transition - ignore child interruption
             return undefined
           }
 
@@ -446,6 +466,10 @@ export class TraceStateMachine<
         const spanEndTimeEpoch =
           spanAndAnnotation.span.startTime.epoch +
           spanAndAnnotation.span.duration
+
+        if (isLongTask(spanAndAnnotation.span.performanceEntry) && spanEndTimeEpoch > (this.#lastLongTaskEndTime ?? 0)) {
+          this.#lastLongTaskEndTime = spanEndTimeEpoch
+        }
 
         if (spanEndTimeEpoch > this.#timeoutDeadline) {
           // we consider this interrupted, because of the clamping of the total duration of the operation
@@ -517,19 +541,11 @@ export class TraceStateMachine<
         return undefined
       },
 
-      onInterrupt: (reason: TraceInterruptionReason) => {
-        // Interrupt all children first (F-4)
-        for (const child of this.#context.children) {
-          child.interrupt('parent-interrupted')
-        }
-        this.#context.children.clear()
-
-        return {
-          transitionToState: 'interrupted',
-          interruptionReason: reason,
-          lastRelevantSpanAndAnnotation: this.lastRelevant,
-        }
-      },
+      onInterrupt: (reason: TraceInterruptionReason) => ({
+        transitionToState: 'interrupted',
+        interruptionReason: reason,
+        lastRelevantSpanAndAnnotation: this.lastRelevant,
+      }),
 
       onDeadline: (deadlineType: DeadlineType) => {
         if (deadlineType === 'global') {
@@ -544,14 +560,12 @@ export class TraceStateMachine<
       },
 
       onChildEnd: (event: ChildEndEvent<RelationSchemasT>) => {
-        // Remove child from active children
-        this.#context.children.delete(event.childTrace)
-        this.#context.terminalStateChildren.add(event.childTrace)
-
         // Check if child was interrupted and handle accordingly
-        if (event.endReason === 'interrupted' && event.interruptionReason) {
-          // Special case: child-swap doesn't propagate up
-          if (event.interruptionReason === 'child-swap') {
+        if (event.terminalState === 'interrupted' && event.interruptionReason) {
+          if (
+            !shouldPropagateChildInterruptToParent(event.interruptionReason)
+          ) {
+            // no transition - ignore child interruption
             return undefined
           }
 
@@ -638,6 +652,11 @@ export class TraceStateMachine<
         const spanEndTimeEpoch =
           spanAndAnnotation.span.startTime.epoch +
           spanAndAnnotation.span.duration
+
+        if (isLongTask(spanAndAnnotation.span.performanceEntry) && spanEndTimeEpoch > (this.#lastLongTaskEndTime ?? 0)) {
+          this.#lastLongTaskEndTime = spanEndTimeEpoch
+        }
+
         if (spanEndTimeEpoch > this.#timeoutDeadline) {
           // we consider this interrupted, because of the clamping of the total duration of the operation
           // as potential other events could have happened and prolonged the operation
@@ -725,30 +744,19 @@ export class TraceStateMachine<
         return undefined
       },
 
-      onInterrupt: (reason: TraceInterruptionReason) => {
-        // Interrupt all children first (F-4)
-        for (const child of this.#context.children) {
-          child.interrupt('parent-interrupted')
-        }
-        // TODO: maybe not needed to clear here?
-        this.#context.children.clear()
-
-        return {
-          transitionToState: 'interrupted',
-          interruptionReason: reason,
-          lastRelevantSpanAndAnnotation: this.lastRelevant,
-        }
-      },
+      onInterrupt: (reason: TraceInterruptionReason) => ({
+        transitionToState: 'interrupted',
+        interruptionReason: reason,
+        lastRelevantSpanAndAnnotation: this.lastRelevant,
+      }),
 
       onChildEnd: (event: ChildEndEvent<RelationSchemasT>) => {
-        // Remove child from active children
-        this.#context.children.delete(event.childTrace)
-        this.#context.terminalStateChildren.add(event.childTrace)
-
         // Check if child was interrupted and handle accordingly
-        if (event.endReason === 'interrupted' && event.interruptionReason) {
-          // Special case: child-swap doesn't propagate up
-          if (event.interruptionReason === 'child-swap') {
+        if (event.terminalState === 'interrupted' && event.interruptionReason) {
+          if (
+            !shouldPropagateChildInterruptToParent(event.interruptionReason)
+          ) {
+            // no transition - ignore child interruption
             return undefined
           }
 
@@ -806,6 +814,7 @@ export class TraceStateMachine<
         const lastRequiredSpanEndTimeEpoch =
           this.completeSpan.span.startTime.epoch +
           this.completeSpan.span.duration
+
         this.setDeadline(
           'interactive',
           lastRequiredSpanEndTimeEpoch +
@@ -822,6 +831,7 @@ export class TraceStateMachine<
             entry: this.completeSpan,
           },
           typeof interactiveConfig === 'object' ? interactiveConfig : {},
+          { lastLongTaskEndTime: this.#lastLongTaskEndTime }
         )
 
         // DECISION: sort the buffer before processing. sorted by end time (spans that end first should be processed first)
@@ -1031,33 +1041,23 @@ export class TraceStateMachine<
         return undefined
       },
 
-      onInterrupt: (reason: TraceInterruptionReason) => {
-        // Interrupt all children first (F-4)
-        for (const child of this.#context.children) {
-          child.interrupt('parent-interrupted')
-        }
-        this.#context.children.clear()
-
+      onInterrupt: (reason: TraceInterruptionReason) =>
         // we captured a complete trace, however the interactive data is missing
-        return {
+        ({
           transitionToState: 'complete',
           interruptionReason: reason,
           lastRequiredSpanAndAnnotation: this.lastRequiredSpan,
           completeSpanAndAnnotation: this.completeSpan,
           lastRelevantSpanAndAnnotation: this.lastRelevant,
           cpuIdleSpanAndAnnotation: undefined,
-        }
-      },
-
+        }),
       onChildEnd: (event: ChildEndEvent<RelationSchemasT>) => {
-        // Remove child from active children
-        this.#context.children.delete(event.childTrace)
-        this.#context.terminalStateChildren.add(event.childTrace)
-
         // Check if child was interrupted and handle accordingly
-        if (event.endReason === 'interrupted' && event.interruptionReason) {
-          // Special case: child-swap doesn't propagate up
-          if (event.interruptionReason === 'child-swap') {
+        if (event.terminalState === 'interrupted' && event.interruptionReason) {
+          if (
+            !shouldPropagateChildInterruptToParent(event.interruptionReason)
+          ) {
+            // no transition - ignore child interruption
             return undefined
           }
 
@@ -1095,15 +1095,12 @@ export class TraceStateMachine<
       },
 
       onChildEnd: (event: ChildEndEvent<RelationSchemasT>) => {
-        // Remove child from active children
-        this.#context.children.delete(event.childTrace)
-        this.#context.terminalStateChildren.add(event.childTrace)
-
         // Check if child was interrupted and handle accordingly
-        if (event.endReason === 'interrupted' && event.interruptionReason) {
-          // Special case: child-swap doesn't propagate up
-          if (event.interruptionReason === 'child-swap') {
-            // No-op, just remove the child
+        if (event.terminalState === 'interrupted' && event.interruptionReason) {
+          if (
+            !shouldPropagateChildInterruptToParent(event.interruptionReason)
+          ) {
+            // no transition - ignore child interruption
             return undefined
           }
 
@@ -1139,36 +1136,17 @@ export class TraceStateMachine<
       ) => {
         this.sideEffectFns.addSpanToRecording(spanAndAnnotation)
 
-        // Forward span to all children (but don't update lastRelevant in waiting-for-children)
-        for (const child of this.#context.children) {
-          child.processSpan(spanAndAnnotation.span)
-        }
-
         return undefined
       },
 
-      onInterrupt: (reason: TraceInterruptionReason) => {
-        // Interrupt all children first
-        for (const child of this.#context.children) {
-          child.interrupt('parent-interrupted')
-        }
-        this.#context.children.clear()
-
-        return {
-          transitionToState: 'interrupted',
-          interruptionReason: reason,
-          lastRelevantSpanAndAnnotation: this.lastRelevant,
-        }
-      },
+      onInterrupt: (reason: TraceInterruptionReason) => ({
+        transitionToState: 'interrupted',
+        interruptionReason: reason,
+        lastRelevantSpanAndAnnotation: this.lastRelevant,
+      }),
 
       onDeadline: (deadlineType: DeadlineType) => {
         if (deadlineType === 'global') {
-          // Interrupt all children first
-          for (const child of this.#context.children) {
-            child.interrupt('parent-interrupted')
-          }
-          this.#context.children.clear()
-
           return {
             transitionToState: 'interrupted',
             interruptionReason: 'timeout',
@@ -1196,20 +1174,6 @@ export class TraceStateMachine<
 
         // terminal state
         this.clearDeadline()
-
-        if (transition.interruptionReason === 'definition-changed') {
-          // do not report if the definition changed
-          // this is a special case where the instance is being recreated
-          return
-        }
-
-        // Interrupt all children
-        for (const child of this.#context.children) {
-          child.interrupt('parent-interrupted')
-        }
-        // TODO: ensure all children are ended/terminal in case of interruption?
-
-        this.sideEffectFns.onTerminalStateReached(transition)
       },
     },
 
@@ -1231,8 +1195,6 @@ export class TraceStateMachine<
           // mutate the annotation to mark the span as interactive
           cpuIdleSpanAndAnnotation.annotation.markedPageInteractive = true
         }
-
-        this.sideEffectFns.onTerminalStateReached(transition)
       },
     },
   } satisfies StatesBase<RelationSchemasT>
@@ -1270,21 +1232,21 @@ export class TraceStateMachine<
         transitionFromState,
       }
 
-      // Emit state transition event for debugging
+      // Emit state transition event
       this.#context.eventSubjects['state-transition'].next({
         traceContext: this.#context,
         stateTransition: onEnterStateEvent,
       })
 
+      const settledTransition =
+        this.emit('onEnterState', onEnterStateEvent) ?? onEnterStateEvent
+
       // Complete all event observables when reaching a terminal state
-      if (isTerminalState(onEnterStateEvent.transitionToState)) {
-        this.#context.eventSubjects['state-transition'].complete()
-        this.#context.eventSubjects['required-span-seen'].complete()
-        this.#context.eventSubjects['add-span-to-recording'].complete()
-        this.#context.eventSubjects['definition-modified'].complete()
+      if (isEnteringTerminalState(onEnterStateEvent)) {
+        this.#context.sideEffectFns.onTerminalStateReached(onEnterStateEvent)
       }
 
-      return this.emit('onEnterState', onEnterStateEvent) ?? onEnterStateEvent
+      return settledTransition
     }
     return undefined
   }
@@ -1376,27 +1338,26 @@ export class Trace<
   adoptChild(childTrace: AllPossibleTraces<RelationSchemasT>): void {
     // Add child to the children set
     this.children.add(childTrace)
+  }
 
-    // Set up child end handler to notify parent when child completes
-    // TODO: do we need any cleanup of subscription here?
-    childTrace.when('state-transition').subscribe((event) => {
-      if (
-        event.stateTransition.transitionToState === 'complete' ||
-        event.stateTransition.transitionToState === 'interrupted'
-      ) {
-        const endReason = event.stateTransition.transitionToState
-        const interruptionReason =
-          endReason === 'interrupted' &&
-          'interruptionReason' in event.stateTransition
-            ? event.stateTransition.interruptionReason
-            : undefined
-        // Emit the onChildEnd event to the state machine
-        this.stateMachine.emit('onChildEnd', {
-          childTrace,
-          endReason,
-          interruptionReason,
-        })
-      }
+  onChildEnd(
+    childTrace: AllPossibleTraces<RelationSchemasT>,
+    stateTransition: FinalTransition<RelationSchemasT>,
+  ): void {
+    // Remove child from active children
+    this.children.delete(childTrace)
+    this.terminalStateChildren.add(childTrace)
+
+    const terminalState = stateTransition.transitionToState
+    const interruptionReason =
+      terminalState === 'interrupted' && 'interruptionReason' in stateTransition
+        ? stateTransition.interruptionReason
+        : undefined
+    // Notify the state machine about the child end
+    this.stateMachine.emit('onChildEnd', {
+      childTrace,
+      terminalState,
+      interruptionReason,
     })
   }
 
@@ -1551,6 +1512,11 @@ export class Trace<
           : undefined,
     }
 
+    if (input.parentTraceId) {
+      // never capture interactive in a child trace, it doesn't make sense
+      this.definition.captureInteractive = undefined
+    }
+
     // all requiredSpans implicitly interrupt the trace if they error, unless explicitly ignored
     // creates interruptOnSpans for the source definition of requiredSpans
     const interruptOnRequiredErrored =
@@ -1607,8 +1573,7 @@ export class Trace<
 
     // definition is now set, we can initialize the state machine
     // note that TraceStateMachine constructor is being called with `this` for a reason
-    // we want to pass in the whole `Trace` object, but actually expose only some of its properties
-    // that's what the `StateMachineContext` interface is if you look carefully
+    // we pass in the `Trace` object, which is a partial of the `StateMachineContext` interface
     this.stateMachine = new TraceStateMachine(this)
 
     if ('importFrom' in data) {
@@ -1630,6 +1595,8 @@ export class Trace<
       // transplant the record of terminal state children:
       this.terminalStateChildren = data.importFrom.terminalStateChildren
     }
+
+    this.traceUtilities.onTraceConstructed(this)
   }
 
   sideEffectFns: TraceStateMachineSideEffectHandlers<RelationSchemasT> = {
@@ -1646,10 +1613,16 @@ export class Trace<
       }
     },
     onTerminalStateReached: (transition) => {
-      if (
-        transition.transitionToState === 'interrupted' ||
-        transition.transitionToState === 'complete'
-      ) {
+      // we never report after definition-changed;
+      // it just means the Trace object has just been recreated
+      if (transition.interruptionReason !== 'definition-changed') {
+        // this is an actual interruption:
+        // interrupt all children
+        for (const child of this.children) {
+          child.interrupt('parent-interrupted')
+        }
+        this.children.clear()
+
         const traceRecording = createTraceRecording(
           // we don't want to pass 'this' but select the relevant properties
           // to avoid circular references
@@ -1661,28 +1634,27 @@ export class Trace<
           },
           transition,
         )
-        this.onEnd(traceRecording)
-
-        // memory clean-up in case something retains the Trace instance
-        this.recordedItems = new Map()
-        this.occurrenceCounters = new Map()
-        this.processedPerformanceEntries = new WeakMap()
-        // @ts-expect-error memory cleanup force override the otherwise readonly property
-        this.recordedItemsByLabel = {}
-
-        // Clear child references for garbage collection
-        this.children.clear()
-        this.terminalStateChildren.clear()
-        this.traceUtilities.performanceEntryDeduplicationStrategy?.reset()
+        this.traceUtilities.reportFn(traceRecording, this)
       }
-    },
-  }
 
-  private onEnd(
-    traceRecording: TraceRecording<SelectedRelationNameT, RelationSchemasT>,
-  ): void {
-    this.traceUtilities.onEndTrace(this)
-    this.traceUtilities.reportFn(traceRecording, this)
+      this.traceUtilities.onTraceEnd(this, transition)
+
+      // close all event subjects, no more events can be sent by this trace
+      for (const subject of Object.values(this.eventSubjects)) {
+        subject.complete()
+      }
+      // memory clean-up in case something retains the Trace instance
+      this.recordedItems = new Map()
+      this.occurrenceCounters = new Map()
+      this.processedPerformanceEntries = new WeakMap()
+      // @ts-expect-error memory cleanup force override the otherwise readonly property
+      this.recordedItemsByLabel = {}
+
+      // Clear child references for garbage collection
+      this.children.clear()
+      this.terminalStateChildren.clear()
+      this.traceUtilities.performanceEntryDeduplicationStrategy?.reset()
+    },
   }
 
   // this is public API only and should not be called internally

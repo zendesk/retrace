@@ -257,7 +257,7 @@ describe('Tracer', () => {
       })
 
       // @ts-expect-error internal prop
-      const trace = tracer.traceUtilities.getCurrentTrace()
+      const trace = tracer.rootTraceUtilities.getCurrentTrace()
       expect(
         trace?.stateMachine.successfullyMatchedRequiredSpanMatchers.size,
       ).toBe(0)
@@ -279,7 +279,7 @@ describe('Tracer', () => {
       })
 
       // @ts-expect-error internal prop
-      const traceRecreated = tracer.traceUtilities.getCurrentTrace()
+      const traceRecreated = tracer.rootTraceUtilities.getCurrentTrace()
       expect(traceRecreated).not.toBe(trace)
       expect(traceRecreated?.definition.requiredSpans).toHaveLength(3)
       expect(traceRecreated?.definition.interruptOnSpans).toHaveLength(3)
@@ -348,7 +348,7 @@ describe('Tracer', () => {
       expect(traceId).toBe('id-0')
 
       // @ts-expect-error internals
-      const trace = tracer.traceUtilities.getCurrentTrace()
+      const trace = tracer.rootTraceUtilities.getCurrentTrace()
       expect(trace?.definition.requiredSpans).toHaveLength(2)
       expect(
         trace?.stateMachine.successfullyMatchedRequiredSpanMatchers.size,
@@ -359,7 +359,7 @@ describe('Tracer', () => {
       const { spans } = getSpansFromTimeline<TestRelationSchema>`
         Events: ${Render('start', 0)}-----${Render('middle', 0)}-----${Render('orig-end', 0)}----${Render('additional-end', 0)}
         Time:   ${0}                      ${50}                      ${100}                      ${150}
-        `
+      `
 
       processSpans(spans, traceManager)
       expect(reportFn).toHaveBeenCalled()
@@ -442,7 +442,7 @@ describe('Tracer', () => {
       })
 
       // @ts-expect-error internals
-      const trace = tracer.traceUtilities.getCurrentTrace()
+      const trace = tracer.rootTraceUtilities.getCurrentTrace()
 
       expect(trace?.definition.requiredSpans).toHaveLength(5)
       expect(
