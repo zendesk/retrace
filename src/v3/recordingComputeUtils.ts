@@ -247,6 +247,7 @@ function getComputedRenderBeaconSpans<
       renderCount: number
       sumOfDurations: number
       lastRenderStartTime: number | undefined // Track the last render start time
+      attributes: Record<string, unknown>
     }
   >()
 
@@ -299,8 +300,14 @@ function getComputedRenderBeaconSpans<
             : undefined,
         lastRenderStartTime:
           entry.span.type === 'component-render-start' ? start : undefined,
+        attributes: entry.span.attributes ?? {},
       })
     } else {
+      // merge attributes:
+      spanTimes.attributes = {
+        ...spanTimes.attributes,
+        ...entry.span.attributes,
+      }
       spanTimes.firstStart = Math.min(spanTimes.firstStart, start)
       spanTimes.firstContentfulRenderEnd =
         contentfulRenderEnd && spanTimes.firstContentfulRenderEnd
@@ -345,20 +352,25 @@ function getComputedRenderBeaconSpans<
   >['computedRenderBeaconSpans'] = {}
 
   // Calculate duration and startOffset for each beacon
-  for (const [beaconName, spanTimes] of renderSpansByBeacon) {
-    if (!spanTimes.firstContentfulRenderEnd) continue
+  for (const [beaconName, renderSummary] of renderSpansByBeacon) {
+    if (!renderSummary.firstContentfulRenderEnd) continue
     computedRenderBeaconSpans[beaconName] = {
-      startOffset: spanTimes.firstStart - input.startTime.now,
+      startOffset: renderSummary.firstStart - input.startTime.now,
       firstRenderTillContent:
-        spanTimes.firstContentfulRenderEnd - spanTimes.firstStart,
-      firstRenderTillLoading: spanTimes.firstLoadingEnd
-        ? spanTimes.firstLoadingEnd - spanTimes.firstStart
+        renderSummary.firstContentfulRenderEnd - renderSummary.firstStart,
+      firstRenderTillLoading: renderSummary.firstLoadingEnd
+        ? renderSummary.firstLoadingEnd - renderSummary.firstStart
         : 0,
-      firstRenderTillData: spanTimes.firstContentStart
-        ? spanTimes.firstContentStart - spanTimes.firstStart
+      firstRenderTillData: renderSummary.firstContentStart
+        ? renderSummary.firstContentStart - renderSummary.firstStart
         : 0,
-      renderCount: spanTimes.renderCount,
-      sumOfRenderDurations: spanTimes.sumOfDurations,
+      renderCount: renderSummary.renderCount,
+      sumOfRenderDurations: renderSummary.sumOfDurations,
+      ...(Object.keys(renderSummary.attributes).length > 0
+        ? {
+            attributes: renderSummary.attributes,
+          }
+        : {}),
     }
   }
 
@@ -438,6 +450,137 @@ function isActiveTraceInput<
   return Boolean(input.relatedTo)
 }
 
+type ChildrenMap = Map<string, string[]>
+type SpanMap<RelationSchemasT> = ReadonlyMap<
+  string,
+  SpanAndAnnotation<RelationSchemasT>
+>
+
+/**
+ * @returns Map<parentId, childIds[]>
+ */
+function buildChildrenMap<const RelationSchemasT>(
+  spanMap: SpanMap<RelationSchemasT>,
+): ChildrenMap {
+  const kids = new Map<string, string[]>()
+
+  for (const { span } of spanMap.values()) {
+    const parent = span.parentSpanId
+    if (!parent) continue
+
+    const childrenIds = kids.get(parent) ?? []
+    childrenIds.push(span.id!)
+    kids.set(parent, childrenIds)
+  }
+  return kids // O(n) time, O(n) memory
+}
+
+interface PropagationConfig<RelationSchemasT> {
+  /** attribute keys that flow *downward* unless child overrides */
+  heritableSpanAttributes?: readonly string[]
+  /** stops errors bubbling *upward* if true */
+  shouldSuppressErrorStatusPropagation: (
+    spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>,
+  ) => boolean
+}
+
+export function propagateStatusAndAttributes<const RelationSchemasT>(
+  idToSpanAndAnnotationMap: SpanMap<RelationSchemasT>,
+  children: ChildrenMap,
+  cfg: PropagationConfig<RelationSchemasT>,
+): void {
+  // 1. build parent-before-child topological order
+  const roots: string[] = []
+
+  for (const { span } of idToSpanAndAnnotationMap.values()) {
+    if (!span.parentSpanId || !idToSpanAndAnnotationMap.has(span.parentSpanId))
+      roots.push(span.id!)
+  }
+
+  const topo: string[] = [] // DFS stack build
+  const stack: string[] = [...roots]
+
+  while (stack.length > 0) {
+    const id = stack.pop()!
+    topo.push(id)
+
+    const kids = children.get(id)
+    if (kids) {
+      for (const cid of kids) stack.push(cid)
+    }
+  }
+
+  if (cfg.heritableSpanAttributes) {
+    // 2. push selected attributes downward (pre-order)
+    const inherited = new Map<string, Record<string, unknown>>() // id → merged bag
+
+    for (const id of topo) {
+      const node = idToSpanAndAnnotationMap.get(id)
+      if (!node) continue
+
+      const parentHeritableAttributes = node.span.parentSpanId
+        ? inherited.get(node.span.parentSpanId)
+        : undefined
+
+      if (!parentHeritableAttributes && !node.span.attributes) {
+        // no parent and no attributes, nothing to inherit
+        continue
+      }
+
+      const heritableAttributes: Record<string, unknown> = {}
+      for (const key of cfg.heritableSpanAttributes) {
+        // child attribute wins over parent if defined:
+        const value =
+          node.span.attributes?.[key] ?? parentHeritableAttributes?.[key]
+        if (value !== undefined) {
+          heritableAttributes[key] = value
+        }
+      }
+
+      inherited.set(id, heritableAttributes)
+
+      if (Object.keys(heritableAttributes).length > 0) {
+        node.span.attributes = {
+          ...heritableAttributes,
+          ...node.span.attributes,
+        }
+      }
+    }
+  }
+
+  // 3. bubble errors upward (post-order)
+  for (let i = topo.length - 1; i >= 0; --i) {
+    const id = topo[i]!
+    const node = idToSpanAndAnnotationMap.get(id)!
+    if (cfg.shouldSuppressErrorStatusPropagation(node)) {
+      // skip this node, it should not propagate (bubble up) errors
+      continue
+    }
+    const ownError = node.span.error ?? node.span.status === 'error'
+    if (ownError) {
+      continue
+    }
+
+    let childError: boolean | Error = false
+    const kids = children.get(id)
+    if (kids) {
+      for (const childId of kids) {
+        const child = idToSpanAndAnnotationMap.get(childId)!
+        childError = child.span.error ?? child.span.status === 'error'
+        if (childError) {
+          break
+        }
+      }
+    }
+
+    if (childError) {
+      node.span.status = 'error'
+      if (!node.span.error && typeof childError === 'object')
+        node.span.error = childError
+    }
+  }
+}
+
 export function createTraceRecording<
   const SelectedRelationNameT extends keyof RelationSchemasT,
   const RelationSchemasT,
@@ -447,7 +590,7 @@ export function createTraceRecording<
   transition: FinalTransition<RelationSchemasT>,
 ): TraceRecording<SelectedRelationNameT, RelationSchemasT> {
   const { definition, recordedItems, input } = context
-  const { id, relatedTo, variant } = input
+  const { id, relatedTo, variant, parentTraceId } = input
   const { name } = definition
 
   const {
@@ -469,15 +612,43 @@ export function createTraceRecording<
       (cpuIdleSpanAndAnnotation ?? completeSpanAndAnnotation)) ||
     lastRelevantSpanAndAnnotation
 
-  // only keep items captured until the endOfOperationSpan or if not available, the lastRelevantSpan
-  const recordedItemsArray = endOfOperationSpan
-    ? [...recordedItems].filter(
-        (item) =>
-          item.span.startTime.now + item.span.duration <=
-          endOfOperationSpan.span.startTime.now +
-            endOfOperationSpan.span.duration,
-      )
-    : [...recordedItems.values()]
+  const childrenMap = buildChildrenMap(recordedItems)
+
+  const shouldSuppressErrorStatusPropagation = (
+    spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>,
+  ) =>
+    definition.suppressErrorStatusPropagationOnSpans?.some((doesSpanMatch) =>
+      doesSpanMatch(spanAndAnnotation, context),
+    ) ?? false
+
+  // selected attributes (like `team`) should propagate to every child (unless set by the child)
+  // and errors should bubble up to the parent (unless suppressed)
+  propagateStatusAndAttributes(recordedItems, childrenMap, {
+    heritableSpanAttributes: definition.heritableSpanAttributes,
+    shouldSuppressErrorStatusPropagation,
+  })
+
+  const recordedItemsArray: SpanAndAnnotation<RelationSchemasT>[] = []
+  const spanIdsToDiscard = new Set<string>()
+
+  for (const item of recordedItems.values()) {
+    if (item.span.startSpanId) {
+      // if the item has a startSpan, we'll want to add it to the list and exclude it from the recorded items
+      // this is because these items are unnecessary, the same information is present in the span that contains the duration
+      spanIdsToDiscard.add(item.span.startSpanId)
+    }
+    if (endOfOperationSpan) {
+      // only keep items captured until the endOfOperationSpan or if not available, the lastRelevantSpan
+      if (
+        item.span.startTime.now + item.span.duration <=
+        endOfOperationSpan.span.startTime.now + endOfOperationSpan.span.duration
+      ) {
+        recordedItemsArray.push(item)
+      }
+    } else {
+      recordedItemsArray.push(item)
+    }
+  }
 
   // CODE CLEAN UP TODO: let's get this information (wasInterrupted) from up top (in FinalState)
   const wasInterrupted = transitionToState === 'interrupted'
@@ -493,13 +664,18 @@ export function createTraceRecording<
       ? getComputedRenderBeaconSpans(recordedItemsArray, input)
       : {}
 
-  const anyNonSuppressedErrors = recordedItemsArray.some(
-    (spanAndAnnotation) =>
+  let markTraceAsErrored = false
+  for (const spanAndAnnotation of recordedItemsArray) {
+    if (
       spanAndAnnotation.span.status === 'error' &&
       !definition.suppressErrorStatusPropagationOnSpans?.some((doesSpanMatch) =>
         doesSpanMatch(spanAndAnnotation, context),
-      ),
-  )
+      )
+    ) {
+      markTraceAsErrored = true
+      break
+    }
+  }
 
   // promote span attributes to trace attributes per configuration
   const promotedAttributes = promoteSpanAttributesForTrace(
@@ -515,8 +691,17 @@ export function createTraceRecording<
     cpuIdleSpanAndAnnotation?.annotation.operationRelativeEndTime ?? null
   const startTillRequirementsMet =
     lastRequiredSpanAndAnnotation?.annotation.operationRelativeEndTime ?? null
+
+  // exclude internalUse and spanIdsToDiscard
+  const filteredRecordedItemsArray = recordedItemsArray.filter(
+    (item) => !(item.span.internalUse ?? spanIdsToDiscard.has(item.span.id!)),
+  )
+
+  // TODO: list last error in recording, and error in computedRender spans
+
   return {
     id,
+    parentTraceId,
     name,
     startTime: input.startTime,
     relatedTo,
@@ -535,7 +720,7 @@ export function createTraceRecording<
     // ?: If we have any error entries then should we mark the status as 'error'
     status: wasInterrupted
       ? 'interrupted'
-      : anyNonSuppressedErrors
+      : markTraceAsErrored
       ? 'error'
       : 'ok',
     computedSpans,
@@ -543,6 +728,6 @@ export function createTraceRecording<
     computedValues,
     attributes: traceAttributes,
     interruptionReason,
-    entries: recordedItemsArray,
+    entries: filteredRecordedItemsArray,
   }
 }

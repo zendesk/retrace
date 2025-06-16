@@ -27,7 +27,7 @@ export type SpanType = NativePerformanceEntryType | ComponentLifecycleSpanType
 
 export interface DraftTraceConfig<RelationSchemaT, VariantsT extends string> {
   id?: string
-  parentId?: string
+  parentTraceId?: string
   startTime?: Partial<Timestamp>
   variant: VariantsT
   /**
@@ -74,6 +74,12 @@ export interface Attributes {
 export type SpanStatus = 'ok' | 'error'
 
 export interface SpanBase<RelationSchemasT> {
+  /**
+   * providing an id is optional, but it will always be present in the recording
+   * if not provided, it will be generated automatically
+   */
+  id?: string
+
   // TODO: allow defining custom spans that extend this SpanBase
   type: SpanType | (string & {})
 
@@ -112,6 +118,29 @@ export interface SpanBase<RelationSchemasT> {
    * if status is error, optionally provide the Error object with additional metadata
    */
   error?: Error
+
+  /**
+   * optional parent span ID
+   */
+  parentSpanId?: string
+
+  /**
+   * The event span that references the beginning of the span.
+   */
+  startSpanId?: string
+
+  /**
+   * The ID of the tick in which the span was created.
+   * This is used to group spans created in the same event loop tick.
+   */
+  tickId?: string
+
+  /**
+   * If true, this span will only be present for matching while the trace is being recorded,
+   * but will not be included in the final trace recording.
+   * This is useful for internal spans that are not relevant to the final trace.
+   */
+  internalUse?: boolean
 }
 
 export interface ComponentRenderSpan<RelationSchemasT>
