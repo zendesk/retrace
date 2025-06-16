@@ -8,7 +8,7 @@ import type {
   Span,
   SpanStatus,
 } from './spanTypes'
-import type { AllPossibleTraces } from './Trace'
+import type { AllPossibleTraces, FinalTransition } from './Trace'
 import type { TraceRecording } from './traceRecordingTypes'
 import type {
   ArrayWithAtLeastOneElement,
@@ -105,12 +105,17 @@ export const INVALID_TRACE_INTERRUPTION_REASONS = [
   'child-timeout',
 ] as const
 
+export type TraceInterruptionReasonForInvalidTraces =
+  (typeof INVALID_TRACE_INTERRUPTION_REASONS)[number]
+
 export const TRACE_REPLACE_INTERRUPTION_REASONS = [
   'another-trace-started',
   // if definition changes, we need to recreate the Trace instance and replay the spans
   'definition-changed',
-  'child-swap',
 ] as const
+
+export type TraceReplaceInterruptionReason =
+  (typeof TRACE_REPLACE_INTERRUPTION_REASONS)[number]
 
 export const VALID_TRACE_INTERRUPTION_REASONS = [
   'waiting-for-interactive-timeout',
@@ -120,12 +125,6 @@ export const VALID_TRACE_INTERRUPTION_REASONS = [
   'matched-on-required-span-with-error',
   ...TRACE_REPLACE_INTERRUPTION_REASONS,
 ] as const
-
-export type TraceInterruptionReasonForInvalidTraces =
-  (typeof INVALID_TRACE_INTERRUPTION_REASONS)[number]
-
-export type TraceReplaceInterruptionReason =
-  (typeof TRACE_REPLACE_INTERRUPTION_REASONS)[number]
 
 export type TraceInterruptionReasonForValidTraces =
   (typeof VALID_TRACE_INTERRUPTION_REASONS)[number]
@@ -192,8 +191,12 @@ export interface TraceManagerUtilities<
     newTrace: AllPossibleTraces<RelationSchemasT>,
     reason: TraceReplaceInterruptionReason,
   ) => void
-  onEndTrace: (traceToCleanUp: AllPossibleTraces<RelationSchemasT>) => void
+  onTraceEnd: (
+    trace: AllPossibleTraces<RelationSchemasT>,
+    finalTransition: FinalTransition<RelationSchemasT>,
+  ) => void
   getCurrentTrace: () => AllPossibleTraces<RelationSchemasT> | undefined
+  onTraceConstructed: (trace: AllPossibleTraces<RelationSchemasT>) => void
 }
 
 export interface TraceDefinitionModifications<
@@ -424,11 +427,24 @@ export interface TraceDefinition<
    */
   computedValueDefinitions?: ComputedValueDefinitionsT
 
+  /**
+   * Define attributes that should be promoted from the span to the trace level, along with the matchers for the spans.
+   * In case of conflicts, last attribute wins.
+   */
   promoteSpanAttributes?: PromoteSpanAttributesDefinition<
     NoInfer<SelectedRelationNameT>,
     RelationSchemasT,
     VariantsT
   >[]
+
+  /**
+   * A list of span attributes that should be inherited by the children spans (propagated downwards).
+   * This is useful for ensuring that certain attributes are available on all spans,
+   * for example, to ensure that `team` ownership information is available on descendant spans,
+   * even if they didn't explicitly define it.
+   * Note that a children span only inherits the attribute if it doesn't already have them defined.
+   */
+  heritableSpanAttributes?: readonly string[]
 }
 
 /**

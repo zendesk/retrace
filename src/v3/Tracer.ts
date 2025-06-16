@@ -5,6 +5,7 @@ import type { SpanAndAnnotation } from './spanAnnotationTypes'
 import type { DraftTraceConfig, StartTraceConfig } from './spanTypes'
 import { type AllPossibleTraces, Trace } from './Trace'
 import {
+  type AllPossibleTraceContexts,
   type CompleteTraceDefinition,
   type ComputedSpanDefinitionInput,
   type ComputedValueDefinitionInput,
@@ -15,7 +16,6 @@ import {
   type TraceModifications,
   type TransitionDraftOptions,
 } from './types'
-
 
 /**
  * Look for an adopting parent for the given trace definition
@@ -35,8 +35,26 @@ function lookForAdoptingParent<
   const maybeParent = globalUtils.getCurrentTrace()
   if (!maybeParent) return undefined
 
-  return maybeParent.canAdoptChild(tracerDef.name) ? maybeParent : undefined
-  // TODO: in the future we could iterate children's adoption to enable deeply nested structures
+  // First check if the immediate parent can adopt
+  if (maybeParent.canAdoptChild(tracerDef.name)) {
+    return maybeParent
+  }
+
+  // Breadth-first search through children
+  const queue: AllPossibleTraces<RelationSchemasT>[] = [...maybeParent.children]
+
+  while (queue.length > 0) {
+    const current = queue.shift()!
+
+    if (current.canAdoptChild(tracerDef.name)) {
+      return current
+    }
+
+    // Add current trace's children to the end of the queue for breadth-first traversal
+    queue.push(...current.children)
+  }
+
+  return undefined
 }
 
 /**
@@ -48,26 +66,46 @@ function buildChildUtilities<
 >(
   getChildTrace: () => AllPossibleTraces<RelationSchemasT> | undefined,
   parent: AllPossibleTraces<RelationSchemasT>,
-  globalUtils: TraceManagerUtilities<RelationSchemasT>,
 ): TraceManagerUtilities<RelationSchemasT> {
   return {
     // reporting and errors continue to use the original functions
-    ...globalUtils,
+    ...parent.traceUtilities,
 
-    // redirect "current trace" queries to return the CHILD when asked
+    // redirect "current trace" queries to return the itself when asked
     getCurrentTrace: getChildTrace,
 
+    onTraceEnd: (trace, finalTransition) => {
+      parent.onChildEnd(trace, finalTransition)
+    },
+
     // handle replacing the current trace in the context of parent-child relationships
-    replaceCurrentTrace(newTrace, reason) {
-      if (reason === 'another-trace-started') {
-        parent.adoptChild(newTrace) // adds to children
-      } else {
-        // For other reasons, interrupt the current child and adopt the new one
-        const currentChild = getChildTrace()
-        if (currentChild) {
-          currentChild.interrupt('child-swap') // special type of interruption that doesn't propagate up
+    replaceCurrentTrace: (newTrace, reason) => {
+      switch (reason) {
+        case 'another-trace-started': {
+          // as a child, starting another trace doesn't actually replace it,
+          // only adds a sibiling to the parent
+          parent.adoptChild(newTrace)
+          return
         }
-        parent.adoptChild(newTrace) // adds to children
+        case 'definition-changed': {
+          // For other reasons, interrupt the current child and adopt the new one
+          const currentChild = getChildTrace()
+          if (currentChild) {
+            currentChild.interrupt(reason)
+          }
+          parent.adoptChild(newTrace) // adds to children
+          return
+        }
+        default: {
+          parent.traceUtilities.reportErrorFn(
+            new Error(
+              `Unexpected reason for replacing current trace: ${reason}`,
+            ),
+            { definition: newTrace.sourceDefinition } as Partial<
+              AllPossibleTraceContexts<RelationSchemasT, string>
+            >,
+          )
+        }
       }
     },
   }
@@ -88,6 +126,7 @@ function findChildWithDefinition<
     VariantsT
   >,
 ): Trace<SelectedRelationNameT, RelationSchemasT, VariantsT> | undefined {
+  // TOOD: switch to breadth-first
   for (const child of trace.children) {
     if (child.sourceDefinition === targetDefinition) {
       return child as Trace<SelectedRelationNameT, RelationSchemasT, VariantsT>
@@ -116,7 +155,7 @@ export class Tracer<
     RelationSchemasT,
     VariantsT
   >
-  private traceUtilities: TraceManagerUtilities<RelationSchemasT>
+  private rootTraceUtilities: TraceManagerUtilities<RelationSchemasT>
 
   constructor(
     definition: CompleteTraceDefinition<
@@ -124,10 +163,10 @@ export class Tracer<
       RelationSchemasT,
       VariantsT
     >,
-    traceUtilities: TraceManagerUtilities<RelationSchemasT>,
+    rootTraceUtilities: TraceManagerUtilities<RelationSchemasT>,
   ) {
     this.definition = definition
-    this.traceUtilities = traceUtilities
+    this.rootTraceUtilities = rootTraceUtilities
   }
 
   /**
@@ -175,10 +214,13 @@ export class Tracer<
       VariantsT
     >,
   ): Trace<SelectedRelationNameT, RelationSchemasT, VariantsT> | undefined => {
-    const id = input.id ?? this.traceUtilities.generateId()
+    const id = input.id ?? this.rootTraceUtilities.generateId()
 
     // Look for an adopting parent according to the nested proposal
-    const parent = lookForAdoptingParent(this.definition, this.traceUtilities)
+    const parent = lookForAdoptingParent(
+      this.definition,
+      this.rootTraceUtilities,
+    )
 
     let trace: Trace<SelectedRelationNameT, RelationSchemasT, VariantsT>
 
@@ -188,11 +230,7 @@ export class Tracer<
         | Trace<SelectedRelationNameT, RelationSchemasT, VariantsT>
         | undefined
       const getChildTrace = () => childTrace
-      const utilities = buildChildUtilities(
-        getChildTrace,
-        parent,
-        this.traceUtilities,
-      )
+      const utilities = buildChildUtilities(getChildTrace, parent)
 
       // Create the trace with child utilities
       trace = new Trace<SelectedRelationNameT, RelationSchemasT, VariantsT>({
@@ -203,7 +241,7 @@ export class Tracer<
           relatedTo: undefined,
           startTime: ensureTimestamp(input.startTime),
           id,
-          parentId: parent.input.id,
+          parentTraceId: parent.input.id,
         },
         definitionModifications,
         traceUtilities: utilities,
@@ -213,7 +251,7 @@ export class Tracer<
       childTrace = trace
 
       parent.adoptChild(trace) // F-1/F-2 behaviour
-      // trace does NOT call global replaceCurrentTrace
+      // we do not replace the singleton currentTrace in TraceManager
     } else {
       // Create the trace with normal utilities
       trace = new Trace<SelectedRelationNameT, RelationSchemasT, VariantsT>({
@@ -226,10 +264,13 @@ export class Tracer<
           id,
         },
         definitionModifications,
-        traceUtilities: this.traceUtilities,
+        traceUtilities: this.rootTraceUtilities,
       })
 
-      this.traceUtilities.replaceCurrentTrace(trace, 'another-trace-started')
+      this.rootTraceUtilities.replaceCurrentTrace(
+        trace,
+        'another-trace-started',
+      )
     }
 
     return trace
@@ -285,7 +326,7 @@ export class Tracer<
     })
 
     // Replace the current trace with the new one
-    this.traceUtilities.replaceCurrentTrace(newTrace, 'definition-changed')
+    trace.traceUtilities.replaceCurrentTrace(newTrace, 'definition-changed')
   }
 
   // can have config changed until we move into active
@@ -309,7 +350,7 @@ export class Tracer<
   private getCurrentTraceInternal = ():
     | Trace<SelectedRelationNameT, RelationSchemasT, VariantsT>
     | undefined => {
-    const rootTrace = this.traceUtilities.getCurrentTrace()
+    const rootTrace = this.rootTraceUtilities.getCurrentTrace()
     if (!rootTrace) {
       return undefined
     }
@@ -339,30 +380,18 @@ export class Tracer<
   private getCurrentTraceOrWarn = ():
     | Trace<SelectedRelationNameT, RelationSchemasT, VariantsT>
     | undefined => {
-      const trace = this.getCurrentTraceInternal()
+    const trace = this.getCurrentTraceInternal()
 
-      if (trace) {
-        return trace
-      }
+    if (trace) {
+      return trace
+    }
 
-      const rootTrace = this.traceUtilities.getCurrentTrace()
-      if (!rootTrace) {
-        // No active trace at all
-        this.traceUtilities.reportWarningFn(
-          new Error(
-            `No current active trace when initializing a trace. Call tracer.start(...) or tracer.createDraft(...) beforehand.`,
-          ),
-          { definition: this.definition } as Partial<
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            DraftTraceContext<any, RelationSchemasT, any>
-          >,
-        )
-        return undefined
-      }
-
-      this.traceUtilities.reportWarningFn(
+    const rootTrace = this.rootTraceUtilities.getCurrentTrace()
+    if (!rootTrace) {
+      // No active trace at all
+      this.rootTraceUtilities.reportWarningFn(
         new Error(
-          `Trying to find an active '${this.definition.name}' trace, however the started root trace (${rootTrace.sourceDefinition.name}) has a different definition`,
+          `No current active trace when initializing a trace. Call tracer.start(...) or tracer.createDraft(...) beforehand.`,
         ),
         { definition: this.definition } as Partial<
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -371,6 +400,18 @@ export class Tracer<
       )
       return undefined
     }
+
+    this.rootTraceUtilities.reportWarningFn(
+      new Error(
+        `Trying to find an active '${this.definition.name}' trace, however the started root trace (${rootTrace.sourceDefinition.name}) has a different definition`,
+      ),
+      { definition: this.definition } as Partial<
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        DraftTraceContext<any, RelationSchemasT, any>
+      >,
+    )
+    return undefined
+  }
 
   /**
    * Dynamically add a computed span to the trace definition.

@@ -80,7 +80,8 @@ export class TraceManager<
           this.currentTrace.interrupt(reason)
         }
         this.currentTrace = newTrace
-
+      },
+      onTraceConstructed: (newTrace) => {
         // Subscribe to the new trace's events and forward them to our subjects
         this.subscribeToTraceEvents(newTrace)
         // Emit trace-start event
@@ -88,8 +89,8 @@ export class TraceManager<
           traceContext: newTrace,
         })
       },
-      onEndTrace: (traceToCleanUp) => {
-        if (traceToCleanUp === this.currentTrace) {
+      onTraceEnd: (endedTrace) => {
+        if (endedTrace === this.currentTrace) {
           this.currentTrace = undefined
         }
         // warn on miss?
@@ -115,14 +116,13 @@ export class TraceManager<
     })
 
     // Forward add-span-to-recording events
-    if ('when' in trace) {
-      trace.when('add-span-to-recording').subscribe((event) => {
-        this.eventSubjects['add-span-to-recording'].next(event)
-      })
-      trace.when('definition-modified').subscribe((event) => {
-        this.eventSubjects['definition-modified'].next(event)
-      })
-    }
+    trace.when('add-span-to-recording').subscribe((event) => {
+      this.eventSubjects['add-span-to-recording'].next(event)
+    })
+
+    trace.when('definition-modified').subscribe((event) => {
+      this.eventSubjects['definition-modified'].next(event)
+    })
   }
 
   /**
@@ -288,6 +288,26 @@ export class TraceManager<
       relationSchema:
         this.utilities.relationSchemas[traceDefinition.relationSchemaName],
     }
+    if (traceDefinition.adoptAsChildren?.includes(traceDefinition.name)) {
+      this.utilities.reportErrorFn(
+        new Error(
+          `A tracer cannot adopt its own traces as a children. Please remove "${traceDefinition.name}" from the adoptAsChildren array.`,
+        ),
+        {
+          definition: completeTraceDefinition as CompleteTraceDefinition<
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            any,
+            RelationSchemasT,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            any
+          >,
+        } as Partial<AllPossibleTraceContexts<RelationSchemasT, string>>,
+      )
+      completeTraceDefinition.adoptAsChildren =
+        completeTraceDefinition.adoptAsChildren!.filter(
+          (childName) => childName !== traceDefinition.name,
+        )
+    }
 
     if (!requiredSpans) {
       this.utilities.reportErrorFn(
@@ -305,6 +325,13 @@ export class TraceManager<
   }
 
   processSpan(span: Span<RelationSchemasT>): SpanAnnotationRecord | undefined {
+    // const spanWithId = span.id
+    //   ? span
+    //   : { id: this.utilities.generateId(), ...span }
+    if (span.id === undefined) {
+      // eslint-disable-next-line no-param-reassign
+      span.id = this.utilities.generateId()
+    }
     return this.currentTrace?.processSpan(span)
   }
 }

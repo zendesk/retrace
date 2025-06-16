@@ -1,13 +1,13 @@
 # **Specification — Parent/Child Traces**
 
 Right now, only one Trace can be ongoing at a given time. We want to make it possible to have children traces. A TraceDefinition will optionally include `adoptAsChildren` - A list of trace names which, when a Tracer for that trace has a draft started, instead of interrupting the current Trace, will be adopted as children of the current Trace.
-The TraceStateMachine would include a new state 'waiting-for-children', and a new event handler `onChildEnd`, which is called by the child Trace's `onEndTrace` implementation. Only once all children have ended, we move forward to the 'complete' state (and of course, if there are no children we transition to 'complete' immediately - in onEnterState). The children Trace instances are a Set inside of the parent Trace. When a child Trace is started, the `TraceManagerUtilities` provided isn't the same as for a top-level Trace, it is the parent Trace that manages how those utilities behave.
+The TraceStateMachine would include a new state 'waiting-for-children', and a new event handler `onChildEnd`, which is called by the child Trace's `onTraceEnd` implementation. Only once all children have ended, we move forward to the 'complete' state (and of course, if there are no children we transition to 'complete' immediately - in onEnterState). The children Trace instances are a Set inside of the parent Trace. When a child Trace is started, the `TraceManagerUtilities` provided isn't the same as for a top-level Trace, it is the parent Trace that manages how those utilities behave.
 If a Trace has children, whenever if executes `processSpan`, it should call `processSpan` on each of its children.
 
 As children Traces complete, they are moved to a separate Set with completed Traces, later passed into the `createTraceRecording`.
 Children traces are instances of Trace, which means they have their own startTime, and they create their own version of SpanAndAnnotation, which means the spans include the annotation that has the `operationRelativeStartTime` and other relative time values.
 If the parent is interrupted while children are present, we interrupt all children, with a new interruptionReason: 'parent-interrupted'
-If a child times out, the `onChildEnd` event will be emitted to the parent - every state must handle this event. If the parent is still in a non-terminal state - this should interrupt the parent with 'child-timeout' `interruptionReason`. The `onChildEnd` event might tell us the child was interrupted, which should interrupt the parent with interruptionReason 'child-interrupted'. The only exception to this is the case of of 'child-swap' interruptionReason, in which case we do not transition, but stay in the same state (noop), and delete the child instance from the children Set.
+If a child times out, the `onChildEnd` event will be emitted to the parent - every state must handle this event. If the parent is still in a non-terminal state - this should interrupt the parent with 'child-timeout' `interruptionReason`. The `onChildEnd` event might tell us the child was interrupted, which should interrupt the parent with interruptionReason 'child-interrupted'. The only exception to this is the case of of 'definition-changed' interruptionReason, in which case we do not transition, but stay in the same state (noop), and delete the child instance from the children Set.
 There's no additional logic to handle nested grandchildren, but they're are allowed simply by the fact that they're all Trace objects, and those can hold their own children. The higher level child always has to wait for all their children to end.
 We clear the parent’s children Set in onTerminalStateReached for GC.
 
@@ -133,7 +133,7 @@ const childUtils: TraceManagerUtilities = {
     if (reason === 'another-trace-started') {
       parent.adoptChild(newTrace) // adds to children
     } else {
-      childTrace.interrupt('child-swap') // special type of interruption that doesn't propagate up
+      childTrace.interrupt('definition-changed') // special type of interruption that doesn't propagate up
       parent.adoptChild(newTrace) // adds to children
     }
   },

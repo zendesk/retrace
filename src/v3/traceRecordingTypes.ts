@@ -28,6 +28,8 @@ export interface ComputedRenderSpan {
   renderCount: number
   /** the sum of all render durations */
   sumOfRenderDurations: number
+
+  attributes?: Attributes
 }
 
 export interface TraceRecordingBase<RelationSchemaT> {
@@ -35,6 +37,12 @@ export interface TraceRecordingBase<RelationSchemaT> {
    * random generated unique value or provided by the user at start
    */
   id: string
+
+  /**
+   * if this is a child trace, this is the id of the parent trace
+   * if this is a root trace, this is undefined
+   */
+  parentTraceId?: string
 
   /**
    * name of the trace / operation

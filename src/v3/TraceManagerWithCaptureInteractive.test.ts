@@ -307,7 +307,7 @@ describe('TraceManager with Capture Interactivity', () => {
 
     // prettier-ignore
     const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
-      Events: ${Render('start', 0)}-----${Render('end', 0)}---------------------${Render('debounce', 100)}------------------${Check}
+      Events: ${Render('start', 0)}-----${Render('end', 0)}------------------------------${Render('debounce', 100)}---------------------------${Check}
       Time:   ${0}                      ${DEFAULT_COLDBOOT_TIMEOUT_DURATION - 500}       ${DEFAULT_COLDBOOT_TIMEOUT_DURATION - 499}           ${DEFAULT_COLDBOOT_TIMEOUT_DURATION + 1}
       `
     processSpans(spans, traceManager)
@@ -542,7 +542,7 @@ describe('TraceManager with Capture Interactivity', () => {
     const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
       Events: ${Render('start', 0)}-----${Render('end', 0)}----------${LongTask(50)}------${LongTask(50)}-----${LongTask(50)}---------${Check}
       Time:   ${0}                      ${200}                       ${300}               ${400}              ${450}                  ${3_050}
-      `
+    `
 
     processSpans(spans, traceManager)
     expect(reportFn).toHaveBeenCalled()
@@ -555,10 +555,10 @@ describe('TraceManager with Capture Interactivity', () => {
         (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,
       ),
     ).toMatchInlineSnapshot(`
-        events    | start        end
-        timeline  | |-<⋯ +200 ⋯>-|
-        time (ms) | 0            200
-      `)
+      events    | start        end
+      timeline  | |-<⋯ +200 ⋯>-|
+      time (ms) | 0            200
+    `)
 
     expect(report.name).toBe('ticket.operation')
     expect(report.duration).toBe(200)

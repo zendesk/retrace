@@ -157,6 +157,7 @@ describe('TraceManager with Fixtures', () => {
         "id": "id-0",
         "interruptionReason": undefined,
         "name": "ticket.activated",
+        "parentTraceId": undefined,
         "relatedTo": {
           "ticketId": "74",
         },
@@ -290,6 +291,7 @@ describe('TraceManager with Fixtures', () => {
         "id": "id-0",
         "interruptionReason": undefined,
         "name": "ticket.activated",
+        "parentTraceId": undefined,
         "relatedTo": {
           "ticketId": "74",
         },
