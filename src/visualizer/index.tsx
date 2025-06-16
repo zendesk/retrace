@@ -1,6 +1,7 @@
 /* eslint-disable import/no-extraneous-dependencies */
 import '@zendeskgarden/css-bedrock'
-import React, { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import * as React from 'react'
 import { DEFAULT_THEME, ThemeProvider } from '@zendeskgarden/react-theming'
 import { DropTarget } from './components/DropTarget'
 import FileUploadButton from './components/FileUploadButton'

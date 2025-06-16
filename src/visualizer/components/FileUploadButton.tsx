@@ -1,4 +1,5 @@
-import React, { type ChangeEvent } from 'react'
+import { type ChangeEvent } from 'react'
+import * as React from 'react'
 
 interface FileUploadButtonProps {
   name: string
