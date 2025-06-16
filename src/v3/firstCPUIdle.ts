@@ -128,6 +128,12 @@ export function createCPUIdleProcessor<T extends number | PerformanceEntryLike>(
           }
         } else {
           longTaskClusterDurationTotal = entry.duration
+          
+          // Check if this single task is a heavy cluster
+          if (longTaskClusterDurationTotal >= heavyClusterThreshold && endTimeOfLastLongTask > fmp) {
+            possibleFirstCPUIdleTimestamp = endTimeOfLastLongTask
+            possibleFirstCPUIdleEntry = entry
+          }
         }
       }
       return quietWindowCheck
