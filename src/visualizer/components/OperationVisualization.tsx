@@ -1,6 +1,7 @@
 /* eslint-disable no-magic-numbers */
 /* eslint-disable import/no-extraneous-dependencies */
-import React, { useEffect, useMemo, useState } from 'react'
+import * as React from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Axis, AxisLeft } from '@visx/axis'
 import { Brush } from '@visx/brush'
 import type { BrushHandleRenderProps } from '@visx/brush/lib/BrushHandle'

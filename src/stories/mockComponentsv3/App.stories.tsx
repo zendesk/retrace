@@ -1,5 +1,6 @@
 /* eslint-disable no-console */
-import React, { useEffect } from 'react'
+import { useEffect } from 'react'
+import * as React from 'react'
 import type { Meta, StoryObj } from '@storybook/react'
 import { createConsoleTraceLogger } from '../../v3/ConsoleTraceLogger'
 import TraceManagerDebugger from '../../v3/TraceManagerDebugger'

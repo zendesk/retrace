@@ -1,5 +1,6 @@
 /* eslint-disable import/no-extraneous-dependencies */
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
+import * as React from 'react'
 import styled from 'styled-components'
 import { Timeline } from '@zendeskgarden/react-accordions'
 import { Avatar } from '@zendeskgarden/react-avatars'
