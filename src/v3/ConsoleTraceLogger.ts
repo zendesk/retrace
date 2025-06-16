@@ -600,11 +600,7 @@ export function createConsoleTraceLogger<
       if (!currentTraceInfo) return
       // Calculate live info from traceContext
       const trace = event.traceContext
-      const entries = [
-        ...(trace.recordedItems.values
-          ? trace.recordedItems.values()
-          : trace.recordedItems),
-      ]
+      const entries = [...trace.recordedItems.values()]
       liveDuration =
         entries.length > 0
           ? Math.round(

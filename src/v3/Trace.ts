@@ -368,7 +368,10 @@ export class TraceStateMachine<
           spanAndAnnotation.span.startTime.epoch +
           spanAndAnnotation.span.duration
 
-        if (isLongTask(spanAndAnnotation.span.performanceEntry) && spanEndTimeEpoch > (this.#lastLongTaskEndTime ?? 0)) {
+        if (
+          isLongTask(spanAndAnnotation.span.performanceEntry) &&
+          spanEndTimeEpoch > (this.#lastLongTaskEndTime ?? 0)
+        ) {
           this.#lastLongTaskEndTime = spanEndTimeEpoch
         }
 
@@ -467,7 +470,10 @@ export class TraceStateMachine<
           spanAndAnnotation.span.startTime.epoch +
           spanAndAnnotation.span.duration
 
-        if (isLongTask(spanAndAnnotation.span.performanceEntry) && spanEndTimeEpoch > (this.#lastLongTaskEndTime ?? 0)) {
+        if (
+          isLongTask(spanAndAnnotation.span.performanceEntry) &&
+          spanEndTimeEpoch > (this.#lastLongTaskEndTime ?? 0)
+        ) {
           this.#lastLongTaskEndTime = spanEndTimeEpoch
         }
 
@@ -653,7 +659,10 @@ export class TraceStateMachine<
           spanAndAnnotation.span.startTime.epoch +
           spanAndAnnotation.span.duration
 
-        if (isLongTask(spanAndAnnotation.span.performanceEntry) && spanEndTimeEpoch > (this.#lastLongTaskEndTime ?? 0)) {
+        if (
+          isLongTask(spanAndAnnotation.span.performanceEntry) &&
+          spanEndTimeEpoch > (this.#lastLongTaskEndTime ?? 0)
+        ) {
           this.#lastLongTaskEndTime = spanEndTimeEpoch
         }
 
@@ -831,7 +840,7 @@ export class TraceStateMachine<
             entry: this.completeSpan,
           },
           typeof interactiveConfig === 'object' ? interactiveConfig : {},
-          { lastLongTaskEndTime: this.#lastLongTaskEndTime }
+          { lastLongTaskEndTime: this.#lastLongTaskEndTime },
         )
 
         // DECISION: sort the buffer before processing. sorted by end time (spans that end first should be processed first)

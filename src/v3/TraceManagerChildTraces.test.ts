@@ -14,7 +14,12 @@ import {
   ticketAndUserAndGlobalRelationSchemasFixture,
   type TicketIdRelationSchemasFixture,
 } from './testUtility/fixtures/relationSchemas'
-import { Check, getSpansFromTimeline, LongTask, Render } from './testUtility/makeTimeline'
+import {
+  Check,
+  getSpansFromTimeline,
+  LongTask,
+  Render,
+} from './testUtility/makeTimeline'
 import { processSpans } from './testUtility/processSpans'
 import { TraceManager } from './TraceManager'
 import type { AnyPossibleReportFn, ReportErrorFn } from './types'
@@ -1791,7 +1796,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
         (call) => call[0].id === firstChildId,
       )?.[0]
       const siblingReport = reportFn.mock.calls.find(
-          (call) => call[0].id === siblingId,
+        (call) => call[0].id === siblingId,
       )?.[0]
 
       expect(parentReport?.status).toBe('ok')
@@ -2479,7 +2484,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       childTracer.start({
         relatedTo: { ticketId: '1' },
         variant: 'default',
-        startTime: {epoch: 25, now: 25},
+        startTime: { epoch: 25, now: 25 },
       })
 
       // Create spans for computed span calculation
@@ -2507,23 +2512,34 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
 
       // Verify computed spans were calculated
       expect(parentReport?.computedSpans?.['parent-computed']).toBeDefined()
-      expect(parentReport?.computedSpans?.['parent-computed']?.startOffset).toBe(0)
-      expect(parentReport?.computedSpans?.['parent-computed']?.duration).toBe(75)
+      expect(
+        parentReport?.computedSpans?.['parent-computed']?.startOffset,
+      ).toBe(0)
+      expect(parentReport?.computedSpans?.['parent-computed']?.duration).toBe(
+        75,
+      )
 
       expect(childReport?.computedSpans?.['child-computed']).toBeDefined()
-      expect(childReport?.computedSpans?.['child-computed']?.startOffset).toBe(0) // Relative to child start
+      expect(childReport?.computedSpans?.['child-computed']?.startOffset).toBe(
+        0,
+      ) // Relative to child start
       expect(childReport?.computedSpans?.['child-computed']?.duration).toBe(150)
       expect(reportErrorFn).not.toHaveBeenCalled()
     })
 
     it('should handle child adoption with required spans and matching relations', () => {
       // Create separate error/warning functions for the extended schema
-      const extendedReportErrorFn: Mock<ReportErrorFn<TicketAndUserAndGlobalRelationSchemasFixture>> = jest.fn()
-      const extendedReportWarningFn: Mock<ReportErrorFn<TicketAndUserAndGlobalRelationSchemasFixture>> = jest.fn()
+      const extendedReportErrorFn: Mock<
+        ReportErrorFn<TicketAndUserAndGlobalRelationSchemasFixture>
+      > = jest.fn()
+      const extendedReportWarningFn: Mock<
+        ReportErrorFn<TicketAndUserAndGlobalRelationSchemasFixture>
+      > = jest.fn()
 
       const traceManager = new TraceManager({
         relationSchemas: ticketAndUserAndGlobalRelationSchemasFixture,
-        reportFn: reportFn as unknown as AnyPossibleReportFn<TicketAndUserAndGlobalRelationSchemasFixture>,
+        reportFn:
+          reportFn as unknown as AnyPossibleReportFn<TicketAndUserAndGlobalRelationSchemasFixture>,
         generateId,
         reportErrorFn: extendedReportErrorFn,
         reportWarningFn: extendedReportWarningFn,
@@ -2570,7 +2586,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       // prettier-ignore
       const { spans } = getSpansFromTimeline<TicketAndUserAndGlobalRelationSchemasFixture>`
       Events: ${Render('parent-start', 0)}---${Render('child-start', 0)}---${Render('child-end', 0, { relatedTo })}---${Render('parent-end', 0, { relatedTo })}
-      Time:   ${0}                           ${25}                         ${75}                                     ${125}
+      Time:   ${0}                           ${25}                         ${75}                                      ${125}
       `
 
       processSpans(spans, traceManager)

@@ -46,7 +46,8 @@ export interface CPUIdleProcessorInit {
 }
 
 export const isLongTask = (entry?: PerformanceEntryLike) =>
-  entry && (entry.entryType === 'longtask' || entry.entryType === 'long-animation-frame')
+  entry &&
+  (entry.entryType === 'longtask' || entry.entryType === 'long-animation-frame')
 
 export function createCPUIdleProcessor<T extends number | PerformanceEntryLike>(
   fmpOrEntry: T,
@@ -128,9 +129,12 @@ export function createCPUIdleProcessor<T extends number | PerformanceEntryLike>(
           }
         } else {
           longTaskClusterDurationTotal = entry.duration
-          
+
           // Check if this single task is a heavy cluster
-          if (longTaskClusterDurationTotal >= heavyClusterThreshold && endTimeOfLastLongTask > fmp) {
+          if (
+            longTaskClusterDurationTotal >= heavyClusterThreshold &&
+            endTimeOfLastLongTask > fmp
+          ) {
             possibleFirstCPUIdleTimestamp = endTimeOfLastLongTask
             possibleFirstCPUIdleEntry = entry
           }
