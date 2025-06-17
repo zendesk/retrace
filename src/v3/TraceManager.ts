@@ -289,7 +289,7 @@ export class TraceManager<
     if (traceDefinition.adoptAsChildren?.includes(traceDefinition.name)) {
       this.utilities.reportErrorFn(
         new Error(
-          `A tracer cannot adopt its own traces as a children. Please remove "${traceDefinition.name}" from the adoptAsChildren array.`,
+          `A tracer cannot adopt its own traces as children. Please remove "${traceDefinition.name}" from the adoptAsChildren array.`,
         ),
         {
           definition: completeTraceDefinition as CompleteTraceDefinition<
@@ -323,9 +323,7 @@ export class TraceManager<
   }
 
   processSpan(span: Span<RelationSchemasT>): SpanAnnotationRecord | undefined {
-    // const spanWithId = span.id
-    //   ? span
-    //   : { id: this.utilities.generateId(), ...span }
+    // note: mutating span on purpose to preserve object identity
     if (span.id === undefined) {
       // eslint-disable-next-line no-param-reassign
       span.id = this.utilities.generateId()

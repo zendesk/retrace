@@ -1836,7 +1836,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       expect(reportErrorFn).toHaveBeenCalledWith(
         expect.objectContaining({
           message: expect.stringContaining(
-            `A tracer cannot adopt its own traces as a children. Please remove "${name}" from the adoptAsChildren array.`,
+            `A tracer cannot adopt its own traces as children. Please remove "${name}" from the adoptAsChildren array.`,
           ),
         }),
         expect.anything(),
