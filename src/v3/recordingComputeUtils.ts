@@ -665,6 +665,7 @@ export function createTraceRecording<
       : {}
 
   let markTraceAsErrored = false
+  let error: Error | undefined
   for (const spanAndAnnotation of recordedItemsArray) {
     if (
       spanAndAnnotation.span.status === 'error' &&
@@ -673,6 +674,8 @@ export function createTraceRecording<
       )
     ) {
       markTraceAsErrored = true
+      // eslint-disable-next-line prefer-destructuring
+      error = spanAndAnnotation.span.error
       break
     }
   }
@@ -723,6 +726,7 @@ export function createTraceRecording<
       : markTraceAsErrored
       ? 'error'
       : 'ok',
+    error,
     computedSpans,
     computedRenderBeaconSpans,
     computedValues,

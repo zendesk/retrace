@@ -91,6 +91,9 @@ export interface TraceRecordingBase<RelationSchemaT> {
   computedValues: {
     [valueName: string]: number | string | boolean
   }
+
+  /** The first unsupressed error that bubbled up to the trace, or undefined */
+  error?: Error
 }
 
 export interface TraceRecording<
