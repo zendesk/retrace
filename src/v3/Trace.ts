@@ -31,6 +31,7 @@ import type {
   SpanAnnotationRecord,
 } from './spanAnnotationTypes'
 import type { ActiveTraceConfig, DraftTraceInput, Span } from './spanTypes'
+import type { TraceRecording } from './traceRecordingTypes'
 import type {
   CompleteTraceDefinition,
   DraftTraceContext,
@@ -1352,6 +1353,9 @@ export class Trace<
   onChildEnd(
     childTrace: AllPossibleTraces<RelationSchemasT>,
     stateTransition: FinalTransition<RelationSchemasT>,
+    childRecording:
+      | TraceRecording<keyof RelationSchemasT, RelationSchemasT>
+      | undefined,
   ): void {
     // Remove child from active children
     this.children.delete(childTrace)
@@ -1362,6 +1366,21 @@ export class Trace<
       terminalState === 'interrupted' && 'interruptionReason' in stateTransition
         ? stateTransition.interruptionReason
         : undefined
+
+    if (
+      typeof childRecording?.duration === 'number' &&
+      childRecording.status !== 'interrupted'
+    ) {
+      // TODO: should this be sent to TraceManager, or just this Trace (parent)?
+      this.processSpan({
+        ...childRecording,
+        parentSpanId: this.input.id,
+        // these below just to satisfy TS, they're already in ...childRecording:
+        duration: childRecording.duration,
+        status: childRecording.status,
+      })
+    }
+
     // Notify the state machine about the child end
     this.stateMachine.emit('onChildEnd', {
       childTrace,
@@ -1608,6 +1627,16 @@ export class Trace<
     this.traceUtilities.onTraceConstructed(this)
   }
 
+  // lets make sure it serializes well
+  toJSON() {
+    return {
+      input: this.input,
+      definition: {
+        name: this.definition.name,
+      },
+    }
+  }
+
   sideEffectFns: TraceStateMachineSideEffectHandlers<RelationSchemasT> = {
     addSpanToRecording: (spanAndAnnotation) => {
       if (!this.recordedItems.has(spanAndAnnotation.span.id!)) {
@@ -1622,6 +1651,9 @@ export class Trace<
       }
     },
     onTerminalStateReached: (transition) => {
+      let traceRecording:
+        | TraceRecording<SelectedRelationNameT, RelationSchemasT>
+        | undefined
       // we never report after definition-changed;
       // it just means the Trace object has just been recreated
       if (transition.interruptionReason !== 'definition-changed') {
@@ -1630,9 +1662,7 @@ export class Trace<
         for (const child of this.children) {
           child.interrupt('parent-interrupted')
         }
-        this.children.clear()
-
-        const traceRecording = createTraceRecording(
+        traceRecording = createTraceRecording(
           // we don't want to pass 'this' but select the relevant properties
           // to avoid circular references
           {
@@ -1646,7 +1676,7 @@ export class Trace<
         this.traceUtilities.reportFn(traceRecording, this)
       }
 
-      this.traceUtilities.onTraceEnd(this, transition)
+      this.traceUtilities.onTraceEnd(this, transition, traceRecording)
 
       // close all event subjects, no more events can be sent by this trace
       for (const subject of Object.values(this.eventSubjects)) {

@@ -194,6 +194,9 @@ export interface TraceManagerUtilities<
   onTraceEnd: (
     trace: AllPossibleTraces<RelationSchemasT>,
     finalTransition: FinalTransition<RelationSchemasT>,
+    traceRecording:
+      | TraceRecording<keyof RelationSchemasT, RelationSchemasT>
+      | undefined,
   ) => void
   getCurrentTrace: () => AllPossibleTraces<RelationSchemasT> | undefined
   onTraceConstructed: (trace: AllPossibleTraces<RelationSchemasT>) => void
@@ -438,11 +441,14 @@ export interface TraceDefinition<
   >[]
 
   /**
-   * A list of span attributes that should be inherited by the children spans (propagated downwards).
+   * A list of span attributes that should be inherited by
+   * the children spans (propagated downwards) in the trace recording.
    * This is useful for ensuring that certain attributes are available on all spans,
    * for example, to ensure that `team` ownership information is available on descendant spans,
    * even if they didn't explicitly define it.
    * Note that a children span only inherits the attribute if it doesn't already have them defined.
+   *
+   * This only applies to the output of the trace recording, it doesn't affect the spans themselves.
    */
   heritableSpanAttributes?: readonly string[]
 }

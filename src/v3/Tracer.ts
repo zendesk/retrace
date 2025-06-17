@@ -74,8 +74,8 @@ function buildChildUtilities<
     // redirect "current trace" queries to return the itself when asked
     getCurrentTrace: getChildTrace,
 
-    onTraceEnd: (trace, finalTransition) => {
-      parent.onChildEnd(trace, finalTransition)
+    onTraceEnd: (trace, finalTransition, recording) => {
+      parent.onChildEnd(trace, finalTransition, recording)
     },
 
     // handle replacing the current trace in the context of parent-child relationships

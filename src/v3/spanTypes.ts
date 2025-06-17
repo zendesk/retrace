@@ -1,4 +1,5 @@
 import type { ErrorInfo } from 'react'
+import type { TraceRecording } from '../main'
 import type { BeaconConfig } from './hooksTypes'
 import type { MapSchemaToTypes, RelationsOnASpan, Timestamp } from './types'
 
@@ -194,9 +195,31 @@ export interface PerformanceEntrySpan<RelationSchemasT>
 }
 
 /**
+ * Represents a child operation span within a trace.
+ * The shape is the same as TraceRecording
+ */
+export interface ChildOperationSpan<RelationSchemasT>
+  extends Omit<SpanBase<RelationSchemasT>, 'id' | 'relatedTo'>,
+    Omit<
+      TraceRecording<keyof RelationSchemasT, RelationSchemasT>,
+      'duration' | 'status'
+    > {
+  type: 'operation'
+}
+
+export interface ErrorSpan<RelationSchemasT>
+  extends SpanBase<RelationSchemasT> {
+  type: 'error'
+  error: Error
+  status: 'error'
+}
+
+/**
  * All possible trace entries
  */
 export type Span<RelationSchemasT> =
   | PerformanceEntrySpan<RelationSchemasT>
   | ComponentRenderSpan<RelationSchemasT>
   | ResourceSpan<RelationSchemasT>
+  | ChildOperationSpan<RelationSchemasT>
+  | ErrorSpan<RelationSchemasT>

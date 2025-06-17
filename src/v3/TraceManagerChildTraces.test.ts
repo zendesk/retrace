@@ -750,8 +750,8 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
 
       // prettier-ignore
       const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
-      Events: ${Render('parent-start', 0)}---${Render('child-start', 0)}---<===+150ms===>----${Check}
-      Time:   ${0}                           ${25}                           ${150}
+      Events: ${Render('parent-start', 0)}---${Render('child-start', 0)}---<===+125ms===>----${Check}
+      Time:   ${0}                           ${25}                                           ${150}
       `
 
       processSpans(spans, traceManager)
@@ -1360,7 +1360,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       // prettier-ignore
       const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
       Events: ${Render('parent-start', 0)}---${Render('child-start', 0)}---${Render('child-end', 0)}---${Render('late-span', 50)}---${Render('parent-end', 0)}
-      Time:   ${0}                           ${25}                         ${75}                     ${125}                     ${175}
+      Time:   ${0}                           ${25}                         ${75}                       ${125}                       ${175}
       `
 
       processSpans(spans, traceManager)
@@ -1454,7 +1454,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       // prettier-ignore
       const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
       Events: ${Render('parent-start', 0)}---${Render('child-1-start', 0)}---${Render('child-2-start', 0)}---${Render('child-1-end', 0)}---${Render('shared-span', 50)}---${Render('child-2-end', 0)}---${Render('parent-end', 0)}
-      Time:   ${0}                           ${25}                            ${50}                            ${75}                           ${125}                       ${175}                          ${225}
+      Time:   ${0}                           ${25}                           ${50}                           ${75}                         ${125}                         ${175}                        ${225}
       `
 
       processSpans(spans, traceManager)
@@ -1542,7 +1542,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       // prettier-ignore
       const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
       Events: ${Render('parent-start', 0)}---${Render('child-start', 0)}---${Render('child-end', 0)}---${Render('parent-end', 0)}
-      Time:   ${0}                           ${25}                         ${75}                      ${125}
+      Time:   ${0}                           ${25}                         ${75}                       ${125}
       `
 
       processSpans(spans, traceManager)
@@ -2609,6 +2609,263 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       expect(parentReport?.relatedTo).toEqual(relatedTo)
       expect(childReport?.relatedTo).toEqual(relatedTo)
       expect(extendedReportErrorFn).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('Parent receives child span', () => {
+    it('should fire a type: operation span in parent when child completes successfully', () => {
+      const traceManager = new TraceManager({
+        relationSchemas: { ticket: { ticketId: String } },
+        reportFn: getReportFn(),
+        generateId,
+        reportErrorFn,
+        reportWarningFn: reportErrorFn,
+      })
+
+      // Create parent tracer that can adopt children
+      const parentTracer = traceManager.createTracer({
+        name: 'ticket.parent-operation',
+        type: 'operation',
+        relationSchemaName: 'ticket',
+        requiredSpans: [{ name: 'parent-end' }],
+        adoptAsChildren: ['ticket.child-operation'],
+        variants: {
+          default: { timeout: DEFAULT_TIMEOUT_DURATION },
+        },
+      })
+
+      // Create child tracer
+      const childTracer = traceManager.createTracer({
+        name: 'ticket.child-operation',
+        type: 'operation',
+        relationSchemaName: 'ticket',
+        requiredSpans: [{ name: 'child-end' }],
+        variants: {
+          default: { timeout: DEFAULT_TIMEOUT_DURATION },
+        },
+      })
+
+      // Start parent and child traces
+      parentTracer.start({
+        relatedTo: { ticketId: '1' },
+        variant: 'default',
+      })
+
+      childTracer.start({
+        relatedTo: { ticketId: '1' },
+        variant: 'default',
+      })
+
+      // prettier-ignore
+      const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
+      Events: ${Render('parent-start', 0)}---${Render('child-start', 0)}---${Render('child-end', 0)}---${Render('parent-end', 0)}
+      Time:   ${0}                           ${25}                         ${75}                      ${125}
+      `
+
+      processSpans(spans, traceManager)
+
+      expect(reportFn).toHaveBeenCalledTimes(2)
+
+      // Verify parent trace received the child operation span
+      const parentReport = reportFn.mock.calls.find(
+        (call) => call[0].name === 'ticket.parent-operation',
+      )?.[0]
+      expect(parentReport).toBeDefined()
+
+      // Look for the operation span in parent's entries
+      const operationSpan = parentReport?.entries.find(
+        (entry) => entry.span.type === 'operation',
+      )
+
+      expect(operationSpan).toBeDefined()
+      expect(operationSpan?.span.name).toBe('ticket.child-operation')
+      expect(operationSpan?.span.status).toBe('ok')
+      expect(typeof operationSpan?.span.duration).toBe('number')
+      expect(operationSpan?.span.duration).toBeGreaterThan(0)
+
+      // Verify the child report details are preserved in the operation span
+      const childReport = reportFn.mock.calls.find(
+        (call) => call[0].name === 'ticket.child-operation',
+      )?.[0]
+      expect(childReport).toBeDefined()
+      expect(operationSpan?.span.duration).toBe(childReport?.duration)
+      expect(reportErrorFn).not.toHaveBeenCalled()
+    })
+
+    it('should NOT fire operation span in parent when child is interrupted', () => {
+      const traceManager = new TraceManager({
+        relationSchemas: { ticket: { ticketId: String } },
+        reportFn: getReportFn(),
+        generateId,
+        reportErrorFn,
+        reportWarningFn: reportErrorFn,
+      })
+
+      // Create parent tracer that can adopt children
+      const parentTracer = traceManager.createTracer({
+        name: 'ticket.parent-operation',
+        type: 'operation',
+        relationSchemaName: 'ticket',
+        requiredSpans: [{ name: 'parent-end' }],
+        adoptAsChildren: ['ticket.child-operation'],
+        variants: {
+          default: { timeout: DEFAULT_TIMEOUT_DURATION },
+        },
+      })
+
+      // Create child tracer that can be interrupted
+      const childTracer = traceManager.createTracer({
+        name: 'ticket.child-operation',
+        type: 'operation',
+        relationSchemaName: 'ticket',
+        requiredSpans: [{ name: 'child-end' }],
+        interruptOnSpans: [matchSpan.withName('child-interrupt')],
+        variants: {
+          default: { timeout: DEFAULT_TIMEOUT_DURATION },
+        },
+      })
+
+      // Start parent and child traces
+      parentTracer.start({
+        relatedTo: { ticketId: '1' },
+        variant: 'default',
+      })
+
+      childTracer.start({
+        relatedTo: { ticketId: '1' },
+        variant: 'default',
+      })
+
+      // Interrupt the child before it completes
+      // prettier-ignore
+      const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
+      Events: ${Render('parent-start', 0)}---${Render('child-start', 0)}---${Render('child-interrupt', 0)}
+      Time:   ${0}                           ${25}                         ${50}
+      `
+
+      processSpans(spans, traceManager)
+
+      expect(reportFn).toHaveBeenCalledTimes(2) // Both parent and child interrupted
+
+      // Verify parent trace was interrupted (due to child interruption propagation)
+      const parentReport = reportFn.mock.calls.find(
+        (call) => call[0].name === 'ticket.parent-operation',
+      )?.[0]
+      expect(parentReport).toBeDefined()
+      expect(parentReport?.status).toBe('interrupted')
+
+      // Verify NO operation span was created in parent (child was interrupted)
+      const operationSpan = parentReport?.entries.find(
+        (entry) => entry.span.type === 'operation',
+      )
+      expect(operationSpan).toBeUndefined()
+
+      // Verify child was interrupted
+      const childReport = reportFn.mock.calls.find(
+        (call) => call[0].name === 'ticket.child-operation',
+      )?.[0]
+      expect(childReport).toBeDefined()
+      expect(childReport?.status).toBe('interrupted')
+      expect(reportErrorFn).not.toHaveBeenCalled()
+    })
+
+    it('should fire operation spans for multiple children completing', () => {
+      const traceManager = new TraceManager({
+        relationSchemas: { ticket: { ticketId: String } },
+        reportFn: getReportFn(),
+        generateId,
+        reportErrorFn,
+        reportWarningFn: reportErrorFn,
+      })
+
+      // Create parent tracer that can adopt multiple children
+      const parentTracer = traceManager.createTracer({
+        name: 'ticket.parent-operation',
+        type: 'operation',
+        relationSchemaName: 'ticket',
+        requiredSpans: [{ name: 'parent-end' }],
+        adoptAsChildren: [
+          'ticket.child-operation-1',
+          'ticket.child-operation-2',
+        ],
+        variants: {
+          default: { timeout: DEFAULT_TIMEOUT_DURATION },
+        },
+      })
+
+      // Create child tracers
+      const child1Tracer = traceManager.createTracer({
+        name: 'ticket.child-operation-1',
+        type: 'operation',
+        relationSchemaName: 'ticket',
+        requiredSpans: [{ name: 'child-1-end' }],
+        variants: {
+          default: { timeout: DEFAULT_TIMEOUT_DURATION },
+        },
+      })
+
+      const child2Tracer = traceManager.createTracer({
+        name: 'ticket.child-operation-2',
+        type: 'operation',
+        relationSchemaName: 'ticket',
+        requiredSpans: [{ name: 'child-2-end' }],
+        variants: {
+          default: { timeout: DEFAULT_TIMEOUT_DURATION },
+        },
+      })
+
+      // Start all traces
+      parentTracer.start({
+        relatedTo: { ticketId: '1' },
+        variant: 'default',
+      })
+
+      child1Tracer.start({
+        relatedTo: { ticketId: '1' },
+        variant: 'default',
+      })
+
+      child2Tracer.start({
+        relatedTo: { ticketId: '1' },
+        variant: 'default',
+      })
+
+      // Complete all traces
+      // prettier-ignore
+      const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
+      Events: ${Render('parent-start', 0)}---${Render('child-1-start', 0)}---${Render('child-2-start', 0)}---${Render('child-1-end', 0)}---${Render('child-2-end', 0)}---${Render('parent-end', 0)}
+      Time:   ${0}                           ${25}                           ${50}                           ${75}                         ${100}                        ${125}
+      `
+
+      processSpans(spans, traceManager)
+
+      expect(reportFn).toHaveBeenCalledTimes(3) // Parent + 2 children
+
+      // Verify parent trace received both child operation spans
+      const parentReport = reportFn.mock.calls.find(
+        (call) => call[0].name === 'ticket.parent-operation',
+      )?.[0]
+      expect(parentReport).toBeDefined()
+
+      // Look for the operation spans in parent's entries
+      const operationSpans = parentReport?.entries.filter(
+        (entry) => entry.span.type === 'operation',
+      )
+
+      expect(operationSpans).toHaveLength(2)
+
+      const child1OperationSpan = operationSpans?.find(
+        (entry) => entry.span.name === 'ticket.child-operation-1',
+      )
+      const child2OperationSpan = operationSpans?.find(
+        (entry) => entry.span.name === 'ticket.child-operation-2',
+      )
+
+      expect(child1OperationSpan).toBeDefined()
+      expect(child1OperationSpan?.span.status).toBe('ok')
+      expect(child2OperationSpan).toBeDefined()
+      expect(child2OperationSpan?.span.status).toBe('ok')
+      expect(reportErrorFn).not.toHaveBeenCalled()
     })
   })
 })
