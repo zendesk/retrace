@@ -22,8 +22,10 @@ export interface SpanSummaryAttributes {
   }
 }
 
-export interface RumTraceRecording<RelationSchemaT>
-  extends TraceRecordingBase<RelationSchemaT> {
+export interface RumTraceRecording<
+  SelectedRelationNameT extends keyof RelationSchemasT,
+  RelationSchemasT,
+> extends TraceRecordingBase<RelationSchemasT[SelectedRelationNameT]> {
   // spans that don't exist as separate spans in the DB
   // useful for things like renders, which can repeat tens of times
   // during the same operation
@@ -45,6 +47,8 @@ export interface RumTraceRecording<RelationSchemaT>
    * If attributes changed, most recent ones overwrite older ones.
    */
   spanAttributes: SpanSummaryAttributes
+
+  longestSpan: SpanAndAnnotation<RelationSchemasT> | undefined
 
   // allow for additional attributes to be added by the consumer
   [key: string]: unknown
@@ -121,6 +125,31 @@ export function getSpanSummaryAttributes<RelationSchemasT>(
   return spanAttributes
 }
 
+export function findLongestSpan<RelationSchemasT>(
+  spanAndAnnotations: readonly SpanAndAnnotation<RelationSchemasT>[],
+  filter?: (spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>) => boolean,
+): SpanAndAnnotation<RelationSchemasT> | undefined {
+  const filteredSpans = filter
+    ? spanAndAnnotations.filter(filter)
+    : spanAndAnnotations
+
+  if (filteredSpans.length === 0) {
+    return undefined
+  }
+
+  let longestSpanAndAnnotation = filteredSpans[0]!
+  let maxDuration = filteredSpans[0]!.span.duration
+
+  for (const spanAndAnnotation of filteredSpans) {
+    if (spanAndAnnotation.span.duration > maxDuration) {
+      maxDuration = spanAndAnnotation.span.duration
+      longestSpanAndAnnotation = spanAndAnnotation
+    }
+  }
+
+  return longestSpanAndAnnotation
+}
+
 type RoundFunction = (x: number) => number
 
 function recursivelyRoundValues<T extends object>(
@@ -155,16 +184,26 @@ export function convertTraceToRUM<
   SelectedRelationNameT extends keyof RelationSchemasT,
   RelationSchemasT,
   const VariantsT extends string,
->(
-  traceRecording: TraceRecording<SelectedRelationNameT, RelationSchemasT>,
-  context: TraceContext<SelectedRelationNameT, RelationSchemasT, VariantsT>,
-  embedSpanSelector: SpanMatcherFn<
+>({
+  traceRecording,
+  context,
+  embedSpanSelector = defaultEmbedSpanSelector,
+  keepComputedRenderBeaconSpanAttributes,
+}: {
+  traceRecording: TraceRecording<SelectedRelationNameT, RelationSchemasT>
+  context: TraceContext<SelectedRelationNameT, RelationSchemasT, VariantsT>
+  embedSpanSelector?: SpanMatcherFn<
     SelectedRelationNameT,
     RelationSchemasT,
     VariantsT
-  > = defaultEmbedSpanSelector,
-): RumTraceRecording<RelationSchemasT[SelectedRelationNameT]> {
-  const { entries, ...otherTraceRecordingAttributes } = traceRecording
+  >
+  keepComputedRenderBeaconSpanAttributes?: string[] | false
+}): RumTraceRecording<SelectedRelationNameT, RelationSchemasT> {
+  const {
+    entries,
+    computedRenderBeaconSpans,
+    ...otherTraceRecordingAttributes
+  } = traceRecording
   const embeddedEntries: SpanAndAnnotation<RelationSchemasT>[] = []
   const nonEmbeddedSpans = new Set<string>()
   const spanAttributes = getSpanSummaryAttributes(traceRecording.entries)
@@ -201,12 +240,41 @@ export function convertTraceToRUM<
     }
   }
 
-  const result: RumTraceRecording<RelationSchemasT[SelectedRelationNameT]> = {
+  let computedRenderBeaconSpansTransformed: typeof computedRenderBeaconSpans =
+    {}
+  if (keepComputedRenderBeaconSpanAttributes !== undefined) {
+    computedRenderBeaconSpansTransformed = Object.fromEntries(
+      Object.entries(computedRenderBeaconSpans).map(
+        ([key, { attributes, ...span }]) => {
+          if (keepComputedRenderBeaconSpanAttributes === false || !attributes) {
+            return [key, { ...span }]
+          }
+          const filteredAttributes: Record<string, unknown> = {}
+          for (const attr of keepComputedRenderBeaconSpanAttributes) {
+            if (attr in attributes) {
+              filteredAttributes[attr] = attributes[attr]
+            }
+          }
+          return [key, { ...span, attributes: filteredAttributes }]
+        },
+      ),
+    )
+  }
+
+  const longestSpanAndAnnotation = findLongestSpan(
+    entries,
+    ({ span }) => span.type !== 'operation',
+  )
+
+  const result: RumTraceRecording<SelectedRelationNameT, RelationSchemasT> = {
     ...otherTraceRecordingAttributes,
+    computedRenderBeaconSpans: computedRenderBeaconSpansTransformed,
     embeddedSpans: Object.fromEntries(embeddedSpans),
     nonEmbeddedSpans: [...nonEmbeddedSpans],
     spanAttributes,
+    longestSpan: longestSpanAndAnnotation,
   }
 
+  // we want to decrease precision to improve readability of the output, and decrease the payload size
   return recursivelyRoundValues(result)
 }
