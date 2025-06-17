@@ -7482,7 +7482,7 @@ __metadata:
     rxjs: "npm:^7.8.2"
     storybook: "npm:^9.0.10"
     style-loader: "npm:^4.0.0"
-    styled-components: "npm:^6.1.17"
+    styled-components: "npm:^6.1.19"
     ts-loader: "npm:^9.5.2"
     typescript: "npm:^5.8.3"
     url-loader: "npm:^4.1.1"
@@ -19277,9 +19277,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"styled-components@npm:^6.1.17":
-  version: 6.1.17
-  resolution: "styled-components@npm:6.1.17"
+"styled-components@npm:^6.1.19":
+  version: 6.1.19
+  resolution: "styled-components@npm:6.1.19"
   dependencies:
     "@emotion/is-prop-valid": "npm:1.2.2"
     "@emotion/unitless": "npm:0.8.1"
@@ -19293,7 +19293,7 @@ __metadata:
   peerDependencies:
     react: ">= 16.8.0"
     react-dom: ">= 16.8.0"
-  checksum: 10/31939ba34ef8440f02cbdd2b509d03c6125d9f67876562899e6359680ad600b169a4d2c87afa57b399ecca31432b61de54bf052e1846051bbcfca64d86e5181b
+  checksum: 10/1e7503b48619c37691791f063d4ebbb32caf3ddef2ae11c3c706c4d6df5c0538357d406ef7a5f6077b2fef6294e365d4426240155a93cab3e49af58c9404ef9a
   languageName: node
   linkType: hard
 
