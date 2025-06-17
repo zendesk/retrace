@@ -3,17 +3,16 @@ import type { StorybookConfig } from '@storybook/react-webpack5'
 
 const config: StorybookConfig = {
   stories: ['../src/**/*.stories.@(js|jsx|ts|tsx)'],
-  addons: [
-    '@storybook/addon-essentials',
-    '@storybook/addon-webpack5-compiler-swc',
-  ],
+  addons: ['@storybook/addon-webpack5-compiler-swc', '@storybook/addon-docs'],
   framework: '@storybook/react-webpack5',
+
   // framework: {
   //   // name: '@storybook/react-vite',
   //   name: '@storybook/react-webpack5',
   //   options: {},
   // },
   core: {},
+
   // other storybook options...,
   webpackFinal(config, options) {
     const assetRule = config.module?.rules?.find(
@@ -40,14 +39,12 @@ const config: StorybookConfig = {
     })
     return config
   },
+
   typescript: {
     check: false,
     reactDocgen: 'react-docgen',
     reactDocgenTypescriptOptions: {}, // Available only when reactDocgen is set to 'react-docgen-typescript'
     // skipCompiler: true,
-  },
-  docs: {
-    autodocs: true,
-  },
+  }
 }
 export default config
