@@ -37,7 +37,6 @@ import type {
 export class TraceManager<
   const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 > {
-  readonly performanceEntryDeduplicationStrategy?: SpanDeduplicationStrategy<RelationSchemasT>
   private currentTrace: AllPossibleTraces<RelationSchemasT> | undefined =
     undefined
 

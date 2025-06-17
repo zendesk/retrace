@@ -41,8 +41,8 @@ import type {
   TraceDefinitionModifications,
   TraceInterruptionReason,
   TraceInterruptionReasonForInvalidTraces,
-  TraceManagerUtilities,
   TraceModifications,
+  TraceUtilities,
   TransitionDraftOptions,
 } from './types'
 import {
@@ -1311,7 +1311,7 @@ export class Trace<
   }
 
   input: DraftTraceInput<RelationSchemasT[SelectedRelationNameT], VariantsT>
-  readonly traceUtilities: TraceManagerUtilities<RelationSchemasT>
+  readonly traceUtilities: TraceUtilities<RelationSchemasT>
 
   get isDraft() {
     return this.stateMachine.currentState === INITIAL_STATE
@@ -1489,7 +1489,7 @@ export class Trace<
             RelationSchemasT,
             VariantsT
           >
-          traceUtilities: TraceManagerUtilities<RelationSchemasT>
+          traceUtilities: TraceUtilities<RelationSchemasT>
         }
       | {
           importFrom: Trace<SelectedRelationNameT, RelationSchemasT, VariantsT>
@@ -1511,6 +1511,13 @@ export class Trace<
             definitionModifications: data.definitionModifications,
           }
         : data
+
+    this.traceUtilities = {
+      ...traceUtilities,
+      // every trace gets its own deduplication strategy instance:
+      performanceEntryDeduplicationStrategy:
+        traceUtilities.getPerformanceEntryDeduplicationStrategy?.(),
+    }
 
     this.sourceDefinition = definition
 
@@ -1559,7 +1566,7 @@ export class Trace<
     if (variant) {
       this.applyDefinitionModifications(variant, false)
     } else {
-      traceUtilities.reportErrorFn(
+      this.traceUtilities.reportErrorFn(
         new Error(
           `Invalid variant value: ${
             input.variant
@@ -1574,7 +1581,6 @@ export class Trace<
       ...input,
       startTime: ensureTimestamp(input.startTime),
     }
-    this.traceUtilities = traceUtilities
 
     this.definition.interruptOnSpans = [
       ...(this.definition.interruptOnSpans ?? []),
