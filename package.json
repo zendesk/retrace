@@ -165,7 +165,7 @@
     "react-test-renderer": "^18.0.0",
     "storybook": "^9.0.10",
     "style-loader": "^4.0.0",
-    "styled-components": "^6.1.17",
+    "styled-components": "^6.1.19",
     "ts-loader": "^9.5.2",
     "typescript": "^5.8.3",
     "url-loader": "^4.1.1",
