@@ -85,7 +85,7 @@ describe('convertTraceToRUM', () => {
       recordedItems,
     }
 
-    const result = convertTraceToRUM(traceRecording, context)
+    const result = convertTraceToRUM({ traceRecording, context })
 
     // Check rounded values in embeddedSpans
     const embeddedSpan = result.embeddedSpans['component-render|test-component']
@@ -182,9 +182,111 @@ describe('convertTraceToRUM', () => {
     }
 
     // we dont want to return any embedded spans
-    const result = convertTraceToRUM(traceRecording, context, () => false)
+    const result = convertTraceToRUM({
+      traceRecording,
+      context,
+      embedSpanSelector: () => false,
+    })
     expect(Object.keys(result.embeddedSpans)).toHaveLength(0)
     expect(result.nonEmbeddedSpans).toEqual(['component-render|test-component'])
     expect(result.nonEmbeddedSpans).toHaveLength(1)
+  })
+
+  it('should identify the longest span correctly', () => {
+    const definition: CompleteTraceDefinition<
+      'ticket',
+      TicketIdRelationSchemasFixture,
+      'origin'
+    > = {
+      name: 'test-trace',
+      relationSchemaName: 'ticket',
+      relationSchema: { ticketId: String },
+      requiredSpans: [() => true],
+      computedSpanDefinitions: {},
+      computedValueDefinitions: {},
+      variants: {
+        origin: { timeout: 45_000 },
+      },
+    }
+
+    const input: ActiveTraceInput<
+      MapTypesToSchema<TicketIdRelationSchemasFixture['ticket']>,
+      'origin'
+    > = {
+      id: 'test',
+      startTime: createTimestamp(0),
+      relatedTo: { ticketId: '74' },
+      variant: 'origin',
+    }
+
+    const recordedItems = new Map([
+      createMockSpanAndAnnotation(100, {
+        name: 'short-component',
+        type: 'component-render',
+        relatedTo: {},
+        duration: 30,
+        isIdle: false,
+        renderCount: 1,
+        renderedOutput: 'loading',
+      }),
+      createMockSpanAndAnnotation(
+        200,
+        {
+          name: 'long-component',
+          type: 'component-render',
+          relatedTo: {},
+          duration: 150,
+          isIdle: true,
+          renderCount: 1,
+          renderedOutput: 'content',
+        },
+        { occurrence: 2 },
+      ),
+      createMockSpanAndAnnotation(
+        300,
+        {
+          name: 'medium-component',
+          type: 'component-render',
+          relatedTo: {},
+          duration: 75,
+          isIdle: false,
+          renderCount: 1,
+          renderedOutput: 'error',
+        },
+        { occurrence: 3 },
+      ),
+    ])
+
+    const traceRecording = createTraceRecording(
+      {
+        definition,
+        input,
+        recordedItemsByLabel: {},
+        recordedItems,
+      },
+      {
+        transitionFromState: 'active',
+        lastRelevantSpanAndAnnotation: undefined,
+        transitionToState: 'complete',
+        completeSpanAndAnnotation: undefined,
+        cpuIdleSpanAndAnnotation: undefined,
+        lastRequiredSpanAndAnnotation: undefined,
+      },
+    )
+
+    const context = {
+      definition,
+      input,
+      recordedItemsByLabel: {},
+      recordedItems,
+    }
+
+    const result = convertTraceToRUM({ traceRecording, context })
+
+    // Should identify the longest span
+    expect(result.longestSpan).toBeDefined()
+    expect(result.longestSpan?.span.name).toBe('long-component')
+    expect(result.longestSpan?.span.duration).toBe(150)
+    expect(result.longestSpan?.span.type).toBe('component-render')
   })
 })
