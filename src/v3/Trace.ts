@@ -1378,6 +1378,7 @@ export class Trace<
         // these below just to satisfy TS, they're already in ...childRecording:
         duration: childRecording.duration,
         status: childRecording.status,
+        relatedTo: { ...childRecording.relatedTo },
       })
     }
 

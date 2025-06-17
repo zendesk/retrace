@@ -24,7 +24,6 @@ import type {
   DraftTraceContext,
   RelationSchemasBase,
   ReportErrorFn,
-  SpanDeduplicationStrategy,
   TraceDefinition,
   TraceManagerConfig,
   TraceManagerUtilities,
