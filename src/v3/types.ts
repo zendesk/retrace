@@ -175,7 +175,7 @@ export interface TraceManagerConfig<RelationSchemasT> {
    * Strategy for deduplicating performance entries.
    * If not provided, no deduplication will be performed.
    */
-  performanceEntryDeduplicationStrategy?: SpanDeduplicationStrategy<RelationSchemasT>
+  getPerformanceEntryDeduplicationStrategy?: () => SpanDeduplicationStrategy<RelationSchemasT>
 
   reportErrorFn: ReportErrorFn<RelationSchemasT>
   reportWarningFn: ReportErrorFn<RelationSchemasT>
@@ -200,6 +200,12 @@ export interface TraceManagerUtilities<
   ) => void
   getCurrentTrace: () => AllPossibleTraces<RelationSchemasT> | undefined
   onTraceConstructed: (trace: AllPossibleTraces<RelationSchemasT>) => void
+}
+
+export interface TraceUtilities<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> extends TraceManagerUtilities<RelationSchemasT> {
+  performanceEntryDeduplicationStrategy?: SpanDeduplicationStrategy<RelationSchemasT>
 }
 
 export interface TraceDefinitionModifications<

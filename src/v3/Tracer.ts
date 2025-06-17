@@ -14,6 +14,7 @@ import {
   type TraceDefinitionModifications,
   type TraceManagerUtilities,
   type TraceModifications,
+  type TraceUtilities,
   type TransitionDraftOptions,
 } from './types'
 
@@ -66,7 +67,7 @@ function buildChildUtilities<
 >(
   getChildTrace: () => AllPossibleTraces<RelationSchemasT> | undefined,
   parent: AllPossibleTraces<RelationSchemasT>,
-): TraceManagerUtilities<RelationSchemasT> {
+): TraceUtilities<RelationSchemasT> {
   return {
     // reporting and errors continue to use the original functions
     ...parent.traceUtilities,
