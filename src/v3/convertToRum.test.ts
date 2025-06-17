@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { assert, describe, expect, it } from 'vitest'
 import { convertTraceToRUM } from './convertToRum'
 import { createTraceRecording } from './recordingComputeUtils'
 import type { ActiveTraceInput } from './spanTypes'
@@ -229,32 +229,24 @@ describe('convertTraceToRUM', () => {
         renderCount: 1,
         renderedOutput: 'loading',
       }),
-      createMockSpanAndAnnotation(
-        200,
-        {
-          name: 'long-component',
-          type: 'component-render',
-          relatedTo: {},
-          duration: 150,
-          isIdle: true,
-          renderCount: 1,
-          renderedOutput: 'content',
-        },
-        { occurrence: 2 },
-      ),
-      createMockSpanAndAnnotation(
-        300,
-        {
-          name: 'medium-component',
-          type: 'component-render',
-          relatedTo: {},
-          duration: 75,
-          isIdle: false,
-          renderCount: 1,
-          renderedOutput: 'error',
-        },
-        { occurrence: 3 },
-      ),
+      createMockSpanAndAnnotation(200, {
+        name: 'long-component',
+        type: 'component-render',
+        relatedTo: {},
+        duration: 150,
+        isIdle: true,
+        renderCount: 1,
+        renderedOutput: 'content',
+      }),
+      createMockSpanAndAnnotation(300, {
+        name: 'medium-component',
+        type: 'component-render',
+        relatedTo: {},
+        duration: 75,
+        isIdle: false,
+        renderCount: 1,
+        renderedOutput: 'error',
+      }),
     ])
 
     const traceRecording = createTraceRecording(
@@ -285,8 +277,10 @@ describe('convertTraceToRUM', () => {
 
     // Should identify the longest span
     expect(result.longestSpan).toBeDefined()
-    expect(result.longestSpan?.span.name).toBe('long-component')
-    expect(result.longestSpan?.span.duration).toBe(150)
-    expect(result.longestSpan?.span.type).toBe('component-render')
+    assert(result.longestSpan)
+    expect(result.longestSpan.span.name).toBe('long-component')
+    expect(result.longestSpan.span.duration).toBe(150)
+    expect(result.longestSpan.span.type).toBe('component-render')
+    expect(result.longestSpan.key).toBe('component-render|long-component')
   })
 })

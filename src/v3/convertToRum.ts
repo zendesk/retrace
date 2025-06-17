@@ -48,7 +48,9 @@ export interface RumTraceRecording<
    */
   spanAttributes: SpanSummaryAttributes
 
-  longestSpan: SpanAndAnnotation<RelationSchemasT> | undefined
+  longestSpan:
+    | (SpanAndAnnotation<RelationSchemasT> & { key: string })
+    | undefined
 
   // allow for additional attributes to be added by the consumer
   [key: string]: unknown
@@ -272,7 +274,11 @@ export function convertTraceToRUM<
     embeddedSpans: Object.fromEntries(embeddedSpans),
     nonEmbeddedSpans: [...nonEmbeddedSpans],
     spanAttributes,
-    longestSpan: longestSpanAndAnnotation,
+    // this can be used to create a query like "list top 10 longest spans" for an operation
+    longestSpan: longestSpanAndAnnotation && {
+      ...longestSpanAndAnnotation,
+      key: getSpanKey(longestSpanAndAnnotation.span),
+    },
   }
 
   // we want to decrease precision to improve readability of the output, and decrease the payload size
