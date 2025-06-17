@@ -24,8 +24,6 @@ export type ComponentLifecycleSpanType =
   | 'component-render'
   | 'component-unmount'
 
-export type SpanType = NativePerformanceEntryType | ComponentLifecycleSpanType
-
 export interface DraftTraceConfig<RelationSchemaT, VariantsT extends string> {
   id?: string
   parentTraceId?: string
@@ -199,10 +197,11 @@ export interface PerformanceEntrySpan<RelationSchemasT>
  * The shape is the same as TraceRecording
  */
 export interface ChildOperationSpan<RelationSchemasT>
-  extends Omit<SpanBase<RelationSchemasT>, 'id' | 'relatedTo'>,
+  extends Omit<SpanBase<RelationSchemasT>, 'id'>,
     Omit<
       TraceRecording<keyof RelationSchemasT, RelationSchemasT>,
-      'duration' | 'status'
+      // these come from the SpanBase type:
+      'duration' | 'status' | 'relatedTo'
     > {
   type: 'operation'
 }
@@ -223,3 +222,9 @@ export type Span<RelationSchemasT> =
   | ResourceSpan<RelationSchemasT>
   | ChildOperationSpan<RelationSchemasT>
   | ErrorSpan<RelationSchemasT>
+
+export type SpanType =
+  | NativePerformanceEntryType
+  | ComponentLifecycleSpanType
+  | 'operation'
+  | 'error'

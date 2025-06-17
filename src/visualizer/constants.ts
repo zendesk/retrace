@@ -49,6 +49,7 @@ export const BAR_FILL_COLOR: Record<SupportedSpanTypes, string> = {
   iframe: '#e377c2',
   element: '#7f7f7f',
   action: '#bcbd22',
+  operation: '#547621',
   'computed-span': '#17becf',
 
   'component-unmount': '#ff9896',
