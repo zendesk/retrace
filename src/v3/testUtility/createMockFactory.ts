@@ -1,6 +1,6 @@
 import type { SpanAndAnnotation, SpanAnnotation } from '../spanAnnotationTypes'
 import type { Span } from '../spanTypes'
-import type { Timestamp } from '../types'
+import type { RelationSchemasBase, Timestamp } from '../types'
 
 const EPOCH_START = 1_000
 
@@ -9,7 +9,7 @@ export const createTimestamp = (now: number): Timestamp => ({
   now,
 })
 
-export type AnyRelation = Record<string, unknown>
+export type AnyRelation = RelationSchemasBase<Record<string, unknown>>
 
 export const createAnnotation = (
   span: Span<AnyRelation>,

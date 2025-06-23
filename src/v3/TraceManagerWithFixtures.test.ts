@@ -15,10 +15,12 @@ import { shouldCompleteAndHaveInteractiveTime } from './testUtility/fixtures/sho
 import { shouldNotEndWithInteractiveTimeout } from './testUtility/fixtures/shouldNotEndWithInteractiveTimeout'
 import { ticketActivatedDefinition } from './testUtility/fixtures/ticket.activated'
 import { TraceManager } from './TraceManager'
-import type { AnyPossibleReportFn } from './types'
+import type { AnyPossibleReportFn, RelationSchemasBase } from './types'
 
 interface TicketIdRelation {
-  ticketId: string
+  ticketId: {
+    ticketId: StringConstructor
+  }
 }
 
 describe('TraceManager with Fixtures', () => {
@@ -88,28 +90,6 @@ describe('TraceManager with Fixtures', () => {
         "attributes": {},
         "computedRenderBeaconSpans": {
           "ConversationPane": {
-            "attributes": {
-              "canLoadMore": false,
-              "composerCollapseDefault": false,
-              "composerPlacement": "BOTTOM",
-              "conversationState": "NONE",
-              "hasAgentCopilotGa": false,
-              "hasCopilotHighAssistMode": false,
-              "hasReactLayoutTicketPanesGridV2": true,
-              "hasSuggestedReplies": false,
-              "hasTicketLayoutBuilder": true,
-              "hasTicketLayoutBuilderAgentGraph": true,
-              "hasTicketLayoutBuilderArturo": true,
-              "isChatting": false,
-              "isCopilotHighAssist": false,
-              "isOcbEnabled": true,
-              "isTicketBeingViewed": true,
-              "omniLogOrder": "asc",
-              "shouldExcludeFromSlo": false,
-              "ticketId": "74",
-              "ticketType": "classic",
-              "visibleEvents": "1-15",
-            },
             "firstRenderTillContent": 1021.7000000178814,
             "firstRenderTillData": 911.5,
             "firstRenderTillLoading": 134,
@@ -118,12 +98,6 @@ describe('TraceManager with Fixtures', () => {
             "sumOfRenderDurations": 695,
           },
           "OmniComposer": {
-            "attributes": {
-              "channel": "web",
-              "isAutoAccepted": false,
-              "isOcbEnabled": true,
-              "ticketChannel": "side_conversation",
-            },
             "firstRenderTillContent": 343.80000001192093,
             "firstRenderTillData": 127.80000001192093,
             "firstRenderTillLoading": 0,
@@ -132,17 +106,6 @@ describe('TraceManager with Fixtures', () => {
             "sumOfRenderDurations": 693.400000050664,
           },
           "OmniLog": {
-            "attributes": {
-              "composerCollapseDefault": false,
-              "composerPlacement": "BOTTOM",
-              "conversationLogPrivacyFilter": "ALL",
-              "hasTicketLayoutBuilder": true,
-              "lastEventOriginatedFrom": "SideConversationInteraction",
-              "lastEventTime": 1726175557,
-              "omniLogMode": "CONVERSATION_LOG",
-              "omnilogOrder": "asc",
-              "ticketId": "74",
-            },
             "firstRenderTillContent": 1009.2999999970198,
             "firstRenderTillData": 905.8999999910593,
             "firstRenderTillLoading": 112.19999998807907,
@@ -223,28 +186,6 @@ describe('TraceManager with Fixtures', () => {
         "attributes": {},
         "computedRenderBeaconSpans": {
           "ConversationPane": {
-            "attributes": {
-              "canLoadMore": false,
-              "composerCollapseDefault": false,
-              "composerPlacement": "BOTTOM",
-              "conversationState": "NONE",
-              "hasAgentCopilotGa": false,
-              "hasCopilotHighAssistMode": false,
-              "hasReactLayoutTicketPanesGridV2": true,
-              "hasSuggestedReplies": false,
-              "hasTicketLayoutBuilder": true,
-              "hasTicketLayoutBuilderAgentGraph": true,
-              "hasTicketLayoutBuilderArturo": true,
-              "isChatting": false,
-              "isCopilotHighAssist": false,
-              "isOcbEnabled": true,
-              "isTicketBeingViewed": true,
-              "omniLogOrder": "asc",
-              "shouldExcludeFromSlo": false,
-              "ticketId": "74",
-              "ticketType": "classic",
-              "visibleEvents": "1-15",
-            },
             "firstRenderTillContent": 831.2999999821186,
             "firstRenderTillData": 753.5,
             "firstRenderTillLoading": 138.59999999403954,
@@ -253,12 +194,6 @@ describe('TraceManager with Fixtures', () => {
             "sumOfRenderDurations": 566.1999999582767,
           },
           "OmniComposer": {
-            "attributes": {
-              "channel": "web",
-              "isAutoAccepted": false,
-              "isOcbEnabled": true,
-              "ticketChannel": "side_conversation",
-            },
             "firstRenderTillContent": 211.99999998509884,
             "firstRenderTillData": 97.20000000298023,
             "firstRenderTillLoading": 0,
@@ -267,17 +202,6 @@ describe('TraceManager with Fixtures', () => {
             "sumOfRenderDurations": 516.9999999701977,
           },
           "OmniLog": {
-            "attributes": {
-              "composerCollapseDefault": false,
-              "composerPlacement": "BOTTOM",
-              "conversationLogPrivacyFilter": "ALL",
-              "hasTicketLayoutBuilder": true,
-              "lastEventOriginatedFrom": "SideConversationInteraction",
-              "lastEventTime": 1726175557,
-              "omniLogMode": "CONVERSATION_LOG",
-              "omnilogOrder": "asc",
-              "ticketId": "74",
-            },
             "firstRenderTillContent": 815.9000000059605,
             "firstRenderTillData": 746.5,
             "firstRenderTillLoading": 113.2000000178814,

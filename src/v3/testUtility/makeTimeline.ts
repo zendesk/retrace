@@ -5,6 +5,7 @@ import type {
   Span,
   SpanType,
 } from '../spanTypes'
+import type { RelationSchemasBase } from '../types'
 
 export interface ComponentRenderStub
   extends Partial<Omit<ComponentRenderSpan<any>, 'startTime' | 'duration'>> {
@@ -129,7 +130,9 @@ export function makeEntries(events: Stub[]): {
   return { entries, fmpTime }
 }
 
-export function getSpansFromTimeline<RelationSchemasT>(
+export function getSpansFromTimeline<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>(
   _: TemplateStringsArray,
   ...exprs: (Stub | number)[]
 ): { spans: Span<RelationSchemasT>[]; fmpTime: number | null } {

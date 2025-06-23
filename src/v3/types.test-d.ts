@@ -6,6 +6,7 @@ import { TraceManager } from './TraceManager'
 import type { MapSchemaToTypes } from './types'
 
 const mockSpanWithoutRelation = {
+  id: 'mock-span-id',
   name: 'some-span',
   duration: 0,
   type: 'mark',
@@ -466,5 +467,38 @@ describe('type tests', () => {
         // https://github.com/microsoft/TypeScript/issues/61228
       },
     })
+  })
+
+  it('allows starting and stopping various spans', () => {
+    const { span, annotations } = traceManager.startRenderSpan({
+      name: 'Component',
+      isIdle: true,
+      renderCount: 0,
+      renderedOutput: 'content',
+    })
+
+    const { span: endSpan, annotations: endAnnotations } =
+      traceManager.endRenderSpan(span, {
+        duration: 4,
+      })
+
+    const {
+      span: errorSpan,
+      annotations: errorAnnotations,
+      parent,
+    } = traceManager.processErrorSpan({
+      error: new Error('Test error'),
+      parentSpanMatcher: {
+        search: 'current-tick',
+        searchDirection: 'before-self',
+        match: {
+          name: 'Component',
+          matchingRelations: true,
+        },
+      },
+    })
+
+    // you can use this to e.g. report your error with a parentName tag, or the ownership attribute
+    const parentName = parent?.span.name
   })
 })

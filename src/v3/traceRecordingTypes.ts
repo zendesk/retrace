@@ -3,6 +3,7 @@ import type { SpanAndAnnotation } from './spanAnnotationTypes'
 import type { Attributes } from './spanTypes'
 import type {
   MapSchemaToTypes,
+  RelationSchemasBase,
   Timestamp,
   TraceInterruptionReason,
   TraceStatus,
@@ -98,7 +99,7 @@ export interface TraceRecordingBase<RelationSchemaT> {
 
 export interface TraceRecording<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 > extends TraceRecordingBase<RelationSchemasT[SelectedRelationNameT]> {
   entries: readonly SpanAndAnnotation<RelationSchemasT>[]
 }

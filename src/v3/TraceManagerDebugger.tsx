@@ -34,7 +34,9 @@ interface RequiredSpan {
   definition?: Record<string, unknown>
 }
 
-interface TraceInfo<RelationSchemasT> {
+interface TraceInfo<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> {
   traceId: string
   traceName: string
   variant: string
@@ -1161,7 +1163,9 @@ function TraceAttributes({
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-function TimeMarkers<RelationSchemasT>({
+function TimeMarkers<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>({
   lastRequiredSpanOffset,
   completeSpanOffset,
   cpuIdleSpanOffset,
@@ -1280,12 +1284,9 @@ function DefinitionChip({
   )
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function RequiredSpansList<RelationSchemasT>({
-  requiredSpans,
-}: {
-  requiredSpans: RequiredSpan[]
-}) {
+function RequiredSpansList<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>({ requiredSpans }: { requiredSpans: RequiredSpan[] }) {
   return (
     <div className="tmdb-section">
       <div className="tmdb-section-title">

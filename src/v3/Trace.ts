@@ -80,7 +80,9 @@ export const isTerminalState = (
 ): state is TerminalTraceStates =>
   (TERMINAL_STATES as readonly TraceStates[]).includes(state)
 
-export const isEnteringTerminalState = <RelationSchemasT>(
+export const isEnteringTerminalState = <
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>(
   onEnterState: OnEnterStatePayload<RelationSchemasT>,
 ): onEnterState is FinalTransition<RelationSchemasT> =>
   isTerminalState(onEnterState.transitionToState)
@@ -97,14 +99,18 @@ interface OnEnterActive {
   transitionFromState: NonTerminalTraceStates
 }
 
-interface OnEnterInterrupted<RelationSchemasT> {
+interface OnEnterInterrupted<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> {
   transitionToState: 'interrupted'
   transitionFromState: NonTerminalTraceStates
   interruptionReason: TraceInterruptionReason
   lastRelevantSpanAndAnnotation: SpanAndAnnotation<RelationSchemasT> | undefined
 }
 
-interface OnEnterComplete<RelationSchemasT> {
+interface OnEnterComplete<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> {
   transitionToState: 'complete'
   transitionFromState: NonTerminalTraceStates
   interruptionReason?: TraceInterruptionReason
@@ -114,9 +120,9 @@ interface OnEnterComplete<RelationSchemasT> {
   lastRelevantSpanAndAnnotation: SpanAndAnnotation<RelationSchemasT> | undefined
 }
 
-export type FinalTransition<RelationSchemasT> =
-  | OnEnterInterrupted<RelationSchemasT>
-  | OnEnterComplete<RelationSchemasT>
+export type FinalTransition<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> = OnEnterInterrupted<RelationSchemasT> | OnEnterComplete<RelationSchemasT>
 
 interface OnEnterWaitingForInteractive {
   transitionToState: 'waiting-for-interactive'
@@ -133,7 +139,9 @@ interface OnEnterDebouncing {
   transitionFromState: NonTerminalTraceStates
 }
 
-export type OnEnterStatePayload<RelationSchemasT> =
+export type OnEnterStatePayload<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> =
   | OnEnterActive
   | OnEnterInterrupted<RelationSchemasT>
   | OnEnterComplete<RelationSchemasT>
@@ -141,7 +149,9 @@ export type OnEnterStatePayload<RelationSchemasT> =
   | OnEnterWaitingForInteractive
   | OnEnterWaitingForChildren
 
-export type Transition<RelationSchemasT> = DistributiveOmit<
+export type Transition<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> = DistributiveOmit<
   OnEnterStatePayload<RelationSchemasT>,
   'transitionFromState'
 >
@@ -156,7 +166,9 @@ export type States<
   VariantsT
 >['states']
 
-interface StateHandlersBase<RelationSchemasT> {
+interface StateHandlersBase<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> {
   [handler: string]: (
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     payload: any,
@@ -174,12 +186,13 @@ interface ChildEndEvent<
   interruptionReason?: TraceInterruptionReason
 }
 
-type StatesBase<RelationSchemasT> = Record<
-  TraceStates,
-  StateHandlersBase<RelationSchemasT>
->
+type StatesBase<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> = Record<TraceStates, StateHandlersBase<RelationSchemasT>>
 
-interface TraceStateMachineSideEffectHandlers<RelationSchemasT> {
+interface TraceStateMachineSideEffectHandlers<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> {
   readonly addSpanToRecording: (
     spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>,
   ) => void
@@ -188,9 +201,10 @@ interface TraceStateMachineSideEffectHandlers<RelationSchemasT> {
   ) => void
 }
 
-type EntryType<RelationSchemasT> = PerformanceEntryLike & {
-  entry: SpanAndAnnotation<RelationSchemasT>
-}
+type EntryType<RelationSchemasT extends RelationSchemasBase<RelationSchemasT>> =
+  PerformanceEntryLike & {
+    entry: SpanAndAnnotation<RelationSchemasT>
+  }
 
 interface StateMachineContext<
   SelectedRelationNameT extends keyof RelationSchemasT,
@@ -1646,8 +1660,8 @@ export class Trace<
 
   sideEffectFns: TraceStateMachineSideEffectHandlers<RelationSchemasT> = {
     addSpanToRecording: (spanAndAnnotation) => {
-      if (!this.recordedItems.has(spanAndAnnotation.span.id!)) {
-        this.recordedItems.set(spanAndAnnotation.span.id!, spanAndAnnotation)
+      if (!this.recordedItems.has(spanAndAnnotation.span.id)) {
+        this.recordedItems.set(spanAndAnnotation.span.id, spanAndAnnotation)
         for (const label of spanAndAnnotation.annotation.labels) {
           this.recordedItemsByLabel[label]?.push(spanAndAnnotation)
         }
