@@ -1,13 +1,53 @@
 import type { SpanAndAnnotation } from './spanAnnotationTypes'
 import type { Attributes, SpanStatus, SpanType } from './spanTypes'
-import type { DraftTraceContext, MapSchemaToTypes } from './types'
+import type {
+  DraftTraceContext,
+  MapSchemaToTypes,
+  RelationSchemasBase,
+  TraceContext,
+} from './types'
 import type { UnionToIntersection } from './typeUtils'
 
-export interface SpanMatcherTags {
-  idleCheck?: boolean
+export interface PublicSpanMatcherTags {
+  /**
+   * Only applicable for 'requiredSpans' list: it will opt-out of the default behavior,
+   * which interrupts the trace if the requiredSpan has an error status.
+   */
   continueWithErrorStatus?: boolean
-  requiredSpan?: boolean
+
+  /**
+   * If multiple matches are found, this specifies which match to use.
+   * It can be set to a negative number to match from the end of the operation (like Array.prototype.slice()).
+   * This only has an effect on matchers that run when the recording is complete,
+   * e.g. in startSpan and endSpan for defining computed spans.
+   */
   matchingIndex?: number
+
+  /**
+   * Do not consider entries before this index.
+   * This only has an effect on matchers that run when the recording is complete.
+   */
+  startFromIndex?: number
+
+  /**
+   * Index of last entry to consider. Will stop considering entries beyond this index.
+   * This only has an effect on matchers that run when the recording is complete.
+   */
+  endAtIndex?: number
+}
+
+export interface SpanMatcherTags extends PublicSpanMatcherTags {
+  /**
+   * @internal
+   * Enables the idle-regression check.
+   * Only has an effect in for component-lifecycle entries in 'requiredSpans' matchers list.
+   */
+  idleCheck?: boolean
+
+  /**
+   * @internal
+   */
+  requiredSpan?: boolean
 }
 
 /**
@@ -15,7 +55,7 @@ export interface SpanMatcherTags {
  */
 export interface SpanMatcherFn<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > extends SpanMatcherTags {
   (
@@ -28,7 +68,7 @@ export interface SpanMatcherFn<
   ): boolean
 
   /** source definition object for debugging (if converted from object) */
-  fromDefinition?: SpanMatchDefinitionCombinator<
+  fromDefinition?: SpanMatchDefinition<
     SelectedRelationNameT,
     RelationSchemasT,
     VariantsT
@@ -43,11 +83,11 @@ export type NameMatcher<RelationSchemaT> =
       inputRelation: MapSchemaToTypes<RelationSchemaT> | undefined,
     ) => boolean)
 
-export interface SpanMatchDefinitionCombinator<
+export interface SpanMatchDefinition<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
-> {
+> extends PublicSpanMatcherTags {
   name?: NameMatcher<RelationSchemasT[SelectedRelationNameT]>
   performanceEntryName?: NameMatcher<RelationSchemasT[SelectedRelationNameT]>
   type?: SpanType
@@ -56,6 +96,7 @@ export interface SpanMatchDefinitionCombinator<
   matchingRelations?:
     | (keyof UnionToIntersection<RelationSchemasT[SelectedRelationNameT]>)[]
     | boolean
+  /** The index of the reoccurrence within the span, calculated based on the span's type+name combination */
   occurrence?: number | ((occurrence: number) => boolean)
   isIdle?: boolean
   label?: string
@@ -67,37 +108,32 @@ export interface SpanMatchDefinitionCombinator<
     VariantsT
   >[]
   not?: SpanMatchDefinition<SelectedRelationNameT, RelationSchemasT, VariantsT>
-  /**
-   * This only has an effect on startSpan and endSpan for defining computed spans
-   * It must be defined on the top level matcher definition
-   * */
-  matchingIndex?: number
 }
-
-export type SpanMatchDefinition<
-  SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
-  VariantsT extends string,
-> = SpanMatchDefinitionCombinator<
-  SelectedRelationNameT,
-  RelationSchemasT,
-  VariantsT
->
 
 export type SpanMatch<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > =
   | SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT>
   | SpanMatchDefinition<SelectedRelationNameT, RelationSchemasT, VariantsT>
+
+export interface ParentSpanMatcher<
+  SelectedRelationNameT extends keyof RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+  VariantsT extends string,
+> {
+  search: 'current-tick' | 'entire-recording'
+  searchDirection: 'after-self' | 'before-self'
+  match: SpanMatch<SelectedRelationNameT, RelationSchemasT, VariantsT>
+}
 
 /**
  * The common name of the span to match. Can be a string, RegExp, or function.
  */
 export function withName<
   const SelectedRelationNameT extends keyof RelationSchemasT,
-  const RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >(
   value: NameMatcher<RelationSchemasT[SelectedRelationNameT]>,
@@ -120,7 +156,7 @@ export function withName<
 
 export function withLabel<
   const SelectedRelationNameT extends keyof RelationSchemasT,
-  const RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >(
   value: string,
@@ -139,7 +175,7 @@ export function withLabel<
  */
 export function withPerformanceEntryName<
   const SelectedRelationNameT extends keyof RelationSchemasT,
-  const RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >(
   value: NameMatcher<RelationSchemasT[SelectedRelationNameT]>,
@@ -161,7 +197,7 @@ export function withPerformanceEntryName<
 
 export function withType<
   const SelectedRelationNameT extends keyof RelationSchemasT,
-  const RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >(
   value: SpanType,
@@ -177,7 +213,7 @@ export function withType<
 
 export function withStatus<
   const SelectedRelationNameT extends keyof RelationSchemasT,
-  const RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >(
   value: SpanStatus,
@@ -195,8 +231,8 @@ export function withStatus<
  * The subset of attributes (metadata) to match against the span.
  */
 export function withAttributes<
-  SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  const SelectedRelationNameT extends keyof RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >(
   attrs: Attributes,
@@ -220,7 +256,7 @@ export function withAttributes<
  */
 export function withMatchingRelations<
   const SelectedRelationNameT extends keyof RelationSchemasT,
-  const RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >(
   keys:
@@ -263,7 +299,7 @@ export function withMatchingRelations<
  */
 export function withOccurrence<
   const SelectedRelationNameT extends keyof RelationSchemasT,
-  const RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >(
   value: number | ((occurrence: number) => boolean),
@@ -282,7 +318,7 @@ export function withOccurrence<
 
 export function withComponentRenderCount<
   const SelectedRelationNameT extends keyof RelationSchemasT,
-  const RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >(
   name: NameMatcher<RelationSchemasT[SelectedRelationNameT]>,
@@ -315,7 +351,7 @@ export function withComponentRenderCount<
  */
 export function whenIdle<
   const SelectedRelationNameT extends keyof RelationSchemasT,
-  const RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >(
   value = true,
@@ -335,12 +371,34 @@ export function whenIdle<
 }
 
 /**
+ * @internal
+ * tag matcher with a special, internal matcher tag, and match on span.status === 'error'
+ */
+export function requiredSpanWithErrorStatus<
+  const SelectedRelationNameT extends keyof RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+  const VariantsT extends string,
+>(): SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT> {
+  const matcherFn: SpanMatcherFn<
+    SelectedRelationNameT,
+    RelationSchemasT,
+    VariantsT
+  > = ({ span }) => span.status === 'error'
+  const result = Object.assign(
+    matcherFn,
+    // add a tag to the function if set to true
+    { requiredSpan: true } satisfies SpanMatcherTags,
+  )
+  return result
+}
+
+/**
  * Only applicable for 'requiredSpans' list: it will opt-out of the default behavior,
  * which interrupts the trace if the requiredSpan has an error status.
  */
 export function continueWithErrorStatus<
   const SelectedRelationNameT extends keyof RelationSchemasT,
-  const RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >(): SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT> {
   const matcherFn: SpanMatcherFn<
@@ -360,7 +418,7 @@ export function continueWithErrorStatus<
 // AND
 export function withAllConditions<
   const SelectedRelationNameT extends keyof RelationSchemasT,
-  const RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >(
   ...matchers: SpanMatcherFn<
@@ -370,7 +428,7 @@ export function withAllConditions<
   >[]
 ): SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT> {
   const tags: SpanMatcherTags = {}
-  const definition: SpanMatchDefinitionCombinator<
+  const definition: SpanMatchDefinition<
     SelectedRelationNameT,
     RelationSchemasT,
     VariantsT
@@ -394,7 +452,7 @@ export function withAllConditions<
 // OR
 export function withOneOfConditions<
   const SelectedRelationNameT extends keyof RelationSchemasT,
-  const RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >(
   ...matchers: SpanMatcherFn<
@@ -418,7 +476,7 @@ export function withOneOfConditions<
 
 export function not<
   const SelectedRelationNameT extends keyof RelationSchemasT,
-  const RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >(
   matcher: SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT>,
@@ -440,7 +498,7 @@ export function not<
 
 export function fromDefinition<
   const SelectedRelationNameT extends keyof RelationSchemasT,
-  const RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >(
   definition: SpanMatchDefinition<
@@ -534,9 +592,18 @@ export function fromDefinition<
 
   combined.fromDefinition = definition
 
-  // Set matchingIndex if it's defined in the definition
+  // add public tags:
+  if (typeof definition.continueWithErrorStatus === 'boolean') {
+    combined.continueWithErrorStatus = definition.continueWithErrorStatus
+  }
   if (typeof definition.matchingIndex === 'number') {
     combined.matchingIndex = definition.matchingIndex
+  }
+  if (typeof definition.startFromIndex === 'number') {
+    combined.startFromIndex = definition.startFromIndex
+  }
+  if (typeof definition.endAtIndex === 'number') {
+    combined.endAtIndex = definition.endAtIndex
   }
 
   return combined

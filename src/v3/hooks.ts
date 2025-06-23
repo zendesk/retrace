@@ -1,24 +1,10 @@
 import { useEffect, useRef } from 'react'
 import { useOnComponentUnmount } from '../ErrorBoundary'
-import { ensureTimestamp } from './ensureTimestamp'
 import type { BeaconConfig, UseBeacon } from './hooksTypes'
+import type { ConstructedSpanAndAnnotations } from './spanAnnotationTypes'
 import type { ComponentRenderSpan } from './spanTypes'
 import type { TraceManager } from './TraceManager'
-import type { RelationSchemasBase, RelationsOnASpan, Timestamp } from './types'
-
-type MakeEntryInput<RelationSchemasT> = Omit<
-  ComponentRenderSpan<RelationSchemasT>,
-  'startTime'
-> & {
-  startTime?: Timestamp
-}
-
-const makeEntry = <RelationSchemasT>(
-  inp: MakeEntryInput<RelationSchemasT>,
-): ComponentRenderSpan<RelationSchemasT> => ({
-  ...inp,
-  startTime: ensureTimestamp(inp.startTime),
-})
+import type { RelationSchemasBase, RelationsOnASpan } from './types'
 
 /**
  * The job of the beacon:
@@ -46,10 +32,9 @@ export const generateUseBeacon =
     const relatedTo =
       config.relatedTo as unknown as RelationsOnASpan<RelationSchemasT>
 
-    const renderStartTaskEntry = makeEntry<RelationSchemasT>({
+    const renderStartEntry = traceManager.startRenderSpan({
       ...config,
       relatedTo,
-      type: 'component-render-start',
       duration: 0,
       attributes,
       status,
@@ -57,45 +42,43 @@ export const generateUseBeacon =
       isIdle,
     })
 
-    traceManager.processSpan(renderStartTaskEntry)
-
-    const renderStartRef = useRef<Timestamp | undefined>()
-    renderStartRef.current = renderStartTaskEntry.startTime
+    const renderStartRef = useRef<
+      | ConstructedSpanAndAnnotations<
+          RelationSchemasT,
+          ComponentRenderSpan<RelationSchemasT>
+        >
+      | undefined
+    >()
+    renderStartRef.current = renderStartEntry
 
     // Beacon effect for tracking 'component-render'. This will fire after every render as it does not have any dependencies:
     useEffect(() => {
-      traceManager.processSpan(
-        makeEntry<RelationSchemasT>({
-          ...config,
-          relatedTo,
-          startTime: renderStartRef.current!,
-          type: 'component-render',
-          duration: performance.now() - renderStartRef.current!.now,
-          status,
-          attributes,
-          renderCount: renderCountRef.current,
-          isIdle,
-        }),
-      )
+      if (!renderStartRef.current) {
+        return
+      }
+      traceManager.endRenderSpan(renderStartRef.current.span, {
+        duration: performance.now() - renderStartRef.current.span.startTime.now,
+      })
       renderStartRef.current = undefined
     })
 
     // Beacon effect for tracking 'component-unmount' entries
     useOnComponentUnmount(
       (errorBoundaryMetadata) => {
-        const unmountEntry = makeEntry<RelationSchemasT>({
+        traceManager.createAndProcessSpan<
+          ComponentRenderSpan<RelationSchemasT>
+        >({
           ...config,
           relatedTo,
           type: 'component-unmount',
           attributes,
           error: errorBoundaryMetadata?.error,
           errorInfo: errorBoundaryMetadata?.errorInfo,
-          duration: 0,
           status: errorBoundaryMetadata?.error ? 'error' : 'ok',
           renderCount: renderCountRef.current,
           isIdle,
+          parentSpanId: renderStartRef.current?.span.id,
         })
-        traceManager.processSpan(unmountEntry)
       },
       [config.name],
     )

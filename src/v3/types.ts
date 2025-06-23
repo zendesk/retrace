@@ -135,31 +135,35 @@ export type TraceInterruptionReason =
 
 export type SingleTraceReportFn<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > = (
   trace: TraceRecording<SelectedRelationNameT, RelationSchemasT>,
   context: TraceContext<SelectedRelationNameT, RelationSchemasT, VariantsT>,
 ) => void
 
-export type AnyPossibleReportFn<RelationSchemasT> = <
-  SelectedRelationNameT extends keyof RelationSchemasT,
->(
+export type AnyPossibleReportFn<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> = <SelectedRelationNameT extends keyof RelationSchemasT>(
   trace: TraceRecording<SelectedRelationNameT, RelationSchemasT>,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   context: TraceContext<SelectedRelationNameT, RelationSchemasT, any>,
 ) => void
 
-export type PartialPossibleTraceContext<RelationSchemasT> = Partial<
-  AllPossibleTraceContexts<RelationSchemasT, string>
->
+export type PartialPossibleTraceContext<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> = Partial<AllPossibleTraceContexts<RelationSchemasT, string>>
 
-export type ReportErrorFn<RelationSchemasT> = (
+export type ReportErrorFn<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> = (
   error: Error,
   currentTraceContext?: PartialPossibleTraceContext<RelationSchemasT>,
 ) => void
 
-export interface TraceManagerConfig<RelationSchemasT> {
+export interface TraceManagerConfig<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> {
   reportFn: AnyPossibleReportFn<RelationSchemasT>
 
   generateId: () => string
@@ -179,6 +183,16 @@ export interface TraceManagerConfig<RelationSchemasT> {
 
   reportErrorFn: ReportErrorFn<RelationSchemasT>
   reportWarningFn: ReportErrorFn<RelationSchemasT>
+
+  /**
+   * Whether to track tickId on spans.
+   * Useful for grouping spans that were recorded in the same event loop tick.
+   * If true, the tickId will be set on the span.
+   * This enables finding the parent relative to the event-loop tick,
+   * when using the `getParentSpanId` function or the `parentSpanMatcher`.
+   * Useful for creating hierarchies from React components or hooks, or attributing and propagating errors.
+   */
+  enableTickTracking?: boolean
 }
 
 export interface TraceManagerUtilities<
@@ -210,7 +224,7 @@ export interface TraceUtilities<
 
 export interface TraceDefinitionModifications<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > {
   additionalRequiredSpans?: readonly SpanMatch<
@@ -232,7 +246,7 @@ export interface TraceDefinitionModifications<
 
 export interface TraceModifications<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > extends TraceDefinitionModifications<
     SelectedRelationNameT,
@@ -259,7 +273,7 @@ export interface CaptureInteractiveConfig extends CPUIdleProcessorOptions {
 
 export type LabelMatchingInputRecord<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > = Record<
   string,
@@ -268,7 +282,7 @@ export type LabelMatchingInputRecord<
 
 export type LabelMatchingFnsRecord<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > = Record<
   string,
@@ -277,7 +291,7 @@ export type LabelMatchingFnsRecord<
 
 export interface TraceVariant<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > extends TraceDefinitionModifications<
     SelectedRelationNameT,
@@ -293,7 +307,7 @@ export interface TraceVariant<
 
 export interface PromoteSpanAttributesDefinition<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > {
   span: SpanMatch<SelectedRelationNameT, RelationSchemasT, VariantsT>
@@ -307,7 +321,7 @@ export interface PromoteSpanAttributesDefinition<
  */
 export interface TraceDefinition<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
   ComputedValueDefinitionsT extends {
     [K in keyof ComputedValueDefinitionsT]: ComputedValueDefinitionInput<
@@ -465,7 +479,7 @@ export interface TraceDefinition<
  */
 export interface CompleteTraceDefinition<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > extends Omit<
     TraceDefinition<SelectedRelationNameT, RelationSchemasT, VariantsT, {}>,
@@ -528,7 +542,9 @@ export interface CompleteTraceDefinition<
 /**
  * Strategy for deduplicating performance entries
  */
-export interface SpanDeduplicationStrategy<RelationSchemasT> {
+export interface SpanDeduplicationStrategy<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> {
   /**
    * Returns an existing span annotation if the span should be considered a duplicate
    */
@@ -569,7 +585,7 @@ export type SpecialToken = SpecialStartToken | SpecialEndToken
  */
 export interface ComputedSpanDefinition<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > {
   /**
@@ -599,7 +615,7 @@ export interface ComputedSpanDefinition<
  */
 export interface ComputedValueDefinition<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > {
   matches: SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT>[]
@@ -622,7 +638,7 @@ export interface ComputedValueDefinition<
  */
 export interface ComputedSpanDefinitionInput<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > {
   startSpan:
@@ -639,7 +655,7 @@ export interface ComputedSpanDefinitionInput<
  */
 export interface ComputedValueDefinitionInput<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
   MatchersT extends NoInfer<
     SpanMatch<SelectedRelationNameT, RelationSchemasT, VariantsT>
@@ -662,7 +678,7 @@ export type DeriveRelationsFromPerformanceEntryFn<RelationSchemasT> = (
 
 export interface DraftTraceContext<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > extends TraceContext<SelectedRelationNameT, RelationSchemasT, VariantsT> {
   readonly input: DraftTraceInput<
@@ -672,7 +688,7 @@ export interface DraftTraceContext<
 }
 
 export type AllPossibleTraceContexts<
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > = {
   [SelectedRelationNameT in keyof RelationSchemasT]: DraftTraceContext<
@@ -684,7 +700,7 @@ export type AllPossibleTraceContexts<
 
 export interface TraceContext<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > {
   readonly definition: CompleteTraceDefinition<

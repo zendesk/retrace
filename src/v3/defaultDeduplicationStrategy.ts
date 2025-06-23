@@ -1,10 +1,10 @@
 import { getPerformanceEntryHash } from './getPerformanceEntryHash'
 import type { SpanAndAnnotation } from './spanAnnotationTypes'
 import type { Span } from './spanTypes'
-import type { SpanDeduplicationStrategy } from './types'
+import type { RelationSchemasBase, SpanDeduplicationStrategy } from './types'
 
 export function createDefaultPerformanceEntryDeduplicationStrategy<
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 >(): SpanDeduplicationStrategy<RelationSchemasT> {
   let processedPerformanceEntries = new WeakMap<
     PerformanceEntry,

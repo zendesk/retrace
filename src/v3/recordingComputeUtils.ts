@@ -3,73 +3,18 @@ import {
   ensureMatcherFn,
   ensureMatcherFnOrSpecialToken,
 } from './ensureMatcherFn'
-import { type SpanMatcherFn } from './matchSpan'
+import { findMatchingSpan } from './matchSpan'
 import type { SpanAndAnnotation } from './spanAnnotationTypes'
 import type { ActiveTraceInput, DraftTraceInput } from './spanTypes'
 import type { FinalTransition } from './Trace'
 import type { TraceRecording } from './traceRecordingTypes'
 import type {
   PromoteSpanAttributesDefinition,
+  RelationSchemasBase,
   SpecialEndToken,
   SpecialStartToken,
   TraceContext,
 } from './types'
-
-/**
- * Helper function to find matching spans according to a matcher and matching index
- */
-function findMatchingSpan<
-  SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
-  VariantsT extends string,
->(
-  matcher: SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT>,
-  recordedItemsArray: SpanAndAnnotation<RelationSchemasT>[],
-  context: TraceContext<SelectedRelationNameT, RelationSchemasT, VariantsT>,
-): SpanAndAnnotation<RelationSchemasT> | undefined {
-  // For positive or undefined indices - find with specified index offset
-  if (
-    !('matchingIndex' in matcher) ||
-    matcher.matchingIndex === undefined ||
-    matcher.matchingIndex >= 0
-  ) {
-    let matchCount = 0
-    for (const spanAndAnnotation of recordedItemsArray) {
-      if (matcher(spanAndAnnotation, context)) {
-        if (
-          matcher.matchingIndex === undefined ||
-          matcher.matchingIndex === matchCount
-        ) {
-          return spanAndAnnotation
-        }
-        matchCount++
-      }
-    }
-    return undefined
-  }
-
-  // For negative indices - iterate from the end
-  // If matchingIndex is -1, we need the last match
-  // If matchingIndex is -2, we need the second-to-last match, etc.
-  const targetIndex = Math.abs(matcher.matchingIndex) - 1
-  let matchCount = 0
-
-  // Iterate from the end of the array
-  // TODO: I'm wondering if we should sort recordedItemsArrayReversed by the end time...?
-  // For that matter, should recordedItemsArray be sorted by their start time?
-  // If yes, it might be good to do this in createTraceRecording and pass in both recordedItemsArray and recordedItemsArrayReversed pre-sorted, so we don't sort every time we need to calculate a computed span.
-  for (let i = recordedItemsArray.length - 1; i >= 0; i--) {
-    const spanAndAnnotation = recordedItemsArray[i]!
-    if (matcher(spanAndAnnotation, context)) {
-      if (matchCount === targetIndex) {
-        return spanAndAnnotation
-      }
-      matchCount++
-    }
-  }
-
-  return undefined
-}
 
 /**
  * ### Deriving SLIs and other metrics from a trace
@@ -92,7 +37,7 @@ function findMatchingSpan<
  */
 export function getComputedValues<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >(
   context: TraceContext<SelectedRelationNameT, RelationSchemasT, VariantsT>,
@@ -130,7 +75,7 @@ export function getComputedValues<
 
 export function getComputedSpans<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >(
   context: TraceContext<SelectedRelationNameT, RelationSchemasT, VariantsT>,
@@ -228,7 +173,7 @@ export function getComputedSpans<
 
 function getComputedRenderBeaconSpans<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >(
   recordedItems: readonly SpanAndAnnotation<RelationSchemasT>[],
@@ -366,11 +311,12 @@ function getComputedRenderBeaconSpans<
         : 0,
       renderCount: renderSummary.renderCount,
       sumOfRenderDurations: renderSummary.sumOfDurations,
-      ...(Object.keys(renderSummary.attributes).length > 0
-        ? {
-            attributes: renderSummary.attributes,
-          }
-        : {}),
+      // TODO: potentially expose attributes; though this might duplicate the span attributes
+      // ...(Object.keys(renderSummary.attributes).length > 0
+      //   ? {
+      //       attributes: renderSummary.attributes,
+      //     }
+      //   : {}),
     }
   }
 
@@ -382,7 +328,7 @@ function getComputedRenderBeaconSpans<
  */
 function promoteSpanAttributesForTrace<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 >(
   definition: {
@@ -451,17 +397,15 @@ function isActiveTraceInput<
 }
 
 type ChildrenMap = Map<string, string[]>
-type SpanMap<RelationSchemasT> = ReadonlyMap<
-  string,
-  SpanAndAnnotation<RelationSchemasT>
->
+type SpanMap<RelationSchemasT extends RelationSchemasBase<RelationSchemasT>> =
+  ReadonlyMap<string, SpanAndAnnotation<RelationSchemasT>>
 
 /**
  * @returns Map<parentId, childIds[]>
  */
-function buildChildrenMap<const RelationSchemasT>(
-  spanMap: SpanMap<RelationSchemasT>,
-): ChildrenMap {
+function buildChildrenMap<
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>(spanMap: SpanMap<RelationSchemasT>): ChildrenMap {
   const kids = new Map<string, string[]>()
 
   for (const { span } of spanMap.values()) {
@@ -469,13 +413,15 @@ function buildChildrenMap<const RelationSchemasT>(
     if (!parent) continue
 
     const childrenIds = kids.get(parent) ?? []
-    childrenIds.push(span.id!)
+    childrenIds.push(span.id)
     kids.set(parent, childrenIds)
   }
   return kids // O(n) time, O(n) memory
 }
 
-interface PropagationConfig<RelationSchemasT> {
+interface PropagationConfig<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> {
   /** attribute keys that flow *downward* unless child overrides */
   heritableSpanAttributes?: readonly string[]
   /** stops errors bubbling *upward* if true */
@@ -484,7 +430,9 @@ interface PropagationConfig<RelationSchemasT> {
   ) => boolean
 }
 
-export function propagateStatusAndAttributes<const RelationSchemasT>(
+export function propagateStatusAndAttributes<
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>(
   idToSpanAndAnnotationMap: SpanMap<RelationSchemasT>,
   children: ChildrenMap,
   cfg: PropagationConfig<RelationSchemasT>,
@@ -494,7 +442,7 @@ export function propagateStatusAndAttributes<const RelationSchemasT>(
 
   for (const { span } of idToSpanAndAnnotationMap.values()) {
     if (!span.parentSpanId || !idToSpanAndAnnotationMap.has(span.parentSpanId))
-      roots.push(span.id!)
+      roots.push(span.id)
   }
 
   const topo: string[] = [] // DFS stack build
@@ -583,7 +531,7 @@ export function propagateStatusAndAttributes<const RelationSchemasT>(
 
 export function createTraceRecording<
   const SelectedRelationNameT extends keyof RelationSchemasT,
-  const RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >(
   context: TraceContext<SelectedRelationNameT, RelationSchemasT, VariantsT>,
@@ -631,6 +579,7 @@ export function createTraceRecording<
   const recordedItemsArray: SpanAndAnnotation<RelationSchemasT>[] = []
   const spanIdsToDiscard = new Set<string>()
 
+  console.log('items', [...recordedItems.values()])
   for (const item of recordedItems.values()) {
     if (item.span.startSpanId) {
       // if the item has a startSpan, we'll want to add it to the list and exclude it from the recorded items
@@ -640,8 +589,8 @@ export function createTraceRecording<
     if (endOfOperationSpan) {
       // only keep items captured until the endOfOperationSpan or if not available, the lastRelevantSpan
       if (
-        item.span.startTime.now + item.span.duration <=
-        endOfOperationSpan.span.startTime.now + endOfOperationSpan.span.duration
+        item.annotation.operationRelativeEndTime <=
+        endOfOperationSpan.annotation.operationRelativeEndTime
       ) {
         recordedItemsArray.push(item)
       }
@@ -697,10 +646,9 @@ export function createTraceRecording<
 
   // exclude internalUse and spanIdsToDiscard
   const filteredRecordedItemsArray = recordedItemsArray.filter(
-    (item) => !(item.span.internalUse ?? spanIdsToDiscard.has(item.span.id!)),
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+    (item) => !(item.span.internalUse || spanIdsToDiscard.has(item.span.id)),
   )
-
-  // TODO: list last error in recording, and error in computedRender spans
 
   return {
     id,

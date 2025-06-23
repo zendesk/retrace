@@ -1,10 +1,13 @@
-import type { Attributes } from './spanTypes'
+import type { Attributes, WithParentSpanMatcher } from './spanTypes'
 import type { TraceManager } from './TraceManager'
-import type { RelatedTo } from './types'
+import type { RelatedTo, RelationSchemasBase } from './types'
 
 export type RenderedOutput = 'null' | 'loading' | 'content' | 'error'
 
-export type BeaconConfig<RelationSchemasT, RequiredAttributesT = {}> = {
+export type BeaconConfig<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+  RequiredAttributesT = {},
+> = {
   name: string
   relatedTo: RelatedTo<RelationSchemasT>
   renderedOutput: RenderedOutput
@@ -12,11 +15,13 @@ export type BeaconConfig<RelationSchemasT, RequiredAttributesT = {}> = {
   error?: Error
 } & (keyof RequiredAttributesT extends never
   ? { attributes?: Attributes }
-  : { attributes: RequiredAttributesT & Attributes })
+  : { attributes: RequiredAttributesT & Attributes }) &
+  WithParentSpanMatcher<RelationSchemasT>
 
-export type UseBeacon<RelationSchemasT, RequiredAttributesT> = (
-  beaconConfig: BeaconConfig<RelationSchemasT, RequiredAttributesT>,
-) => void
+export type UseBeacon<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+  RequiredAttributesT,
+> = (beaconConfig: BeaconConfig<RelationSchemasT, RequiredAttributesT>) => void
 
 export type GetRelationSchemasTFromTraceManager<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -23,6 +23,7 @@ const mockRelations: MapSchemaToTypes<
 }
 
 const mockEntryBase = {
+  id: '123',
   type: 'element',
   name: 'testEntry',
   startTime: {

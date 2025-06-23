@@ -4,7 +4,7 @@ import type { SpanMatcherFn } from './matchSpan'
 import type { SpanAndAnnotation } from './spanAnnotationTypes'
 import type { ComponentRenderSpan, Span } from './spanTypes'
 import type { TraceRecording, TraceRecordingBase } from './traceRecordingTypes'
-import type { TraceContext } from './types'
+import type { RelationSchemasBase, TraceContext } from './types'
 
 export interface EmbeddedEntry {
   count: number
@@ -24,7 +24,7 @@ export interface SpanSummaryAttributes {
 
 export interface RumTraceRecording<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 > extends TraceRecordingBase<RelationSchemasT[SelectedRelationNameT]> {
   // spans that don't exist as separate spans in the DB
   // useful for things like renders, which can repeat tens of times
@@ -56,7 +56,9 @@ export interface RumTraceRecording<
   [key: string]: unknown
 }
 
-export function isRenderEntry<RelationSchemasT>(
+export function isRenderEntry<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>(
   entry: Span<RelationSchemasT>,
 ): entry is ComponentRenderSpan<RelationSchemasT> {
   return (
@@ -66,7 +68,9 @@ export function isRenderEntry<RelationSchemasT>(
   )
 }
 
-function updateEmbeddedEntry<RelationSchemasT>(
+function updateEmbeddedEntry<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>(
   embeddedEntry: EmbeddedEntry,
   spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>,
 ): EmbeddedEntry {
@@ -84,10 +88,9 @@ function updateEmbeddedEntry<RelationSchemasT>(
   }
 }
 
-function createEmbeddedEntry<RelationSchemasT>({
-  span,
-  annotation,
-}: SpanAndAnnotation<RelationSchemasT>): EmbeddedEntry {
+function createEmbeddedEntry<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>({ span, annotation }: SpanAndAnnotation<RelationSchemasT>): EmbeddedEntry {
   return {
     count: 1,
     totalDuration: span.duration,
@@ -100,14 +103,18 @@ function createEmbeddedEntry<RelationSchemasT>({
   }
 }
 
-export const defaultEmbedSpanSelector = <RelationSchemasT>(
+export const defaultEmbedSpanSelector = <
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>(
   spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>,
 ) => {
   const { span } = spanAndAnnotation
   return isRenderEntry(span)
 }
 
-export function getSpanSummaryAttributes<RelationSchemasT>(
+export function getSpanSummaryAttributes<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>(
   recordedItems: readonly SpanAndAnnotation<RelationSchemasT>[],
 ): SpanSummaryAttributes {
   // loop through recorded items, create a entry based on the name
@@ -127,7 +134,9 @@ export function getSpanSummaryAttributes<RelationSchemasT>(
   return spanAttributes
 }
 
-export function findLongestSpan<RelationSchemasT>(
+export function findLongestSpan<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>(
   spanAndAnnotations: readonly SpanAndAnnotation<RelationSchemasT>[],
   filter?: (spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>) => boolean,
 ): SpanAndAnnotation<RelationSchemasT> | undefined {
@@ -183,8 +192,8 @@ function recursivelyRoundValues<T extends object>(
 }
 
 export function convertTraceToRUM<
-  SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  const SelectedRelationNameT extends keyof RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >({
   traceRecording,

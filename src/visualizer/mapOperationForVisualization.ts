@@ -187,6 +187,7 @@ export const mapOperationForVisualization = (
     groupName: name,
     type: 'computed-span',
     span: {
+      id: `computed-span-${name}-${traceRecording.id}`,
       type: 'computed-span',
       duration: computedSpan.duration,
       name,
@@ -213,6 +214,7 @@ export const mapOperationForVisualization = (
       groupName: beaconName,
       type: 'computed-span',
       span: {
+        id: `computed-span-${beaconName}-${traceRecording.id}`,
         type: 'computed-span',
         duration: beaconSpan.firstRenderTillContent,
         name: `${beaconName}/firstRenderTillContent`,
@@ -234,6 +236,7 @@ export const mapOperationForVisualization = (
       groupName: beaconName,
       type: 'computed-span',
       span: {
+        id: `computed-span-${beaconName}-${traceRecording.id}`,
         type: 'computed-span',
         duration: beaconSpan.firstRenderTillLoading,
         name: `${beaconName}/firstRenderTillLoading`,
@@ -255,6 +258,7 @@ export const mapOperationForVisualization = (
       groupName: beaconName,
       type: 'computed-span',
       span: {
+        id: `computed-span-${beaconName}-${traceRecording.id}`,
         type: 'computed-span',
         duration: beaconSpan.firstRenderTillData,
         name: `${beaconName}/firstRenderTillData`,

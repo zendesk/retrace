@@ -282,10 +282,13 @@ export class Tracer<
     if (!trace) return
     if (error) {
       trace.processSpan({
+        id: this.rootTraceUtilities.generateId(),
         name: error.name,
         startTime: ensureTimestamp(),
         // TODO: use a dedicated error type
-        type: 'mark',
+        type: 'error',
+        status: 'error',
+        relatedTo: { ...trace.input.relatedTo },
         attributes: {},
         duration: 0,
         error,

@@ -2,7 +2,7 @@ import {
   DEFAULT_DEBOUNCE_DURATION,
   DEFAULT_INTERACTIVE_TIMEOUT_DURATION,
 } from './constants'
-import type { SpanMatchDefinitionCombinator, SpanMatcherFn } from './matchSpan'
+import type { SpanMatchDefinition, SpanMatcherFn } from './matchSpan'
 import { createTraceRecording } from './recordingComputeUtils'
 import type { SpanAndAnnotation } from './spanAnnotationTypes'
 import type { FinalTransition, OnEnterStatePayload } from './Trace'
@@ -14,7 +14,9 @@ import type {
 } from './types'
 
 // Helper to check if error is suppressed
-export function isSuppressedError<RelationSchemasT>(
+export function isSuppressedError<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>(
   trace: DraftTraceContext<keyof RelationSchemasT, RelationSchemasT, string>,
   spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>,
 ) {
@@ -58,7 +60,9 @@ export function getConfigSummary<
 }
 
 // Helper to get computed values/spans for completed/interrupted traces
-export function getComputedResults<RelationSchemasT>(
+export function getComputedResults<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   traceContext: TraceContext<any, RelationSchemasT, any>,
   finalTransition: FinalTransition<RelationSchemasT>,
@@ -75,7 +79,9 @@ export function getComputedResults<RelationSchemasT>(
 /**
  * Extract timing offsets from a transition object
  */
-export const extractTimingOffsets = <RelationSchemasT>(
+export const extractTimingOffsets = <
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>(
   transition: OnEnterStatePayload<RelationSchemasT>,
 ) => {
   let lastRequiredSpanOffset: number | undefined
@@ -120,11 +126,7 @@ export function getMatcherLabelFromCombinator<
   SelectedRelationNameT extends keyof RelationSchemasT,
   VariantsT extends string,
 >(
-  def: SpanMatchDefinitionCombinator<
-    SelectedRelationNameT,
-    RelationSchemasT,
-    VariantsT
-  >,
+  def: SpanMatchDefinition<SelectedRelationNameT, RelationSchemasT, VariantsT>,
   index?: number,
 ): string {
   const parts: string[] = []
