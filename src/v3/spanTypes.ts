@@ -353,4 +353,3 @@ export type RenderSpanInput<
     > &
     ConvenienceSpanProperties<RelationSchemasT>
 >
-
