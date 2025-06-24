@@ -80,5 +80,5 @@ export const generateUseBeacon =
       [config.name],
     )
 
-    return renderStartEntry.span
+    return renderStartEntry
   }

@@ -1,3 +1,4 @@
+import type { ProcessedSpan } from './spanAnnotationTypes'
 import type {
   Attributes,
   ComponentRenderSpan,
@@ -27,7 +28,7 @@ export type UseBeacon<
   RequiredAttributesT,
 > = (
   beaconConfig: BeaconConfig<RelationSchemasT, RequiredAttributesT>,
-) => ComponentRenderSpan<RelationSchemasT>
+) => ProcessedSpan<RelationSchemasT, ComponentRenderSpan<RelationSchemasT>>
 
 export type GetRelationSchemasTFromTraceManager<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

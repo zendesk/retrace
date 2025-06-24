@@ -10,7 +10,7 @@ import type {
   RelationsOnASpan,
   Timestamp,
 } from './types'
-import type { Prettify } from './typeUtils'
+import type { OpenPick, Prettify } from './typeUtils'
 
 export type NativePerformanceEntryType =
   | 'element'
@@ -353,3 +353,14 @@ export type RenderSpanInput<
     > &
     ConvenienceSpanProperties<RelationSchemasT>
 >
+
+export type UpdatableSpanProperties =
+  | 'attributes'
+  | 'relatedTo'
+  | 'renderedOutput'
+  | 'isIdle'
+
+export type SpanUpdateFunction<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+  SpanT extends Span<RelationSchemasT>,
+> = (spanUpdates: Partial<OpenPick<SpanT, UpdatableSpanProperties>>) => void

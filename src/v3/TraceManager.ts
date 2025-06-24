@@ -30,6 +30,7 @@ import type {
   PerformanceEntrySpanInput,
   RenderSpanInput,
   Span,
+  SpanUpdateFunction,
 } from './spanTypes'
 import { TickParentResolver } from './TickParentResolver'
 import type { AllPossibleTraces } from './Trace'
@@ -360,32 +361,55 @@ export class TraceManager<
       span.id = this.utilities.generateId('span')
     }
     const tickMeta = this.tickParentResolver?.addSpanToCurrentTick(span)
-    const annotations = this.currentTrace?.processSpan(span)
-
-    const currentSpanContext = this.currentTraceContext
-    const currentSpanAndAnnotation = currentSpanContext?.recordedItems.get(
-      span.id,
-    )
+    // eslint-disable-next-line prefer-destructuring
+    const currentTrace = this.currentTrace
+    const annotations = currentTrace?.processSpan(span)
+    const currentSpanAndAnnotation = currentTrace?.recordedItems.get(span.id)
 
     const resolveParent = ():
       | SpanAndAnnotation<RelationSchemasT>
       | undefined => {
       if (
-        currentSpanContext &&
+        currentTrace &&
         currentSpanAndAnnotation &&
         tickMeta &&
         span.getParentSpanId
       ) {
         const parentSpanId = span.getParentSpanId({
-          traceContext: currentSpanContext,
+          traceContext: currentTrace,
           thisSpanAndAnnotation: currentSpanAndAnnotation,
           ...tickMeta,
         })
         if (parentSpanId) {
-          return currentSpanContext?.recordedItems.get(parentSpanId)
+          return currentTrace.recordedItems.get(parentSpanId)
         }
       }
       return undefined
+    }
+
+    const updateSpan: SpanUpdateFunction<RelationSchemasT, SpanT> = (
+      spanUpdates,
+    ) => {
+      if (currentTrace !== this.currentTrace) {
+        // ignore updates if the trace has changed
+        return
+      }
+      for (const [k, value] of Object.entries(spanUpdates)) {
+        const key = k as keyof SpanT
+        if (
+          typeof value === 'object' &&
+          typeof span[key] === 'object' &&
+          value !== null
+        ) {
+          // merge objects, such as attributes or relatedTo:
+          Object.assign(span[key] as object, value)
+          // eslint-disable-next-line no-continue
+          continue
+        }
+        // for other properties, just assign the value to the new one:
+        // eslint-disable-next-line no-param-reassign
+        span[key] = value as never
+      }
     }
 
     return {
@@ -393,6 +417,7 @@ export class TraceManager<
       annotations,
       tickMeta,
       resolveParent,
+      updateSpan,
     }
   }
 
@@ -478,7 +503,7 @@ export class TraceManager<
   }
 
   endSpan<SpanT extends Span<RelationSchemasT>>(
-    startSpan: ConvenienceSpan<RelationSchemasT, SpanT>,
+    startSpan: SpanT,
     endSpanAttributes: Partial<ConvenienceSpan<RelationSchemasT, SpanT>> = {},
   ): ProcessedSpan<RelationSchemasT, SpanT> {
     const endSpan = this.ensureCompleteSpan<SpanT>({
@@ -539,7 +564,7 @@ export class TraceManager<
   }
 
   endRenderSpan(
-    startSpan: RenderSpanInput<RelationSchemasT>,
+    startSpan: ComponentRenderSpan<RelationSchemasT>,
     endSpanAttributes: Partial<ComponentRenderSpan<RelationSchemasT>> & {
       duration: number
     },

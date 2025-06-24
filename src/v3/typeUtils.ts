@@ -195,3 +195,7 @@ type LastOf<U> = UnionToIntersection<
 > extends (x: infer L) => void
   ? L
   : never
+
+export type OpenPick<T, K extends string> = {
+  [P in K & keyof T]: T[P]
+}

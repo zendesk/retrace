@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style */
-import type { Span } from './spanTypes'
+import type { Span, SpanUpdateFunction } from './spanTypes'
 import type { TickMeta } from './TickParentResolver'
 import type { NonTerminalTraceStates } from './Trace'
 import type { RelationSchemasBase } from './types'
@@ -67,4 +67,17 @@ export interface ProcessedSpan<
   readonly annotations: SpanAnnotationRecord | undefined
   readonly resolveParent: () => SpanAndAnnotation<RelationSchemasT> | undefined
   readonly tickMeta: TickMeta<RelationSchemasT> | undefined
+  /**
+   * While not usually needed, you can use this function
+   * to update some of the span's attributes AFTER it has been processed.
+   * Note that this will only work if the trace is still in progress.
+   * Object properties (such as attributes) are merged onto the original span,
+   * so if you want to remove a property, set it to `undefined`.
+   *
+   * Caveat: since spans are processed synchronously, this will NOT affect any matchers.
+   * If, for example, your trace has a `requiredToEndSpan` matcher on an attribute
+   * that wasn't present in the span when it was processed, and you update the span
+   * to include that attribute, the matcher will NOT be triggered.
+   */
+  readonly updateSpan: SpanUpdateFunction<RelationSchemasT, SpanT>
 }
