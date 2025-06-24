@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style */
 import type { Span } from './spanTypes'
 import type { NonTerminalTraceStates } from './Trace'
+import type { RelationSchemasBase } from './types'
 
 export interface SpanAnnotation {
   /**
@@ -50,7 +51,25 @@ export interface SpanAnnotationRecord {
   [operationName: string]: SpanAnnotation
 }
 
-export interface SpanAndAnnotation<RelationSchemasT> {
+export interface SpanAndAnnotation<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> {
   span: Span<RelationSchemasT>
   annotation: SpanAnnotation
+}
+
+export interface ConstructedSpanAndAnnotations<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+  SpanT extends Span<RelationSchemasT>,
+> {
+  readonly span: SpanT
+  readonly annotations: SpanAnnotationRecord | undefined
+}
+
+export interface ConstructedSpanAndAnnotationsWithParent<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+  SpanT extends Span<RelationSchemasT>,
+> extends ConstructedSpanAndAnnotations<RelationSchemasT, SpanT> {
+  parent: SpanAndAnnotation<RelationSchemasT> | undefined
+  parentSpanId: string | undefined
 }

@@ -608,3 +608,66 @@ export function fromDefinition<
 
   return combined
 }
+
+/**
+ * Evaluates a span matcher against an entry array.
+ * Respects matching index, startFromIndex, and endAtIndex.
+ */
+export function findMatchingSpan<
+  const SelectedRelationNameT extends keyof RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+  const VariantsT extends string,
+>(
+  matcher: SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT>,
+  recordedItemsArray: readonly SpanAndAnnotation<RelationSchemasT>[],
+  context: TraceContext<SelectedRelationNameT, RelationSchemasT, VariantsT>,
+  /** config argument can be used to override tags from matcher: */
+  {
+    startFromIndex = matcher.startFromIndex ?? 0,
+    endAtIndex: endAtIndexInput = matcher.endAtIndex,
+    matchingIndex = matcher.matchingIndex,
+  }: PublicSpanMatcherTags = {},
+): SpanAndAnnotation<RelationSchemasT> | undefined {
+  const endAtIndex =
+    endAtIndexInput === undefined
+      ? recordedItemsArray.length - 1
+      : Math.min(endAtIndexInput, recordedItemsArray.length - 1)
+
+  let matchedCount = 0
+
+  // For positive or undefined indices - find with specified index offset
+  if (matchingIndex === undefined || matchingIndex >= 0) {
+    for (let i = startFromIndex; i <= endAtIndex; i++) {
+      const spanAndAnnotation = recordedItemsArray[i]!
+      if (matcher(spanAndAnnotation, context)) {
+        if (matchingIndex === undefined || matchingIndex === matchedCount) {
+          return spanAndAnnotation
+        }
+        matchedCount++
+      }
+    }
+    // we didn't find a match with the specified index
+    return undefined
+  }
+
+  // For negative indices - iterate from the end
+  // If matchingIndex is -1, we need the last match (index 0 from reverse)
+  // If matchingIndex is -2, we need the second-to-last match (index 1 from reverse), etc.
+  const targetIndex = Math.abs(matchingIndex) - 1
+
+  // Iterate from the end of the array
+  // TODO: I'm wondering if we should sort recordedItemsArrayReversed by the end time...?
+  // For that matter, should recordedItemsArray be sorted by their start time?
+  // If yes, it might be good to do this in createTraceRecording and pass in both recordedItemsArray and recordedItemsArrayReversed pre-sorted, so we don't sort every time we need to calculate a computed span.
+  for (let i = endAtIndex; i >= 0; i--) {
+    const spanAndAnnotation = recordedItemsArray[i]!
+    if (matcher(spanAndAnnotation, context)) {
+      if (matchedCount === targetIndex) {
+        return spanAndAnnotation
+      }
+      matchedCount++
+    }
+  }
+
+  return undefined
+}

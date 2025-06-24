@@ -1,7 +1,16 @@
 import type { ErrorInfo } from 'react'
-import type { TraceRecording } from '../main'
 import type { BeaconConfig } from './hooksTypes'
-import type { MapSchemaToTypes, RelationsOnASpan, Timestamp } from './types'
+import type { ParentSpanMatcher } from './matchSpan'
+import type { SpanAndAnnotation } from './spanAnnotationTypes'
+import type { TraceRecording } from './traceRecordingTypes'
+import type {
+  DraftTraceContext,
+  MapSchemaToTypes,
+  RelationSchemasBase,
+  RelationsOnASpan,
+  Timestamp,
+} from './types'
+import type { Prettify } from './typeUtils'
 
 export type NativePerformanceEntryType =
   | 'element'
@@ -72,12 +81,18 @@ export interface Attributes {
 }
 export type SpanStatus = 'ok' | 'error'
 
-export interface SpanBase<RelationSchemasT> {
+export type GetParentSpanIdFn<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> = (context: GetParentSpanIdContext<RelationSchemasT>) => string | undefined
+
+export interface SpanBase<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> {
   /**
    * providing an id is optional, but it will always be present in the recording
    * if not provided, it will be generated automatically
    */
-  id?: string
+  id: string
 
   // TODO: allow defining custom spans that extend this SpanBase
   type: SpanType | (string & {})
@@ -119,13 +134,14 @@ export interface SpanBase<RelationSchemasT> {
   error?: Error
 
   /**
-   * optional parent span ID
+   * Optional parent span ID, if known. Takes precedence over getParentSpanId.
    */
   parentSpanId?: string
 
   /**
-   * The event span that references the beginning of the span.
+   * Resolve parentSpanId after the Trace is completed. Takes precedence over parentSpanMatcher.
    */
+  getParentSpanId?: GetParentSpanIdFn<RelationSchemasT>
   startSpanId?: string
 
   /**
@@ -142,7 +158,49 @@ export interface SpanBase<RelationSchemasT> {
   internalUse?: boolean
 }
 
-export interface ComponentRenderSpan<RelationSchemasT>
+export interface WithParentSpanMatcher<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> {
+  /**
+   * A matcher that can be used to find the parent span of this span after the trace is completed.
+   */
+  parentSpanMatcher?: ParentSpanMatcher<
+    keyof RelationSchemasT,
+    RelationSchemasT,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    any
+  >
+}
+
+export interface ConvenienceSpanProperties<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> extends WithParentSpanMatcher<RelationSchemasT> {
+  startTime?: Partial<Timestamp>
+}
+
+export interface GetParentSpanIdContext<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> {
+  thisSpanAndAnnotation: SpanAndAnnotation<RelationSchemasT>
+  // TODO: improve types here by requiring SelectedRelationNameT and VariantsT:
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  traceContext: DraftTraceContext<any, RelationSchemasT, any>
+  /**
+   * Array of all spans that were processed in the current event loop tick.
+   * Empty if tick tracking is disabled
+   */
+  spansInCurrentTick: Span<RelationSchemasT>[]
+  /**
+   * The index of the current span in the spansInCurrentTick array.
+   * Can be used to find preceeding or following spans that were processed in the same tick.
+   * Always -1 if tick tracking is disabled.
+   */
+  thisSpanInCurrentTickIndex: number
+}
+
+export interface ComponentRenderSpan<
+    RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+  >
   // it would be more correct to use 'relatedTo' from BeaconConfig,
   // but we'd need to solve some type issues
   extends Omit<SpanBase<RelationSchemasT>, 'attributes'>,
@@ -177,8 +235,9 @@ export type InitiatorType =
   | 'xmlhttprequest'
   | 'other'
 
-export interface ResourceSpan<RelationSchemasT>
-  extends SpanBase<RelationSchemasT> {
+export interface ResourceSpan<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> extends SpanBase<RelationSchemasT> {
   type: 'resource'
   resourceDetails: {
     initiatorType: InitiatorType
@@ -187,8 +246,9 @@ export interface ResourceSpan<RelationSchemasT>
   }
 }
 
-export interface PerformanceEntrySpan<RelationSchemasT>
-  extends SpanBase<RelationSchemasT> {
+export interface PerformanceEntrySpan<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> extends SpanBase<RelationSchemasT> {
   type: Exclude<NativePerformanceEntryType, 'resource'>
 }
 
@@ -196,8 +256,9 @@ export interface PerformanceEntrySpan<RelationSchemasT>
  * Represents a child operation span within a trace.
  * The shape is the same as TraceRecording
  */
-export interface ChildOperationSpan<RelationSchemasT>
-  extends Omit<SpanBase<RelationSchemasT>, 'id'>,
+export interface ChildOperationSpan<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> extends Omit<SpanBase<RelationSchemasT>, 'id'>,
     Omit<
       TraceRecording<keyof RelationSchemasT, RelationSchemasT>,
       // these come from the SpanBase type:
@@ -206,8 +267,9 @@ export interface ChildOperationSpan<RelationSchemasT>
   type: 'operation'
 }
 
-export interface ErrorSpan<RelationSchemasT>
-  extends SpanBase<RelationSchemasT> {
+export interface ErrorSpan<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> extends SpanBase<RelationSchemasT> {
   type: 'error'
   error: Error
   status: 'error'
@@ -216,7 +278,9 @@ export interface ErrorSpan<RelationSchemasT>
 /**
  * All possible trace entries
  */
-export type Span<RelationSchemasT> =
+export type Span<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> =
   | PerformanceEntrySpan<RelationSchemasT>
   | ComponentRenderSpan<RelationSchemasT>
   | ResourceSpan<RelationSchemasT>
@@ -228,3 +292,65 @@ export type SpanType =
   | ComponentLifecycleSpanType
   | 'operation'
   | 'error'
+
+export type AutoAddedSpanProperties =
+  | 'id'
+  | 'startTime'
+  | 'attributes'
+  | 'duration'
+
+export type ConvenienceSpan<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+  SpanT extends Span<RelationSchemasT>,
+> = Prettify<
+  Omit<SpanT, AutoAddedSpanProperties> &
+    Partial<Pick<SpanT, 'id' | 'attributes' | 'duration'>> &
+    ConvenienceSpanProperties<RelationSchemasT>
+>
+
+export type ErrorSpanInput<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> = Prettify<
+  Omit<
+    ErrorSpan<RelationSchemasT>,
+    'status' | 'type' | 'name' | AutoAddedSpanProperties
+  > &
+    Partial<
+      Pick<
+        ErrorSpan<RelationSchemasT>,
+        'type' | 'name' | 'id' | 'attributes' | 'duration'
+      > & {
+        startTime: Partial<Timestamp>
+      }
+    > &
+    ConvenienceSpanProperties<RelationSchemasT>
+>
+
+export type PerformanceEntrySpanInput<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> = Prettify<
+  Omit<PerformanceEntrySpan<RelationSchemasT>, AutoAddedSpanProperties> &
+    Partial<
+      Pick<
+        PerformanceEntrySpan<RelationSchemasT>,
+        'id' | 'attributes' | 'duration'
+      > & {
+        startTime?: Partial<Timestamp>
+      }
+    > &
+    ConvenienceSpanProperties<RelationSchemasT>
+>
+
+export type RenderSpanInput<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> = Prettify<
+  Omit<ComponentRenderSpan<RelationSchemasT>, AutoAddedSpanProperties> &
+    Partial<
+      Pick<
+        ComponentRenderSpan<RelationSchemasT>,
+        'id' | 'attributes' | 'duration'
+      >
+    > &
+    ConvenienceSpanProperties<RelationSchemasT>
+>
+

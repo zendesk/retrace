@@ -22,14 +22,14 @@ import {
 } from './testUtility/makeTimeline'
 import { processSpans } from './testUtility/processSpans'
 import { TraceManager } from './TraceManager'
-import type { AnyPossibleReportFn, ReportErrorFn } from './types'
+import type { AnyPossibleReportFn, GenerateIdFn, ReportErrorFn } from './types'
 
 describe('TraceManager - Child Traces (Nested Proposal)', () => {
   let reportFn: Mock<AnyPossibleReportFn<TicketIdRelationSchemasFixture>>
   // TS doesn't like that reportFn is wrapped in Mock<> type
   const getReportFn = () =>
     reportFn as AnyPossibleReportFn<TicketIdRelationSchemasFixture>
-  let generateId: Mock
+  let generateId: Mock<GenerateIdFn>
   let reportErrorFn: Mock<ReportErrorFn<TicketIdRelationSchemasFixture>>
   const DEFAULT_TIMEOUT_DURATION = 45_000
 
@@ -37,11 +37,27 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
     now: 0,
   })
 
-  let id = 0
+  let idPerType = {
+    span: 0,
+    trace: 0,
+    tick: 0,
+  }
+
   beforeEach(() => {
+    idPerType = {
+      span: 0,
+      trace: 0,
+      tick: 0,
+    }
+    generateId = jest.fn((type) => {
+      const seq = idPerType[type]++
+      return type === 'span'
+        ? `id-${seq}`
+        : type === 'trace'
+        ? `trace-${seq}`
+        : `tick-${seq}`
+    })
     reportFn = jest.fn()
-    id = 0
-    generateId = jest.fn(() => `id-${id++}`)
     reportErrorFn = jest.fn()
   })
 
@@ -100,9 +116,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       expect(childTraceId).toBe('child-trace-id')
 
       // the Trace Manager should still have a reference to the parent trace, child never overrides it:
-      expect(traceManager.currentTracerContext?.input.id).toBe(
-        'parent-trace-id',
-      )
+      expect(traceManager.currentTraceContext?.input.id).toBe('parent-trace-id')
 
       // prettier-ignore
       const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
@@ -172,14 +186,14 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
         relatedTo: { ticketId: '1' },
         variant: 'default',
       })
-      expect(parentTraceId).toBe('id-0')
+      expect(parentTraceId).toBe('trace-0')
 
       // Start other trace - should interrupt parent (existing behavior)
       const otherTraceId = otherTracer.start({
         relatedTo: { ticketId: '1' },
         variant: 'default',
       })
-      expect(otherTraceId).toBe('id-1')
+      expect(otherTraceId).toBe('trace-1')
 
       // prettier-ignore
       const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
@@ -262,21 +276,21 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
         relatedTo: { ticketId: '1' },
         variant: 'default',
       })
-      expect(parentTraceId).toBe('id-0')
+      expect(parentTraceId).toBe('trace-0')
 
       // Start first child trace - should be adopted
       const childTraceId1 = childTracer1.start({
         relatedTo: { ticketId: '1' },
         variant: 'default',
       })
-      expect(childTraceId1).toBe('id-1')
+      expect(childTraceId1).toBe('trace-1')
 
       // Start second child trace - should also be adopted
       const childTraceId2 = childTracer2.start({
         relatedTo: { ticketId: '1' },
         variant: 'default',
       })
-      expect(childTraceId2).toBe('id-2')
+      expect(childTraceId2).toBe('trace-2')
 
       // prettier-ignore
       const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
@@ -304,7 +318,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       expect(child1Report).toBeDefined()
       expect(child1Report?.status).toBe('ok')
       expect(child1Report?.interruptionReason).toBeUndefined()
-      expect(child1Report?.parentTraceId).toBe('id-0') // Child-1 adopted by parent
+      expect(child1Report?.parentTraceId).toBe('trace-0') // Child-1 adopted by parent
 
       // Verify second child trace completed
       const child2Report = reportFn.mock.calls.find(
@@ -313,7 +327,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       expect(child2Report).toBeDefined()
       expect(child2Report?.status).toBe('ok')
       expect(child2Report?.interruptionReason).toBeUndefined()
-      expect(child2Report?.parentTraceId).toBe('id-0') // Child-2 adopted by parent
+      expect(child2Report?.parentTraceId).toBe('trace-0') // Child-2 adopted by parent
       expect(reportErrorFn).not.toHaveBeenCalled()
     })
 
@@ -701,7 +715,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       expect(childReport).toBeDefined()
       expect(childReport?.status).toBe('interrupted')
       expect(childReport?.interruptionReason).toBe('parent-interrupted')
-      expect(childReport?.parentTraceId).toBe('id-0') // Child was adopted by parent
+      expect(childReport?.parentTraceId).toBe('trace-0') // Child was adopted by parent
       expect(reportErrorFn).not.toHaveBeenCalled()
     })
 
@@ -774,7 +788,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       expect(childReport).toBeDefined()
       expect(childReport?.status).toBe('interrupted')
       expect(childReport?.interruptionReason).toBe('parent-interrupted')
-      expect(childReport?.parentTraceId).toBe('id-0') // Child was adopted by parent
+      expect(childReport?.parentTraceId).toBe('trace-0') // Child was adopted by parent
       expect(reportErrorFn).not.toHaveBeenCalled()
     })
 
@@ -823,7 +837,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       })
 
       // Verify traces are running
-      expect(traceManager.currentTracerContext).toBeDefined()
+      expect(traceManager.currentTraceContext).toBeDefined()
 
       // Interrupt parent
       // prettier-ignore
@@ -839,7 +853,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
 
       // Verify no active traces remain (memory cleaned up)
       // This is a basic check - in real implementation, we'd verify children sets are cleared
-      expect(traceManager.currentTracerContext).toBeUndefined()
+      expect(traceManager.currentTraceContext).toBeUndefined()
 
       // Verify parentTraceId relationships
       const parentReport = reportFn.mock.calls.find(
@@ -850,7 +864,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       )?.[0]
 
       expect(parentReport?.parentTraceId).toBeUndefined() // Parent has no parent
-      expect(childReport?.parentTraceId).toBe('id-0') // Child was adopted by parent
+      expect(childReport?.parentTraceId).toBe('trace-0') // Child was adopted by parent
       expect(reportErrorFn).not.toHaveBeenCalled()
     })
   })
@@ -916,7 +930,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       expect(childReport).toBeDefined()
       expect(childReport?.status).toBe('interrupted')
       expect(childReport?.interruptionReason).toBe('timeout')
-      expect(childReport?.parentTraceId).toBe('id-0') // Child was adopted by parent
+      expect(childReport?.parentTraceId).toBe('trace-0') // Child was adopted by parent
 
       // Verify parent was interrupted due to child timeout
       const parentReport = reportFn.mock.calls.find(
@@ -991,7 +1005,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       expect(childReport).toBeDefined()
       expect(childReport?.status).toBe('interrupted')
       expect(childReport?.interruptionReason).toBe('matched-on-interrupt')
-      expect(childReport?.parentTraceId).toBe('id-0') // Child was adopted by parent
+      expect(childReport?.parentTraceId).toBe('trace-0') // Child was adopted by parent
 
       // Verify parent was interrupted due to child interruption
       const parentReport = reportFn.mock.calls.find(
@@ -1072,7 +1086,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       // Verify new child completed successfully
       expect(completedChildReport?.status).toBe('ok')
       expect(completedChildReport?.interruptionReason).toBeUndefined()
-      expect(completedChildReport?.parentTraceId).toBe('id-0')
+      expect(completedChildReport?.parentTraceId).toBe('trace-0')
 
       // Verify parent was NOT interrupted (continued successfully)
       const parentReport = reportFn.mock.calls.find(
@@ -1141,7 +1155,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       const childReport = reportFn.mock.calls[0]![0]
       expect(childReport.name).toBe('ticket.child-operation')
       expect(childReport.status).toBe('ok')
-      expect(childReport.parentTraceId).toBe('id-0')
+      expect(childReport.parentTraceId).toBe('trace-0')
 
       // Parent should still be waiting, not yet reported
       // Now complete parent
@@ -1226,7 +1240,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
 
       // Child completed and was moved to completedChildren
       expect(childReport?.status).toBe('ok')
-      expect(childReport?.parentTraceId).toBe('id-0')
+      expect(childReport?.parentTraceId).toBe('trace-0')
 
       // Parent completed after all children
       expect(parentReport?.status).toBe('ok')
@@ -1300,7 +1314,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
 
       // Verify parentTraceId relationships
       expect(parentReport?.parentTraceId).toBeUndefined() // Parent has no parent
-      expect(childReport?.parentTraceId).toBe('id-0') // Child was adopted by parent
+      expect(childReport?.parentTraceId).toBe('trace-0') // Child was adopted by parent
 
       // Both should have processed the shared-span
       const parentSpanNames = parentReport?.entries.map(
@@ -1561,7 +1575,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       expect(childReport?.status).toBe('ok')
 
       // Memory should be cleaned up - no active traces should remain
-      expect(traceManager.currentTracerContext).toBeUndefined()
+      expect(traceManager.currentTraceContext).toBeUndefined()
       expect(reportErrorFn).not.toHaveBeenCalled()
     })
 
@@ -1620,7 +1634,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       expect(reportFn).toHaveBeenCalledTimes(6) // 3 parents + 3 children
 
       // Memory should be clean - no dangling references
-      expect(traceManager.currentTracerContext).toBeUndefined()
+      expect(traceManager.currentTraceContext).toBeUndefined()
 
       // All reports should have correct parent-child relationships
       const parentReports = reportFn.mock.calls
@@ -1691,7 +1705,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       })
 
       // The main trace manager should still reference the parent as current
-      expect(traceManager.currentTracerContext?.input.id).toBe(parentTraceId)
+      expect(traceManager.currentTraceContext?.input.id).toBe(parentTraceId)
 
       // Complete both traces
       // prettier-ignore
@@ -1775,7 +1789,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       })
 
       // Parent should still be the current trace in main manager
-      expect(traceManager.currentTracerContext?.input.id).toBe(parentTraceId)
+      expect(traceManager.currentTraceContext?.input.id).toBe(parentTraceId)
 
       // Complete new child and parent
       // prettier-ignore
@@ -1968,8 +1982,8 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
 
       // Verify parentTraceId hierarchy
       expect(parentReport?.parentTraceId).toBeUndefined() // Parent has no parent
-      expect(childReport?.parentTraceId).toBe('id-0') // Child adopted by parent
-      expect(grandchildReport?.parentTraceId).toBe('id-1') // Grandchild adopted by child
+      expect(childReport?.parentTraceId).toBe('trace-0') // Child adopted by parent
+      expect(grandchildReport?.parentTraceId).toBe('trace-1') // Grandchild adopted by child
     })
 
     it('should handle complex nested hierarchies', () => {
@@ -2058,8 +2072,8 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
 
       // Verify parent-child hierarchy
       expect(rootReport?.parentTraceId).toBeUndefined() // Root has no parent
-      expect(level1Report?.parentTraceId).toBe('id-0') // Level1 adopted by root
-      expect(level2Report?.parentTraceId).toBe('id-1') // Level2 adopted by level1
+      expect(level1Report?.parentTraceId).toBe('trace-0') // Level1 adopted by root
+      expect(level2Report?.parentTraceId).toBe('trace-1') // Level2 adopted by level1
 
       expect(reportErrorFn).not.toHaveBeenCalled()
     })
@@ -2127,7 +2141,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
 
       // Both should complete successfully
       expect(childReport?.status).toBe('ok')
-      expect(childReport?.parentTraceId).toBe('id-0')
+      expect(childReport?.parentTraceId).toBe('trace-0')
       expect(childReport?.duration).toBe(220) // child completes immediately
       expect(childReport?.additionalDurations.startTillInteractive).toBe(null)
 
@@ -2201,7 +2215,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
 
       // Child should complete immediately without waiting for interactive
       expect(childReport?.status).toBe('ok')
-      expect(childReport?.parentTraceId).toBe('id-0')
+      expect(childReport?.parentTraceId).toBe('trace-0')
 
       // Parent should also complete
       expect(parentReport?.status).toBe('ok')
@@ -2248,14 +2262,14 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
         relatedTo: { ticketId: '1' },
         variant: 'default',
       })
-      expect(firstTraceId).toBe('id-0')
+      expect(firstTraceId).toBe('trace-0')
 
       // Start second trace - should interrupt first (existing behavior)
       const secondTraceId = secondTracer.start({
         relatedTo: { ticketId: '1' },
         variant: 'default',
       })
-      expect(secondTraceId).toBe('id-1')
+      expect(secondTraceId).toBe('trace-1')
 
       // prettier-ignore
       const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
@@ -2424,7 +2438,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       // Both should complete successfully with debouncing applied
       expect(parentReport?.status).toBe('ok')
       expect(childReport?.status).toBe('ok')
-      expect(childReport?.parentTraceId).toBe('id-0')
+      expect(childReport?.parentTraceId).toBe('trace-0')
 
       // Verify debouncing was applied (duration should reflect debounced end times)
       expect(parentReport?.duration).toBe(220) // parent-start to parent-end
@@ -2508,7 +2522,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       // Both should complete successfully
       expect(parentReport?.status).toBe('ok')
       expect(childReport?.status).toBe('ok')
-      expect(childReport?.parentTraceId).toBe('id-0')
+      expect(childReport?.parentTraceId).toBe('trace-0')
 
       // Verify computed spans were calculated
       expect(parentReport?.computedSpans?.['parent-computed']).toBeDefined()
@@ -2603,7 +2617,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       // Both should complete successfully with matching relations
       expect(parentReport?.status).toBe('ok')
       expect(childReport?.status).toBe('ok')
-      expect(childReport?.parentTraceId).toBe('id-0')
+      expect(childReport?.parentTraceId).toBe('trace-0')
 
       // Verify relations are preserved
       expect(parentReport?.relatedTo).toEqual(relatedTo)
