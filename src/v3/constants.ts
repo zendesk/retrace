@@ -12,3 +12,5 @@ export const FALLBACK_ANNOTATION: SpanAnnotation = {
   recordedInState: 'active',
   labels: [],
 }
+
+export const INHERIT_FROM_PARENT = Symbol('inheritFromParent')

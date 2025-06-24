@@ -1,4 +1,5 @@
 /* eslint-disable no-continue */
+import { INHERIT_FROM_PARENT } from './constants'
 import {
   ensureMatcherFn,
   ensureMatcherFnOrSpecialToken,
@@ -477,9 +478,15 @@ export function propagateStatusAndAttributes<
 
       const heritableAttributes: Record<string, unknown> = {}
       for (const key of cfg.heritableSpanAttributes) {
-        // child attribute wins over parent if defined:
+        // child attribute wins over parent if defined,
+        // unless it is literally the INHERIT_FROM_PARENT placeholder
+        const childValue = node.span.attributes?.[key]
+        const parentValue = parentHeritableAttributes?.[key]
         const value =
-          node.span.attributes?.[key] ?? parentHeritableAttributes?.[key]
+          childValue === INHERIT_FROM_PARENT
+            ? parentValue
+            : childValue ?? parentValue
+
         if (value !== undefined) {
           heritableAttributes[key] = value
         }
