@@ -74,10 +74,10 @@ export interface ProcessedSpan<
    * Object properties (such as attributes) are merged onto the original span,
    * so if you want to remove a property, set it to `undefined`.
    *
-   * Caveat: since spans are processed synchronously, this will NOT affect any matchers.
-   * If, for example, your trace has a `requiredToEndSpan` matcher on an attribute
+   * This will re-process the span, so if, for example,
+   * your trace has a `requiredToEndSpan` matcher on an attribute
    * that wasn't present in the span when it was processed, and you update the span
-   * to include that attribute, the matcher will NOT be triggered.
+   * to include that attribute, calling this function will trigger re-evaluation of the matchers.
    */
   readonly updateSpan: SpanUpdateFunction<RelationSchemasT, SpanT>
 }

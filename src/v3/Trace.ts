@@ -1946,13 +1946,23 @@ export class Trace<
     }
     // TODO: also ignore events that started a long long time before the trace started
 
-    // check if the performanceEntry has already been processed
-    // a single performanceEntry can have Spans created from it multiple times
-    // we allow this in case the Span comes from different contexts
-    // currently the version of the Span wins,
-    // but we could consider creating some customizable logic
-    // re-processing the same span should be safe
+    if (isTerminalState(this.stateMachine.currentState)) {
+      // nothing to do here
+      return undefined
+    }
+
+    // check if the span is already processed:
+    // 1. check recorded items by span.id
+    // 2. check if the performanceEntry has already been processed:
+    //    a single performanceEntry can have Spans created from it multiple times
+    //    we allow this in case the Span comes from different contexts
+    //    currently the version of the Span wins,
+    //    but we could consider creating some customizable logic
+    //    re-processing the same span should be safe
+    // 3. check if we can safely deduplicate the span
+    //    using the performanceEntryDeduplicationStrategy
     const existingAnnotation =
+      this.recordedItems.get(span.id) ??
       (span.performanceEntry &&
         this.processedPerformanceEntries.get(span.performanceEntry)) ??
       this.traceUtilities.performanceEntryDeduplicationStrategy?.findDuplicate(
@@ -1964,12 +1974,15 @@ export class Trace<
 
     if (existingAnnotation) {
       spanAndAnnotation = existingAnnotation
-      // update the span in the recording using the strategy's selector
-      spanAndAnnotation.span =
-        this.traceUtilities.performanceEntryDeduplicationStrategy?.selectPreferredSpan(
-          existingAnnotation.span,
-          span,
-        ) ?? span
+      if (existingAnnotation.span !== span) {
+        // if the object instance of the span is different (re-processing a copy with the same id)
+        // update the span in the recording using the deduplication strategy's selector
+        spanAndAnnotation.span =
+          this.traceUtilities.performanceEntryDeduplicationStrategy?.selectPreferredSpan(
+            existingAnnotation.span,
+            span,
+          ) ?? span
+      }
     } else {
       const spanKey = getSpanKey(span)
       const occurrence = this.occurrenceCounters.get(spanKey) ?? 1
@@ -1982,8 +1995,7 @@ export class Trace<
         operationRelativeEndTime:
           span.startTime.now - this.input.startTime.now + span.duration,
         occurrence,
-        recordedInState: this.stateMachine
-          .currentState as NonTerminalTraceStates,
+        recordedInState: this.stateMachine.currentState,
         labels: [],
       }
 
@@ -2000,10 +2012,7 @@ export class Trace<
     // make sure the labels are up-to-date
     spanAndAnnotation.annotation.labels = this.getSpanLabels(spanAndAnnotation)
 
-    const transition = this.stateMachine.emit(
-      'onProcessSpan',
-      spanAndAnnotation,
-    )
+    this.stateMachine.emit('onProcessSpan', spanAndAnnotation)
 
     const annotationRecord: SpanAnnotationRecord = {}
     // Forward span to all still-running children (F-7), and merge result into annotation record
@@ -2011,18 +2020,11 @@ export class Trace<
       Object.assign(annotationRecord, child.processSpan(span))
     }
 
-    const shouldRecord =
-      !transition || transition.transitionToState !== 'interrupted'
-
-    if (shouldRecord) {
-      // the return value is used for reporting the annotation externally (e.g. to the RUM agent)
-      return {
-        ...annotationRecord,
-        [this.definition.name]: spanAndAnnotation.annotation,
-      }
+    // the return value is used for reporting the annotation externally (e.g. to the RUM agent)
+    return {
+      ...annotationRecord,
+      [this.definition.name]: spanAndAnnotation.annotation,
     }
-
-    return undefined
   }
 
   private getSpanLabels(span: SpanAndAnnotation<RelationSchemasT>): string[] {
