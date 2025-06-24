@@ -579,7 +579,6 @@ export function createTraceRecording<
   const recordedItemsArray: SpanAndAnnotation<RelationSchemasT>[] = []
   const spanIdsToDiscard = new Set<string>()
 
-  console.log('items', [...recordedItems.values()])
   for (const item of recordedItems.values()) {
     if (item.span.startSpanId) {
       // if the item has a startSpan, we'll want to add it to the list and exclude it from the recorded items

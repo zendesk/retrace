@@ -167,15 +167,16 @@ export function getSpansFromTimeline<
     if (stub.entryType === 'fmp') {
       fmpTime = currentTime
     }
+    const now =
+      'startTime' in stub ? stub.startTime ?? currentTime : currentTime
     spans.push({
       type: stub.entryType as SpanType,
       duration: 0,
       name: `${stub.entryType}`,
       ...stub,
       startTime: {
-        now: 'startTime' in stub ? stub.startTime ?? currentTime : currentTime,
-        epoch:
-          'startTime' in stub ? stub.startTime ?? currentTime : currentTime,
+        now,
+        epoch: now,
       },
       isIdle:
         'isIdle' in stub
@@ -199,6 +200,9 @@ export function getSpansFromTimeline<
           'startTime' in stub ? stub.startTime ?? currentTime : currentTime,
         toJSON: () => {},
       },
+      id: `span-${i}-${now}-${stub.entryType}-${
+        'duration' in stub ? stub.duration : 0
+      }`,
     } as Span<RelationSchemasT>)
   }
 

@@ -161,12 +161,14 @@ export type ReportErrorFn<
   currentTraceContext?: PartialPossibleTraceContext<RelationSchemasT>,
 ) => void
 
+export type GenerateIdFn = (kind: 'span' | 'tick' | 'trace') => string
+
 export interface TraceManagerConfig<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 > {
   reportFn: AnyPossibleReportFn<RelationSchemasT>
 
-  generateId: () => string
+  generateId: GenerateIdFn
 
   relationSchemas: RelationSchemasT
 

@@ -215,7 +215,7 @@ export class Tracer<
       VariantsT
     >,
   ): Trace<SelectedRelationNameT, RelationSchemasT, VariantsT> | undefined => {
-    const id = input.id ?? this.rootTraceUtilities.generateId()
+    const id = input.id ?? this.rootTraceUtilities.generateId('trace')
 
     // Look for an adopting parent according to the nested proposal
     const parent = lookForAdoptingParent(
@@ -282,10 +282,9 @@ export class Tracer<
     if (!trace) return
     if (error) {
       trace.processSpan({
-        id: this.rootTraceUtilities.generateId(),
+        id: this.rootTraceUtilities.generateId('span'),
         name: error.name,
         startTime: ensureTimestamp(),
-        // TODO: use a dedicated error type
         type: 'error',
         status: 'error',
         relatedTo: { ...trace.input.relatedTo },

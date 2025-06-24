@@ -5,7 +5,8 @@ import {
   describe,
   expect,
   it,
-  vitest as jest,
+  type Mock,
+  vitest,
 } from 'vitest'
 import {
   ticketAndUserAndGlobalRelationSchemasFixture,
@@ -15,7 +16,7 @@ import { shouldCompleteAndHaveInteractiveTime } from './testUtility/fixtures/sho
 import { shouldNotEndWithInteractiveTimeout } from './testUtility/fixtures/shouldNotEndWithInteractiveTimeout'
 import { ticketActivatedDefinition } from './testUtility/fixtures/ticket.activated'
 import { TraceManager } from './TraceManager'
-import type { AnyPossibleReportFn, RelationSchemasBase } from './types'
+import type { AnyPossibleReportFn, GenerateIdFn } from './types'
 
 interface TicketIdRelation {
   ticketId: {
@@ -25,25 +26,40 @@ interface TicketIdRelation {
 
 describe('TraceManager with Fixtures', () => {
   let reportFn: jest.Mock
-  let generateId: jest.Mock
+  let generateId: Mock<GenerateIdFn>
   let reportErrorFn: jest.Mock
 
-  jest.useFakeTimers({
+  vitest.useFakeTimers({
     now: 0,
   })
 
-  let id = 0
+  let idPerType = {
+    span: 0,
+    trace: 0,
+    tick: 0,
+  }
 
   beforeEach(() => {
-    reportFn = jest.fn<AnyPossibleReportFn<TicketIdRelation>>()
-    id = 0
-    generateId = jest.fn(() => `id-${id++}`)
-    reportErrorFn = jest.fn()
+    idPerType = {
+      span: 0,
+      trace: 0,
+      tick: 0,
+    }
+    generateId = vitest.fn((type) => {
+      const seq = idPerType[type]++
+      return type === 'span'
+        ? `id-${seq}`
+        : type === 'trace'
+        ? `trace-${seq}`
+        : `tick-${seq}`
+    })
+    reportFn = vitest.fn<AnyPossibleReportFn<TicketIdRelation>>()
+    reportErrorFn = vitest.fn()
   })
 
   afterEach(() => {
-    jest.clearAllMocks()
-    jest.clearAllTimers()
+    vitest.clearAllMocks()
+    vitest.clearAllTimers()
   })
 
   it('should complete with interactive time without interruption', () => {
@@ -118,7 +134,7 @@ describe('TraceManager with Fixtures', () => {
         "computedValues": {},
         "duration": 1504.4000000059605,
         "error": undefined,
-        "id": "id-0",
+        "id": "trace-0",
         "interruptionReason": undefined,
         "name": "ticket.activated",
         "parentTraceId": undefined,
@@ -214,7 +230,7 @@ describe('TraceManager with Fixtures', () => {
         "computedValues": {},
         "duration": 1302.3999999910593,
         "error": undefined,
-        "id": "id-0",
+        "id": "trace-0",
         "interruptionReason": undefined,
         "name": "ticket.activated",
         "parentTraceId": undefined,

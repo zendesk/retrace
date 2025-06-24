@@ -1,5 +1,6 @@
 import type { Observable } from 'rxjs'
 import { Subject } from 'rxjs'
+import { FALLBACK_ANNOTATION } from './constants'
 import type {
   AllPossibleAddSpanToRecordingEvents,
   AllPossibleDefinitionModifiedEvents,
@@ -12,9 +13,26 @@ import {
   convertMatchersToFns,
   ensureMatcherFn,
 } from './ensureMatcherFn'
-import { type SpanMatch } from './matchSpan'
-import type { SpanAnnotationRecord } from './spanAnnotationTypes'
-import type { Span } from './spanTypes'
+import { ensureTimestamp } from './ensureTimestamp'
+import { findMatchingSpan, fromDefinition, type SpanMatch } from './matchSpan'
+import type {
+  ConstructedSpanAndAnnotations,
+  ConstructedSpanAndAnnotationsWithParent,
+  SpanAndAnnotation,
+  SpanAnnotationRecord,
+} from './spanAnnotationTypes'
+import type {
+  ComponentRenderSpan,
+  ConvenienceSpan,
+  ErrorSpan,
+  ErrorSpanInput,
+  GetParentSpanIdFn,
+  PerformanceEntrySpan,
+  PerformanceEntrySpanInput,
+  RenderSpanInput,
+  Span,
+} from './spanTypes'
+import { type TickMeta, TickParentResolver } from './TickParentResolver'
 import type { AllPossibleTraces } from './Trace'
 import { Tracer } from './Tracer'
 import type {
@@ -56,22 +74,25 @@ export class TraceManager<
     >(),
   }
 
-  get currentTracerContext():
+  get currentTraceContext():
     | AllPossibleTraceContexts<RelationSchemasT, string>
     | undefined {
     if (!this.currentTrace) return undefined
     return this.currentTrace
   }
 
-  constructor(
-    configInput: Omit<
-      TraceManagerConfig<RelationSchemasT>,
-      'reportWarningFn'
-    > & { reportWarningFn?: ReportErrorFn<RelationSchemasT> },
-  ) {
+  tickParentResolver: TickParentResolver<RelationSchemasT> | undefined
+
+  constructor({
+    enableTickTracking = true,
+    ...configInput
+  }: Omit<TraceManagerConfig<RelationSchemasT>, 'reportWarningFn'> & {
+    reportWarningFn?: ReportErrorFn<RelationSchemasT>
+  }) {
     this.utilities = {
       // by default noop for warnings
       reportWarningFn: () => {},
+      enableTickTracking,
       ...configInput,
       replaceCurrentTrace: (newTrace, reason) => {
         if (this.currentTrace) {
@@ -95,6 +116,9 @@ export class TraceManager<
       },
       getCurrentTrace: () => this.currentTrace,
     }
+    this.tickParentResolver = enableTickTracking
+      ? new TickParentResolver(this.utilities)
+      : undefined
   }
 
   /**
@@ -322,12 +346,217 @@ export class TraceManager<
     return new Tracer(completeTraceDefinition, this.utilities)
   }
 
-  processSpan(span: Span<RelationSchemasT>): SpanAnnotationRecord | undefined {
-    // note: mutating span on purpose to preserve object identity
+  #processSpan(span: Span<RelationSchemasT>): {
+    tickMeta: TickMeta<RelationSchemasT> | undefined
+    annotations: SpanAnnotationRecord | undefined
+  } {
     if (span.id === undefined) {
+      this.utilities.reportWarningFn(
+        new Error(
+          'Span ID for provided span was undefined, generating a new one.',
+        ),
+        this.currentTraceContext,
+      )
+      // note: mutating span on purpose to preserve object identity
       // eslint-disable-next-line no-param-reassign
-      span.id = this.utilities.generateId()
+      span.id = this.utilities.generateId('span')
     }
-    return this.currentTrace?.processSpan(span)
+    const tickMeta = this.tickParentResolver?.addSpanToCurrentTick(span)
+    const annotations = this.currentTrace?.processSpan(span)
+    return {
+      annotations,
+      tickMeta,
+    }
+  }
+
+  processSpan(span: Span<RelationSchemasT>): SpanAnnotationRecord | undefined {
+    return this.#processSpan(span).annotations
+  }
+
+  ensureCompleteSpan<SpanT extends Span<RelationSchemasT>>({
+    parentSpanMatcher,
+    ...partialSpan
+  }: ConvenienceSpan<RelationSchemasT, SpanT>): SpanT {
+    const id = partialSpan.id ?? this.utilities.generateId('span')
+    // eslint-disable-next-line prefer-destructuring
+    let getParentSpanId: GetParentSpanIdFn<RelationSchemasT> | undefined =
+      partialSpan.getParentSpanId
+    if (parentSpanMatcher && !getParentSpanId) {
+      // let's create a function that resolves the parent span ID based on the matcher:
+      getParentSpanId = (context): string | undefined => {
+        const spanAndAnnotations =
+          parentSpanMatcher.search === 'current-tick'
+            ? context.spansInCurrentTick.map(
+                (sp) =>
+                  context.traceContext.recordedItems.get(sp.id) ?? {
+                    span: sp,
+                    // this should never happen, but we provide a fallback annotation to satisfy types / in case of a bug:
+                    annotation: FALLBACK_ANNOTATION,
+                  },
+              )
+            : // TODO: we could optimize this to not iterate over the entire array for every span by providing it in context
+              [...context.traceContext.recordedItems.values()]
+
+        // TODO: consider memoizing the matchFn
+        const parentSpanMatchFn =
+          typeof parentSpanMatcher.match === 'object'
+            ? fromDefinition(parentSpanMatcher.match)
+            : parentSpanMatcher.match
+
+        const thisSpanIndex =
+          parentSpanMatcher.search === 'current-tick'
+            ? context.thisSpanInCurrentTickIndex
+            : spanAndAnnotations.findIndex(
+                (spanAndAnnotation) => spanAndAnnotation.span.id === id,
+              )
+
+        const found = findMatchingSpan(
+          parentSpanMatchFn,
+          spanAndAnnotations,
+          context.traceContext,
+          {
+            ...(parentSpanMatcher.searchDirection === 'after-self' && {
+              matchingIndex: 0,
+              startFromIndex: thisSpanIndex + 1,
+            }),
+            ...(parentSpanMatcher.searchDirection === 'before-self' && {
+              matchingIndex: -1,
+              endAtIndex: thisSpanIndex - 1,
+            }),
+          },
+        )
+
+        return found?.span.id
+      }
+    }
+
+    // ensure the span has an ID, and a startTime
+    const span = {
+      ...partialSpan,
+      id,
+      startTime: ensureTimestamp(partialSpan.startTime),
+      attributes: partialSpan.attributes ?? {},
+      duration: partialSpan.duration ?? 0,
+      getParentSpanId,
+    }
+    return span as SpanT
+  }
+
+  // helper functions to create and process spans that have a start event and an end event
+  startSpan<SpanT extends Span<RelationSchemasT>>(
+    inputSpan: ConvenienceSpan<RelationSchemasT, SpanT>,
+  ): ConstructedSpanAndAnnotations<RelationSchemasT, SpanT> {
+    const span = this.ensureCompleteSpan(inputSpan)
+    const annotations = this.processSpan(span)
+    return { span, annotations } as const
+  }
+
+  endSpan<SpanT extends Span<RelationSchemasT>>(
+    startSpan: ConvenienceSpan<RelationSchemasT, SpanT>,
+    endSpanAttributes: Partial<ConvenienceSpan<RelationSchemasT, SpanT>> = {},
+  ): ConstructedSpanAndAnnotations<RelationSchemasT, SpanT> {
+    const endSpan = this.ensureCompleteSpan<SpanT>({
+      // all properties from startSpan:
+      ...startSpan,
+      // all overriding properties from endSpan:
+      ...endSpanAttributes,
+      // a new id, if not provided
+      id: endSpanAttributes.id ?? this.utilities.generateId('span'),
+      // a reference to the startSpan:
+      startSpanId: startSpan.id,
+    })
+
+    const annotations = this.processSpan(endSpan)
+    return { span: endSpan, annotations } as const
+  }
+
+  processErrorSpan(
+    partialSpan: ErrorSpanInput<RelationSchemasT>,
+    tryResolveParentSynchronously = false,
+  ): ConstructedSpanAndAnnotationsWithParent<
+    RelationSchemasT,
+    ErrorSpan<RelationSchemasT>
+  > {
+    return this.createAndProcessSpan(
+      {
+        name: partialSpan.error.name,
+        status: 'error',
+        type: 'error',
+        ...partialSpan,
+      },
+      tryResolveParentSynchronously,
+    )
+  }
+
+  createAndProcessSpan<SpanT extends Span<RelationSchemasT>>(
+    partialSpan: ConvenienceSpan<RelationSchemasT, SpanT>,
+    tryResolveParentSynchronously = false,
+  ): ConstructedSpanAndAnnotationsWithParent<RelationSchemasT, SpanT> {
+    const span = this.ensureCompleteSpan<SpanT>(partialSpan)
+    const { tickMeta, annotations } = this.#processSpan(span)
+    let parentSpanId: string | undefined
+    let parentSpanAndAnnotation: SpanAndAnnotation<RelationSchemasT> | undefined
+
+    if (tryResolveParentSynchronously && span.getParentSpanId) {
+      const currentSpanContext = this.currentTraceContext
+      const currentSpanAndAnnotation = currentSpanContext?.recordedItems.get(
+        span.id,
+      )
+      if (currentSpanContext && currentSpanAndAnnotation && tickMeta) {
+        parentSpanId = span.getParentSpanId({
+          traceContext: currentSpanContext,
+          thisSpanAndAnnotation: currentSpanAndAnnotation,
+          ...tickMeta,
+        })
+        if (parentSpanId) {
+          parentSpanAndAnnotation =
+            currentSpanContext?.recordedItems.get(parentSpanId)
+        }
+      }
+    }
+
+    return {
+      span,
+      annotations,
+      parent: parentSpanAndAnnotation,
+      parentSpanId,
+    } as const
+  }
+
+  makePerformanceEntrySpan(
+    partialSpan: PerformanceEntrySpanInput<RelationSchemasT>,
+  ): PerformanceEntrySpan<RelationSchemasT> {
+    return this.ensureCompleteSpan<PerformanceEntrySpan<RelationSchemasT>>(
+      partialSpan,
+    )
+  }
+
+  makeRenderSpan(
+    partialSpan: RenderSpanInput<RelationSchemasT>,
+  ): ComponentRenderSpan<RelationSchemasT> {
+    return this.ensureCompleteSpan<ComponentRenderSpan<RelationSchemasT>>(
+      partialSpan,
+    )
+  }
+
+  startRenderSpan(
+    startSpanInput: Omit<RenderSpanInput<RelationSchemasT>, 'type'>,
+  ) {
+    return this.startSpan<ComponentRenderSpan<RelationSchemasT>>({
+      ...startSpanInput,
+      type: 'component-render-start',
+    })
+  }
+
+  endRenderSpan(
+    startSpan: RenderSpanInput<RelationSchemasT>,
+    endSpanAttributes: Partial<ComponentRenderSpan<RelationSchemasT>> & {
+      duration: number
+    },
+  ) {
+    return this.endSpan<ComponentRenderSpan<RelationSchemasT>>(startSpan, {
+      ...endSpanAttributes,
+      type: 'component-render',
+    })
   }
 }

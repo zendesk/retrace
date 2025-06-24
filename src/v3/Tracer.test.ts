@@ -1,16 +1,9 @@
 import './testUtility/asciiTimelineSerializer'
-import {
-  beforeEach,
-  describe,
-  expect,
-  it,
-  type Mock,
-  vitest as jest,
-} from 'vitest'
+import { beforeEach, describe, expect, it, type Mock, vitest } from 'vitest'
 import { Check, getSpansFromTimeline, Render } from './testUtility/makeTimeline'
 import { processSpans } from './testUtility/processSpans'
 import { TraceManager } from './TraceManager'
-import type { AnyPossibleReportFn } from './types'
+import type { AnyPossibleReportFn, GenerateIdFn } from './types'
 
 interface TestRelationSchema {
   test: {
@@ -22,16 +15,32 @@ describe('Tracer', () => {
   let reportFn: Mock<AnyPossibleReportFn<TestRelationSchema>>
   // TS doesn't like that reportFn is wrapped in Mock<> type
   const getReportFn = () => reportFn as AnyPossibleReportFn<TestRelationSchema>
-  let generateId: Mock
+  let generateId: Mock<GenerateIdFn>
   let reportErrorFn: Mock
 
-  let id = 0
+  let idPerType = {
+    span: 0,
+    trace: 0,
+    tick: 0,
+  }
+
   beforeEach(() => {
-    reportFn = jest.fn<AnyPossibleReportFn<TestRelationSchema>>()
-    id = 0
-    generateId = jest.fn(() => `id-${id++}`)
-    reportErrorFn = jest.fn()
-    jest.useFakeTimers({ now: 0 })
+    idPerType = {
+      span: 0,
+      trace: 0,
+      tick: 0,
+    }
+    generateId = vitest.fn((type) => {
+      const seq = idPerType[type]++
+      return type === 'span'
+        ? `id-${seq}`
+        : type === 'trace'
+        ? `trace-${seq}`
+        : `tick-${seq}`
+    })
+    reportFn = vitest.fn<AnyPossibleReportFn<TestRelationSchema>>()
+    reportErrorFn = vitest.fn()
+    vitest.useFakeTimers({ now: 0 })
   })
 
   describe('variants', () => {
@@ -315,7 +324,7 @@ describe('Tracer', () => {
         'initial-required',
         'added-required',
       ])
-      expect(traceManager.currentTracerContext).toBeUndefined()
+      expect(traceManager.currentTraceContext).toBeUndefined()
     })
   })
 
@@ -345,7 +354,7 @@ describe('Tracer', () => {
           additionalRequiredSpans: [{ name: 'additional-end' }],
         },
       )
-      expect(traceId).toBe('id-0')
+      expect(traceId).toBe('trace-0')
 
       // @ts-expect-error internals
       const trace = tracer.rootTraceUtilities.getCurrentTrace()

@@ -1,12 +1,5 @@
 import './testUtility/asciiTimelineSerializer'
-import {
-  beforeEach,
-  describe,
-  expect,
-  it,
-  type Mock,
-  vitest as jest,
-} from 'vitest'
+import { beforeEach, describe, expect, it, type Mock, vitest } from 'vitest'
 import * as match from './matchSpan'
 import {
   type TicketAndUserAndGlobalRelationSchemasFixture,
@@ -15,7 +8,7 @@ import {
 import { Check, getSpansFromTimeline, Render } from './testUtility/makeTimeline'
 import { processSpans } from './testUtility/processSpans'
 import { TraceManager } from './TraceManager'
-import type { AnyPossibleReportFn } from './types'
+import type { AnyPossibleReportFn, GenerateIdFn } from './types'
 
 describe('Trace Definitions', () => {
   let reportFn: Mock<
@@ -24,20 +17,36 @@ describe('Trace Definitions', () => {
   // TS doesn't like that reportFn is wrapped in Mock<> type
   const getReportFn = () =>
     reportFn as AnyPossibleReportFn<TicketAndUserAndGlobalRelationSchemasFixture>
-  let generateId: Mock
+  let generateId: Mock<GenerateIdFn>
   let reportErrorFn: Mock
   const DEFAULT_COLDBOOT_TIMEOUT_DURATION = 45_000
 
-  jest.useFakeTimers({
+  vitest.useFakeTimers({
     now: 0,
   })
 
-  let id = 0
+  let idPerType = {
+    span: 0,
+    trace: 0,
+    tick: 0,
+  }
+
   beforeEach(() => {
-    reportFn = jest.fn()
-    id = 0
-    generateId = jest.fn(() => `id-${id++}`)
-    reportErrorFn = jest.fn()
+    idPerType = {
+      span: 0,
+      trace: 0,
+      tick: 0,
+    }
+    generateId = vitest.fn((type) => {
+      const seq = idPerType[type]++
+      return type === 'span'
+        ? `id-${seq}`
+        : type === 'trace'
+        ? `trace-${seq}`
+        : `tick-${seq}`
+    })
+    reportFn = vitest.fn()
+    reportErrorFn = vitest.fn()
   })
 
   describe('computedSpanDefinitions', () => {
@@ -72,7 +81,7 @@ describe('Trace Definitions', () => {
         variant: 'cold_boot',
       })
 
-      expect(traceId).toBe('id-0')
+      expect(traceId).toBe('trace-0')
 
       // prettier-ignore
       const { spans } = getSpansFromTimeline<TicketAndUserAndGlobalRelationSchemasFixture>`

@@ -22,9 +22,12 @@ import {
   type PerformanceEntryLike,
 } from './firstCPUIdle'
 import { getSpanKey } from './getSpanKey'
-import { type SpanMatcherFn, withAllConditions } from './matchSpan'
+import {
+  requiredSpanWithErrorStatus,
+  type SpanMatcherFn,
+  withAllConditions,
+} from './matchSpan'
 import { createTraceRecording } from './recordingComputeUtils'
-import { requiredSpanWithErrorStatus } from './requiredSpanWithErrorStatus'
 import type {
   SpanAndAnnotation,
   SpanAnnotation,
@@ -1672,6 +1675,8 @@ export class Trace<
       }
     },
     onTerminalStateReached: (transition) => {
+      this.postProcessSpans()
+
       let traceRecording:
         | TraceRecording<SelectedRelationNameT, RelationSchemasT>
         | undefined
@@ -1715,6 +1720,26 @@ export class Trace<
       this.terminalStateChildren.clear()
       this.traceUtilities.performanceEntryDeduplicationStrategy?.reset()
     },
+  }
+
+  private postProcessSpans() {
+    // assigns parentSpanId to spans that have it defined in getParentSpanId
+    for (const spanAndAnnotation of this.recordedItems.values()) {
+      if (
+        !spanAndAnnotation.span.parentSpanId &&
+        typeof spanAndAnnotation.span.getParentSpanId === 'function'
+      ) {
+        spanAndAnnotation.span.parentSpanId =
+          spanAndAnnotation.span.getParentSpanId({
+            thisSpanAndAnnotation: spanAndAnnotation,
+            traceContext: this,
+            // these two will be overwritten if tick tracking is enabled:
+            spansInCurrentTick: [],
+            thisSpanInCurrentTickIndex: -1,
+          })
+        spanAndAnnotation.span.getParentSpanId = undefined
+      }
+    }
   }
 
   // this is public API only and should not be called internally
