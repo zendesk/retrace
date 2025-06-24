@@ -1,3 +1,4 @@
+import type { INHERIT_FROM_PARENT } from './constants'
 import type { ProcessedSpan } from './spanAnnotationTypes'
 import type {
   Attributes,
@@ -9,18 +10,38 @@ import type { RelatedTo, RelationSchemasBase } from './types'
 
 export type RenderedOutput = 'null' | 'loading' | 'content' | 'error'
 
+// allow setting any attribute value to INHERIT_FROM_PARENT:
+export type MapRequiredAttributes<RequiredAttributesT> = {
+  [K in keyof RequiredAttributesT]:
+    | RequiredAttributesT[K]
+    | typeof INHERIT_FROM_PARENT
+}
+
 export type BeaconConfig<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   RequiredAttributesT = {},
 > = {
+  /** The name of the component or hook */
   name: string
+  /** What is this component related to based on the tracing schema? */
   relatedTo: RelatedTo<RelationSchemasT>
+  /**
+   * What is being rendered in this pass of the render function?
+   */
   renderedOutput: RenderedOutput
+  /**
+   * If true, this is a component that is idle and not waiting for any data.
+   * This is inferred automatically from `renderedOutput` and `error`, but can be overridden.
+   */
   isIdle?: boolean
+  /**
+   * An Error instance if the component encountered an error during rendering.
+   * Will set the span status to 'error'
+   */
   error?: Error
 } & (keyof RequiredAttributesT extends never
   ? { attributes?: Attributes }
-  : { attributes: RequiredAttributesT & Attributes }) &
+  : { attributes: MapRequiredAttributes<RequiredAttributesT> & Attributes }) &
   WithParentSpanMatcher<RelationSchemasT>
 
 export type UseBeacon<

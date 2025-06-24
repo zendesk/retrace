@@ -1,4 +1,5 @@
 import { assertType, describe, expect, it } from 'vitest'
+import { INHERIT_FROM_PARENT } from './constants'
 import { generateUseBeacon } from './hooks'
 import type { GetRelationSchemasTFromTraceManager } from './hooksTypes'
 import * as match from './matchSpan'
@@ -115,6 +116,14 @@ describe('type tests', () => {
       renderedOutput: 'content',
       relatedTo: { userId: '123' },
       attributes: { team: 'test' },
+    })
+
+    // valid beacon with heritable attributes
+    useBeaconWithRequiredAttributes({
+      name: 'UserPage',
+      renderedOutput: 'content',
+      relatedTo: { userId: '123' },
+      attributes: { team: INHERIT_FROM_PARENT },
     })
 
     // valid beacon required attributes and additional attributes
