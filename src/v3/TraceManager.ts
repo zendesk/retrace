@@ -390,7 +390,7 @@ export class TraceManager<
     const updateSpan: SpanUpdateFunction<RelationSchemasT, SpanT> = (
       spanUpdates,
     ) => {
-      if (currentTrace !== this.currentTrace) {
+      if (!currentTrace || currentTrace !== this.currentTrace) {
         // ignore updates if the trace has changed
         return
       }
@@ -410,6 +410,8 @@ export class TraceManager<
         // eslint-disable-next-line no-param-reassign
         span[key] = value as never
       }
+      // re-process the span
+      currentTrace.processSpan(span)
     }
 
     return {

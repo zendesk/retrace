@@ -18,6 +18,7 @@ import type {
   PerformanceEntrySpan,
 } from './spanTypes'
 import type { TicketIdRelationSchemasFixture } from './testUtility/fixtures/relationSchemas'
+import type { Trace } from './Trace'
 import { TraceManager } from './TraceManager'
 import type { AnyPossibleReportFn } from './types'
 
@@ -891,22 +892,6 @@ describe('creating spans', () => {
       expect(result.span.error).toBe(error) // Error object should remain unchanged
     })
 
-    it('should handle null values correctly', () => {
-      const result = traceManager.createAndProcessSpan({
-        type: 'mark',
-        name: 'test-span',
-        relatedTo: { ticketId: '123' },
-        attributes: { prop: 'original' },
-      })
-
-      // Update with null value - should be assigned directly, not merged
-      result.updateSpan({
-        attributes: null as any,
-      })
-
-      expect(result.span.attributes).toBe(null)
-    })
-
     it('should update multiple properties in one call for component render spans', () => {
       const result = traceManager.createAndProcessSpan<
         ComponentRenderSpan<TicketIdRelationSchemasFixture>
@@ -961,8 +946,7 @@ describe('creating spans', () => {
       // logic would be tested in the tracer/matcher tests
     })
 
-    it('should work without an active trace', () => {
-      // End the current trace first
+    it('should not do anything without an active trace', () => {
       const endSpan = traceManager.ensureCompleteSpan({
         type: 'mark',
         name: 'end',
@@ -978,15 +962,12 @@ describe('creating spans', () => {
 
       const originalAttributes = { ...result.span.attributes }
 
-      // updateSpan should still work (since there's no trace to have changed)
+      // updateSpan should be a no-op, as there is no active trace
       result.updateSpan({
         attributes: { updated: true },
       })
 
-      expect(result.span.attributes).toEqual({
-        ...originalAttributes,
-        updated: true,
-      })
+      expect(result.span.attributes).toEqual(originalAttributes)
     })
 
     it('should only allow updating specific properties defined in UpdatableSpanProperties', () => {
@@ -1033,6 +1014,251 @@ describe('creating spans', () => {
         nested: { prop2: 'value2' }, // nested object is replaced, not merged
         topLevel: 'keep',
         newTopLevel: 'added',
+      })
+    })
+  })
+
+  describe('span re-processing after updateSpan', () => {
+    let activeTrace: string | undefined
+
+    beforeEach(() => {
+      // Create a tracer to enable trace recording
+      const tracer = traceManager.createTracer({
+        name: 'reprocessing-test',
+        relationSchemaName: 'ticket',
+        requiredSpans: [
+          { name: 'test-span', attributes: { status: 'ready' } },
+          { name: 'final-span', attributes: { completed: true } },
+        ],
+        variants: {
+          default: { timeout: 10_000 },
+        },
+      })
+
+      // Start a trace to have an active context
+      activeTrace = tracer.start({
+        relatedTo: { ticketId: '123' },
+        variant: 'default',
+      })
+    })
+
+    it('should re-evaluate matchers when updateSpan is called', () => {
+      // Create a span with the correct name but wrong attribute
+      const result = traceManager.createAndProcessSpan({
+        type: 'mark',
+        name: 'test-span',
+        relatedTo: { ticketId: '123' },
+        attributes: { status: 'pending' }, // Wrong status, should be 'ready'
+      })
+
+      // Verify the trace is still active (required spans not met)
+      expect(
+        (
+          traceManager.currentTraceContext as Trace<
+            'ticket',
+            TicketIdRelationSchemasFixture,
+            'default'
+          >
+        )?.stateMachine?.currentState,
+      ).toBe('active')
+
+      // Update the span attributes to match the requirement - this should trigger re-processing
+      result.updateSpan({
+        attributes: { status: 'ready' }, // Now matches the required attribute
+      })
+
+      // Verify the attribute was updated
+      expect(result.span.attributes?.status).toBe('ready')
+
+      // Create the second required span to complete the trace
+      const finalSpan = traceManager.createAndProcessSpan({
+        type: 'mark',
+        name: 'final-span',
+        relatedTo: { ticketId: '123' },
+        attributes: { completed: true },
+      })
+
+      // The trace should now be complete
+      expect(traceManager.currentTraceContext).toBeUndefined()
+      expect(reportFn).toHaveBeenCalledTimes(1)
+    })
+
+    it('should re-evaluate attribute-based matchers when attributes are updated', () => {
+      // End the current trace first
+      const endCurrentTrace = traceManager.ensureCompleteSpan({
+        type: 'mark',
+        name: 'final-span',
+        relatedTo: { ticketId: '123' },
+        attributes: { completed: true },
+      })
+      traceManager.processSpan(endCurrentTrace)
+
+      // Create a tracer that requires a specific attribute value
+      const attributeTracer = traceManager.createTracer({
+        name: 'attribute-test',
+        relationSchemaName: 'ticket',
+        requiredSpans: [
+          { name: 'test-span', attributes: { required: true } },
+          { name: 'end' },
+        ],
+        variants: {
+          default: { timeout: 10_000 },
+        },
+      })
+
+      // Start the new trace
+      attributeTracer.start({
+        relatedTo: { ticketId: '456' },
+        variant: 'default',
+      })
+
+      // Create a span without the required attribute
+      const result = traceManager.createAndProcessSpan({
+        type: 'mark',
+        name: 'test-span',
+        relatedTo: { ticketId: '456' },
+        attributes: { required: false, other: 'value' },
+      })
+
+      // Verify the trace is still active (required span not matched due to attribute)
+      expect(
+        (
+          traceManager.currentTraceContext as Trace<
+            'ticket',
+            TicketIdRelationSchemasFixture,
+            'default'
+          >
+        )?.stateMachine?.currentState,
+      ).toBe('active')
+
+      // Update the span attributes to match the requirement
+      result.updateSpan({
+        attributes: { required: true, additional: 'new' },
+      })
+
+      // Verify the attributes were merged correctly
+      expect(result.span.attributes).toEqual({
+        required: true,
+        other: 'value',
+        additional: 'new',
+      })
+
+      // Add the end span to complete the trace
+      const endSpan = traceManager.createAndProcessSpan({
+        type: 'mark',
+        name: 'end',
+        relatedTo: { ticketId: '456' },
+      })
+
+      // The trace should now be complete
+      expect(traceManager.currentTraceContext).toBeUndefined()
+      expect(reportFn).toHaveBeenCalledTimes(2) // Original trace + this new one
+    })
+
+    it('should not re-process spans after trace has ended', () => {
+      const result = traceManager.createAndProcessSpan({
+        type: 'mark',
+        name: 'test-span',
+        relatedTo: { ticketId: '123' },
+        attributes: { original: 'value' },
+      })
+
+      // Complete the trace
+      const initialSpan = traceManager.ensureCompleteSpan({
+        type: 'mark',
+        name: 'test-span',
+        relatedTo: { ticketId: '123' },
+        attributes: { status: 'ready' },
+      })
+      traceManager.processSpan(initialSpan)
+
+      const finalSpan = traceManager.ensureCompleteSpan({
+        type: 'mark',
+        name: 'final-span',
+        relatedTo: { ticketId: '123' },
+        attributes: { completed: true },
+      })
+      traceManager.processSpan(finalSpan)
+
+      // Trace should be complete
+      expect(traceManager.currentTraceContext).toBeUndefined()
+
+      const originalAttributes = { ...result.span.attributes }
+
+      // Try to update the span after trace completion - should be ignored
+      result.updateSpan({
+        attributes: { updated: 'ignored' },
+      })
+
+      // Attributes should remain unchanged
+      expect(result.span.attributes).toEqual(originalAttributes)
+    })
+
+    it('should preserve span object references during re-processing', () => {
+      const result = traceManager.createAndProcessSpan({
+        type: 'mark',
+        name: 'test-span',
+        relatedTo: { ticketId: '123' },
+        attributes: { prop: 'value' },
+      })
+
+      const originalSpanRef = result.span
+      const originalAttributesRef = result.span.attributes
+
+      // Update the span
+      result.updateSpan({
+        attributes: { newProp: 'newValue' },
+      })
+
+      // Object references should be preserved
+      expect(result.span).toBe(originalSpanRef)
+      expect(result.span.attributes).toBe(originalAttributesRef)
+
+      // But content should be updated
+      expect(result.span.attributes).toEqual({
+        prop: 'value',
+        newProp: 'newValue',
+      })
+    })
+
+    it('should handle multiple updateSpan calls correctly', () => {
+      const result = traceManager.createAndProcessSpan({
+        type: 'mark',
+        name: 'evolving-span',
+        relatedTo: { ticketId: '123' },
+        attributes: { step: 1 },
+      })
+
+      // First update
+      result.updateSpan({
+        attributes: { step: 2, phase: 'early' },
+      })
+
+      expect(result.span.attributes).toEqual({
+        step: 2,
+        phase: 'early',
+      })
+
+      // Second update
+      result.updateSpan({
+        attributes: { step: 3, phase: 'late', final: true },
+      })
+
+      expect(result.span.attributes).toEqual({
+        step: 3,
+        phase: 'late',
+        final: true,
+      })
+
+      // Third update - partial
+      result.updateSpan({
+        attributes: { phase: 'complete' },
+      })
+
+      expect(result.span.attributes).toEqual({
+        step: 3,
+        phase: 'complete',
+        final: true,
       })
     })
   })
