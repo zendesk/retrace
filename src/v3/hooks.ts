@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useOnComponentUnmount } from '../ErrorBoundary'
 import type { BeaconConfig, UseBeacon } from './hooksTypes'
-import type { ConstructedSpanAndAnnotations } from './spanAnnotationTypes'
+import type { ProcessedSpan } from './spanAnnotationTypes'
 import type { ComponentRenderSpan } from './spanTypes'
 import type { TraceManager } from './TraceManager'
 import type { RelationSchemasBase, RelationsOnASpan } from './types'
@@ -43,10 +43,7 @@ export const generateUseBeacon =
     })
 
     const renderStartRef = useRef<
-      | ConstructedSpanAndAnnotations<
-          RelationSchemasT,
-          ComponentRenderSpan<RelationSchemasT>
-        >
+      | ProcessedSpan<RelationSchemasT, ComponentRenderSpan<RelationSchemasT>>
       | undefined
     >()
     renderStartRef.current = renderStartEntry
@@ -82,4 +79,6 @@ export const generateUseBeacon =
       },
       [config.name],
     )
+
+    return renderStartEntry.span
   }

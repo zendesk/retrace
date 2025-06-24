@@ -1,4 +1,8 @@
-import type { Attributes, WithParentSpanMatcher } from './spanTypes'
+import type {
+  Attributes,
+  ComponentRenderSpan,
+  WithParentSpanMatcher,
+} from './spanTypes'
 import type { TraceManager } from './TraceManager'
 import type { RelatedTo, RelationSchemasBase } from './types'
 
@@ -21,7 +25,9 @@ export type BeaconConfig<
 export type UseBeacon<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   RequiredAttributesT,
-> = (beaconConfig: BeaconConfig<RelationSchemasT, RequiredAttributesT>) => void
+> = (
+  beaconConfig: BeaconConfig<RelationSchemasT, RequiredAttributesT>,
+) => ComponentRenderSpan<RelationSchemasT>
 
 export type GetRelationSchemasTFromTraceManager<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

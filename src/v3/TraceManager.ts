@@ -16,8 +16,7 @@ import {
 import { ensureTimestamp } from './ensureTimestamp'
 import { findMatchingSpan, fromDefinition, type SpanMatch } from './matchSpan'
 import type {
-  ConstructedSpanAndAnnotations,
-  ConstructedSpanAndAnnotationsWithParent,
+  ProcessedSpan,
   SpanAndAnnotation,
   SpanAnnotationRecord,
 } from './spanAnnotationTypes'
@@ -32,7 +31,7 @@ import type {
   RenderSpanInput,
   Span,
 } from './spanTypes'
-import { type TickMeta, TickParentResolver } from './TickParentResolver'
+import { TickParentResolver } from './TickParentResolver'
 import type { AllPossibleTraces } from './Trace'
 import { Tracer } from './Tracer'
 import type {
@@ -346,10 +345,9 @@ export class TraceManager<
     return new Tracer(completeTraceDefinition, this.utilities)
   }
 
-  #processSpan(span: Span<RelationSchemasT>): {
-    tickMeta: TickMeta<RelationSchemasT> | undefined
-    annotations: SpanAnnotationRecord | undefined
-  } {
+  #processSpan<SpanT extends Span<RelationSchemasT>>(
+    span: SpanT,
+  ): ProcessedSpan<RelationSchemasT, SpanT> {
     if (span.id === undefined) {
       this.utilities.reportWarningFn(
         new Error(
@@ -363,9 +361,38 @@ export class TraceManager<
     }
     const tickMeta = this.tickParentResolver?.addSpanToCurrentTick(span)
     const annotations = this.currentTrace?.processSpan(span)
+
+    const currentSpanContext = this.currentTraceContext
+    const currentSpanAndAnnotation = currentSpanContext?.recordedItems.get(
+      span.id,
+    )
+
+    const resolveParent = ():
+      | SpanAndAnnotation<RelationSchemasT>
+      | undefined => {
+      if (
+        currentSpanContext &&
+        currentSpanAndAnnotation &&
+        tickMeta &&
+        span.getParentSpanId
+      ) {
+        const parentSpanId = span.getParentSpanId({
+          traceContext: currentSpanContext,
+          thisSpanAndAnnotation: currentSpanAndAnnotation,
+          ...tickMeta,
+        })
+        if (parentSpanId) {
+          return currentSpanContext?.recordedItems.get(parentSpanId)
+        }
+      }
+      return undefined
+    }
+
     return {
+      span,
       annotations,
       tickMeta,
+      resolveParent,
     }
   }
 
@@ -445,16 +472,15 @@ export class TraceManager<
   // helper functions to create and process spans that have a start event and an end event
   startSpan<SpanT extends Span<RelationSchemasT>>(
     inputSpan: ConvenienceSpan<RelationSchemasT, SpanT>,
-  ): ConstructedSpanAndAnnotations<RelationSchemasT, SpanT> {
+  ): ProcessedSpan<RelationSchemasT, SpanT> {
     const span = this.ensureCompleteSpan(inputSpan)
-    const annotations = this.processSpan(span)
-    return { span, annotations } as const
+    return this.#processSpan(span)
   }
 
   endSpan<SpanT extends Span<RelationSchemasT>>(
     startSpan: ConvenienceSpan<RelationSchemasT, SpanT>,
     endSpanAttributes: Partial<ConvenienceSpan<RelationSchemasT, SpanT>> = {},
-  ): ConstructedSpanAndAnnotations<RelationSchemasT, SpanT> {
+  ): ProcessedSpan<RelationSchemasT, SpanT> {
     const endSpan = this.ensureCompleteSpan<SpanT>({
       // all properties from startSpan:
       ...startSpan,
@@ -466,61 +492,25 @@ export class TraceManager<
       startSpanId: startSpan.id,
     })
 
-    const annotations = this.processSpan(endSpan)
-    return { span: endSpan, annotations } as const
+    return this.#processSpan(endSpan)
   }
 
   processErrorSpan(
     partialSpan: ErrorSpanInput<RelationSchemasT>,
-    tryResolveParentSynchronously = false,
-  ): ConstructedSpanAndAnnotationsWithParent<
-    RelationSchemasT,
-    ErrorSpan<RelationSchemasT>
-  > {
-    return this.createAndProcessSpan(
-      {
-        name: partialSpan.error.name,
-        status: 'error',
-        type: 'error',
-        ...partialSpan,
-      },
-      tryResolveParentSynchronously,
-    )
+  ): ProcessedSpan<RelationSchemasT, ErrorSpan<RelationSchemasT>> {
+    return this.createAndProcessSpan({
+      name: partialSpan.error.name,
+      status: 'error',
+      type: 'error',
+      ...partialSpan,
+    })
   }
 
   createAndProcessSpan<SpanT extends Span<RelationSchemasT>>(
     partialSpan: ConvenienceSpan<RelationSchemasT, SpanT>,
-    tryResolveParentSynchronously = false,
-  ): ConstructedSpanAndAnnotationsWithParent<RelationSchemasT, SpanT> {
+  ): ProcessedSpan<RelationSchemasT, SpanT> {
     const span = this.ensureCompleteSpan<SpanT>(partialSpan)
-    const { tickMeta, annotations } = this.#processSpan(span)
-    let parentSpanId: string | undefined
-    let parentSpanAndAnnotation: SpanAndAnnotation<RelationSchemasT> | undefined
-
-    if (tryResolveParentSynchronously && span.getParentSpanId) {
-      const currentSpanContext = this.currentTraceContext
-      const currentSpanAndAnnotation = currentSpanContext?.recordedItems.get(
-        span.id,
-      )
-      if (currentSpanContext && currentSpanAndAnnotation && tickMeta) {
-        parentSpanId = span.getParentSpanId({
-          traceContext: currentSpanContext,
-          thisSpanAndAnnotation: currentSpanAndAnnotation,
-          ...tickMeta,
-        })
-        if (parentSpanId) {
-          parentSpanAndAnnotation =
-            currentSpanContext?.recordedItems.get(parentSpanId)
-        }
-      }
-    }
-
-    return {
-      span,
-      annotations,
-      parent: parentSpanAndAnnotation,
-      parentSpanId,
-    } as const
+    return this.#processSpan(span)
   }
 
   makePerformanceEntrySpan(
