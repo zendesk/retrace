@@ -36,10 +36,8 @@ export function createDefaultPerformanceEntryDeduplicationStrategy<
       return undefined
     },
 
-    recordSpan(
-      span: Span<RelationSchemasT>,
-      spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>,
-    ): void {
+    recordSpan(spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>): void {
+      const { span } = spanAndAnnotation
       if (!span.performanceEntry) {
         return
       }

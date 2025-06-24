@@ -558,10 +558,7 @@ export interface SpanDeduplicationStrategy<
   /**
    * Called when a span is recorded to update deduplication state
    */
-  recordSpan: (
-    span: Span<RelationSchemasT>,
-    spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>,
-  ) => void
+  recordSpan: (spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>) => void
 
   /**
    * Called when trace recording is complete to clean up any deduplication state
