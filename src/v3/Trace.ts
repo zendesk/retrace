@@ -1991,12 +1991,11 @@ export class Trace<
         span,
         annotation,
       }
-
-      this.traceUtilities.performanceEntryDeduplicationStrategy?.recordSpan(
-        span,
-        spanAndAnnotation,
-      )
     }
+
+    this.traceUtilities.performanceEntryDeduplicationStrategy?.recordSpan(
+      spanAndAnnotation,
+    )
 
     // make sure the labels are up-to-date
     spanAndAnnotation.annotation.labels = this.getSpanLabels(spanAndAnnotation)
