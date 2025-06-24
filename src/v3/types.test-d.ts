@@ -485,7 +485,7 @@ describe('type tests', () => {
     const {
       span: errorSpan,
       annotations: errorAnnotations,
-      parent,
+      resolveParent,
     } = traceManager.processErrorSpan({
       error: new Error('Test error'),
       parentSpanMatcher: {
@@ -499,6 +499,6 @@ describe('type tests', () => {
     })
 
     // you can use this to e.g. report your error with a parentName tag, or the ownership attribute
-    const parentName = parent?.span.name
+    const parentName = resolveParent()?.span.name
   })
 })

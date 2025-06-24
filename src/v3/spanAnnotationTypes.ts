@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style */
 import type { Span } from './spanTypes'
+import type { TickMeta } from './TickParentResolver'
 import type { NonTerminalTraceStates } from './Trace'
 import type { RelationSchemasBase } from './types'
 
@@ -58,18 +59,12 @@ export interface SpanAndAnnotation<
   annotation: SpanAnnotation
 }
 
-export interface ConstructedSpanAndAnnotations<
+export interface ProcessedSpan<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   SpanT extends Span<RelationSchemasT>,
 > {
   readonly span: SpanT
   readonly annotations: SpanAnnotationRecord | undefined
-}
-
-export interface ConstructedSpanAndAnnotationsWithParent<
-  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
-  SpanT extends Span<RelationSchemasT>,
-> extends ConstructedSpanAndAnnotations<RelationSchemasT, SpanT> {
-  parent: SpanAndAnnotation<RelationSchemasT> | undefined
-  parentSpanId: string | undefined
+  readonly resolveParent: () => SpanAndAnnotation<RelationSchemasT> | undefined
+  readonly tickMeta: TickMeta<RelationSchemasT> | undefined
 }

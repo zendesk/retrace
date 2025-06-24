@@ -577,13 +577,14 @@ export function createTraceRecording<
   })
 
   const recordedItemsArray: SpanAndAnnotation<RelationSchemasT>[] = []
-  const spanIdsToDiscard = new Set<string>()
+  const startSpanIdToEndSpanIdMap = new Map<string, string>()
 
   for (const item of recordedItems.values()) {
     if (item.span.startSpanId) {
-      // if the item has a startSpan, we'll want to add it to the list and exclude it from the recorded items
-      // this is because these items are unnecessary, the same information is present in the span that contains the duration
-      spanIdsToDiscard.add(item.span.startSpanId)
+      // if the item has a startSpan, it is the full span
+      // we'll want to add the startSpan to the list, and exclude it from the recorded items
+      // These startSpans are unnecessary, since the same information is present in the span that contains the duration
+      startSpanIdToEndSpanIdMap.set(item.span.startSpanId, item.span.id)
     }
     if (endOfOperationSpan) {
       // only keep items captured until the endOfOperationSpan or if not available, the lastRelevantSpan
@@ -595,6 +596,16 @@ export function createTraceRecording<
       }
     } else {
       recordedItemsArray.push(item)
+    }
+  }
+
+  // we need to re-parent any span that referred to a startSpanId that was discarded
+  for (const item of recordedItemsArray) {
+    if (item.span.parentSpanId) {
+      const newParent = startSpanIdToEndSpanIdMap.get(item.span.parentSpanId)
+      if (newParent) {
+        item.span.parentSpanId = newParent
+      }
     }
   }
 
@@ -645,8 +656,9 @@ export function createTraceRecording<
 
   // exclude internalUse and spanIdsToDiscard
   const filteredRecordedItemsArray = recordedItemsArray.filter(
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-    (item) => !(item.span.internalUse || spanIdsToDiscard.has(item.span.id)),
+    (item) =>
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+      !(item.span.internalUse || startSpanIdToEndSpanIdMap.has(item.span.id)),
   )
 
   return {
