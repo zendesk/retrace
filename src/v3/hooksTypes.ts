@@ -39,6 +39,11 @@ export type BeaconConfig<
    * Will set the span status to 'error'
    */
   error?: Error
+
+  /**
+   * True if this is a hook being instrumented.
+   */
+  isHook?: boolean
 } & (keyof RequiredAttributesT extends never
   ? { attributes?: Attributes }
   : { attributes: MapRequiredAttributes<RequiredAttributesT> & Attributes }) &
