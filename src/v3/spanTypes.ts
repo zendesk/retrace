@@ -185,17 +185,6 @@ export interface GetParentSpanIdContext<
   // TODO: improve types here by requiring SelectedRelationNameT and VariantsT:
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   traceContext: DraftTraceContext<any, RelationSchemasT, any>
-  /**
-   * Array of all spans that were processed in the current event loop tick.
-   * Empty if tick tracking is disabled
-   */
-  spansInCurrentTick: Span<RelationSchemasT>[]
-  /**
-   * The index of the current span in the spansInCurrentTick array.
-   * Can be used to find preceeding or following spans that were processed in the same tick.
-   * Always -1 if tick tracking is disabled.
-   */
-  thisSpanInCurrentTickIndex: number
 }
 
 export interface ComponentRenderSpan<

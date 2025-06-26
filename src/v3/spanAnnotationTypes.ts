@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style */
+import type { SpanMatch } from './matchSpan'
 import type { Span, SpanUpdateFunction } from './spanTypes'
 import type { TickMeta } from './TickParentResolver'
 import type { NonTerminalTraceStates } from './Trace'
@@ -57,6 +58,7 @@ export interface SpanAndAnnotation<
 > {
   span: Span<RelationSchemasT>
   annotation: SpanAnnotation
+  tickMeta?: TickMeta<RelationSchemasT>
 }
 
 export interface ProcessedSpan<
@@ -80,4 +82,8 @@ export interface ProcessedSpan<
    * to include that attribute, calling this function will trigger re-evaluation of the matchers.
    */
   readonly updateSpan: SpanUpdateFunction<RelationSchemasT, SpanT>
+  readonly findSpanInParentHierarchy: (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    spanMatch: SpanMatch<keyof RelationSchemasT, RelationSchemasT, any>,
+  ) => SpanAndAnnotation<RelationSchemasT> | undefined
 }

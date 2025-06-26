@@ -661,11 +661,19 @@ export function createTraceRecording<
   const startTillRequirementsMet =
     lastRequiredSpanAndAnnotation?.annotation.operationRelativeEndTime ?? null
 
-  // exclude internalUse and spanIdsToDiscard
-  const filteredRecordedItemsArray = recordedItemsArray.filter(
-    (item) =>
-      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-      !(item.span.internalUse || startSpanIdToEndSpanIdMap.has(item.span.id)),
+  const filteredRecordedItemsArray = recordedItemsArray.flatMap(
+    // remove the currentTick attributes from the array
+    ({ tickMeta: _, ...item }) => {
+      // exclude internalUse and spanIdsToDiscard
+      const keep = !(
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+        (item.span.internalUse || startSpanIdToEndSpanIdMap.has(item.span.id))
+      )
+      if (keep) {
+        return [item]
+      }
+      return []
+    },
   )
 
   return {

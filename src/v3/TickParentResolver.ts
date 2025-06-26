@@ -4,7 +4,16 @@ import type { RelationSchemasBase, TraceManagerUtilities } from './types'
 export interface TickMeta<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 > {
+  /**
+   * Array of all spans that were processed in the current event loop tick.
+   * Empty if tick tracking is disabled
+   */
   spansInCurrentTick: Span<RelationSchemasT>[]
+  /**
+   * The index of the current span in the spansInCurrentTick array.
+   * Can be used to find preceeding or following spans that were processed in the same tick.
+   * Always -1 if tick tracking is disabled.
+   */
   thisSpanInCurrentTickIndex: number
 }
 
@@ -47,17 +56,6 @@ export class TickParentResolver<
     const thisSpanInCurrentTickIndex = spansInCurrentTick.push(span) - 1
     // eslint-disable-next-line no-param-reassign
     span.tickId = this.#tickId
-    const { getParentSpanId } = span
-    if (getParentSpanId) {
-      // wrap the getParentSpanId function to include the current tick context:
-      // eslint-disable-next-line no-param-reassign
-      span.getParentSpanId = (context) =>
-        getParentSpanId({
-          ...context,
-          spansInCurrentTick,
-          thisSpanInCurrentTickIndex,
-        })
-    }
     this.#ensureFlushScheduled()
     return {
       spansInCurrentTick,

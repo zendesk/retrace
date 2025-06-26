@@ -58,13 +58,11 @@ export interface RumTraceRecording<
 
 export function isRenderEntry<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
->(
-  entry: Span<RelationSchemasT>,
-): entry is ComponentRenderSpan<RelationSchemasT> {
+>(span: Span<RelationSchemasT>): span is ComponentRenderSpan<RelationSchemasT> {
   return (
-    entry.type === 'component-render' ||
-    entry.type === 'component-render-start' ||
-    entry.type === 'component-unmount'
+    span.type === 'component-render' ||
+    span.type === 'component-render-start' ||
+    span.type === 'component-unmount'
   )
 }
 
