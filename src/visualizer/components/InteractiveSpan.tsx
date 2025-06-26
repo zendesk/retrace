@@ -14,7 +14,7 @@ import type { WithTooltipProvidedProps } from '@visx/tooltip/lib/enhancers/withT
 import type { ScaleBand, ScaleLinear } from '@visx/vendor/d3-scale'
 import { getColor } from '@zendeskgarden/react-theming'
 import { BAR_FILL_COLOR } from '../constants'
-import type { MappedSpanAndAnnotation } from '../types'
+import type { HierarchicalSpanAndAnnotation } from '../types'
 
 const interactiveStyles = `
   cursor: pointer;
@@ -71,9 +71,9 @@ interface SharedAnnotationProps {
   titleColor?: string
   title?: string
   annotateAt?: 'top'
-  data: MappedSpanAndAnnotation
+  data: HierarchicalSpanAndAnnotation
   showTooltip: (
-    data: Partial<WithTooltipProvidedProps<MappedSpanAndAnnotation>>,
+    data: Partial<WithTooltipProvidedProps<HierarchicalSpanAndAnnotation>>,
   ) => void
   hideTooltip: () => void
 }

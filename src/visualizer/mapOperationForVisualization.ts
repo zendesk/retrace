@@ -1,6 +1,14 @@
 import { adjustTimestampBy } from '../v3/ensureTimestamp'
 import type { SupportedSpanTypes } from './constants'
-import type { MappedSpanAndAnnotation, RecordingInputFile } from './types'
+import type {
+  HierarchicalOperation,
+  MappedSpanAndAnnotation,
+  RecordingInputFile,
+} from './types'
+import {
+  buildSpanHierarchy,
+  validateSpanHierarchy,
+} from './utils/buildSpanHierarchy'
 
 const orderArray = [
   'longtask',
@@ -57,9 +65,9 @@ const order: Record<string, number> = Object.fromEntries(
 
 export interface MappedOperation {
   name: string
-  spanEvents: MappedSpanAndAnnotation[]
+  // spanEvents: MappedSpanAndAnnotation[]
   spanTypes: Set<SupportedSpanTypes>
-  spansWithDuration: MappedSpanAndAnnotation[]
+  spans: MappedSpanAndAnnotation[]
   uniqueGroups: string[]
   duration: number
 }
@@ -149,7 +157,7 @@ export const mapOperationForVisualization = (
   })
 
   const mappedEntries = preMappedEntries.map<MappedSpanAndAnnotation>(
-    (mapped, idx) => {
+    (mapped) => {
       if (mapped.groupName.startsWith('graphql/')) {
         const clientName = mapped.span.attributes?.apolloClientName
         const commonName = mapped.overrideGroupName ?? mapped.groupName
@@ -288,32 +296,80 @@ export const mapOperationForVisualization = (
     return orderA - orderB
   })
 
-  const spansWithDuration = entriesWithComputedSpans
-    .filter((task) => task.span.duration > 0)
+  const spans = entriesWithComputedSpans
+    // .filter((task) => task.span.duration > 0)
     .filter(
       (task) =>
         (displayResources || task.type !== 'resource') &&
         (displayMeasures || task.type !== 'measure'),
     )
 
-  const spanEvents = entriesWithComputedSpans.filter(
-    (entry) => entry.span.duration === 0,
-  )
-  const spanTypes = new Set(spansWithDuration.map((entry) => entry.type))
+  // const spanEvents = entriesWithComputedSpans.filter(
+  //   (entry) => entry.span.duration === 0,
+  // )
+  const spanTypes = new Set(spans.map((entry) => entry.type))
 
-  const uniqueGroups = [
-    ...new Set(spansWithDuration.map((task) => task.groupName)),
-  ]
+  const uniqueGroups = [...new Set(spans.map((task) => task.groupName))]
 
   return {
     name: traceRecording.name,
-    spansWithDuration,
+    spans,
     uniqueGroups,
-    spanEvents,
     spanTypes,
     duration:
       traceRecording.duration ??
       traceRecording.entries.at(-1)?.annotation.operationRelativeEndTime ??
       0,
+  }
+}
+
+/**
+ * Enhanced version of mapOperationForVisualization that builds hierarchical span structures
+ */
+export const mapOperationForVisualizationHierarchical = (
+  traceRecording: RecordingInputFile,
+  options: {
+    collapseRenders?: boolean
+    collapseAssets?: boolean
+    collapseEmberResources?: boolean
+    collapseIframes?: boolean
+    displayResources?: boolean
+    displayMeasures?: boolean
+  } = {},
+): HierarchicalOperation | null => {
+  // First get the flat mapped operation
+  const flatOperation = mapOperationForVisualization(traceRecording, options)
+  if (!flatOperation) return null
+
+  // Validate the hierarchy before building it
+  const validation = validateSpanHierarchy(flatOperation.spans)
+
+  if (!validation.isValid) {
+    // eslint-disable-next-line no-console
+    console.warn('Span hierarchy validation failed:', validation.errors)
+    // Fall back to flat structure if hierarchy is invalid
+    return {
+      ...flatOperation,
+      spans: flatOperation.spans.map((span) => ({
+        ...span,
+        children: [],
+        isExpanded: false,
+        depth: 0,
+        parentId: span.span.parentSpanId,
+      })),
+      expandedSpanIds: new Set<string>(),
+    }
+  }
+
+  // Build hierarchical structures
+  const hierarchicalSpans = buildSpanHierarchy(flatOperation.spans)
+
+  return {
+    name: flatOperation.name,
+    spans: hierarchicalSpans,
+    uniqueGroups: flatOperation.uniqueGroups,
+    spanTypes: flatOperation.spanTypes,
+    duration: flatOperation.duration,
+    expandedSpanIds: new Set<string>(),
   }
 }
