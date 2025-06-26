@@ -13,7 +13,7 @@ import type {
   RequiredSpanSeenEvent,
   StateTransitionEvent,
 } from './debugTypes'
-import { convertMatchersToFns } from './ensureMatcherFn'
+import { convertMatchersToFns, ensureMatcherFn } from './ensureMatcherFn'
 import { ensureTimestamp } from './ensureTimestamp'
 import {
   type CPUIdleLongTaskProcessor,
@@ -24,6 +24,7 @@ import {
 import { getSpanKey } from './getSpanKey'
 import {
   requiredSpanWithErrorStatus,
+  type SpanMatch,
   type SpanMatcherFn,
   withAllConditions,
 } from './matchSpan'
@@ -34,6 +35,7 @@ import type {
   SpanAnnotationRecord,
 } from './spanAnnotationTypes'
 import type { ActiveTraceConfig, DraftTraceInput, Span } from './spanTypes'
+import type { TickMeta } from './TickParentResolver'
 import type { TraceRecording } from './traceRecordingTypes'
 import type {
   CompleteTraceDefinition,
@@ -1389,14 +1391,17 @@ export class Trace<
       childRecording.status !== 'interrupted'
     ) {
       // TODO: should this be sent to TraceManager, or just this Trace (parent)?
-      this.processSpan({
-        ...childRecording,
-        parentSpanId: this.input.id,
-        // these below just to satisfy TS, they're already in ...childRecording:
-        duration: childRecording.duration,
-        status: childRecording.status,
-        relatedTo: { ...childRecording.relatedTo },
-      })
+      this.processSpan(
+        {
+          ...childRecording,
+          parentSpanId: this.input.id,
+          // these below just to satisfy TS, they're already in ...childRecording:
+          duration: childRecording.duration,
+          status: childRecording.status,
+          relatedTo: { ...childRecording.relatedTo },
+        },
+        undefined,
+      )
     }
 
     // Notify the state machine about the child end
@@ -1733,9 +1738,6 @@ export class Trace<
           spanAndAnnotation.span.getParentSpanId({
             thisSpanAndAnnotation: spanAndAnnotation,
             traceContext: this,
-            // these two will be overwritten if tick tracking is enabled:
-            spansInCurrentTick: [],
-            thisSpanInCurrentTickIndex: -1,
           })
         spanAndAnnotation.span.getParentSpanId = undefined
       }
@@ -1934,7 +1936,10 @@ export class Trace<
     }
   }
 
-  processSpan(span: Span<RelationSchemasT>): SpanAnnotationRecord | undefined {
+  processSpan(
+    span: Span<RelationSchemasT>,
+    tickMeta: TickMeta<RelationSchemasT> | undefined,
+  ): SpanAnnotationRecord | undefined {
     const spanEndTime = span.startTime.now + span.duration
     // check if valid for this trace:
     if (spanEndTime < this.input.startTime.now) {
@@ -1982,6 +1987,7 @@ export class Trace<
             existingAnnotation.span,
             span,
           ) ?? span
+        spanAndAnnotation.tickMeta = tickMeta
       }
     } else {
       const spanKey = getSpanKey(span)
@@ -2002,6 +2008,7 @@ export class Trace<
       spanAndAnnotation = {
         span,
         annotation,
+        tickMeta,
       }
     }
 
@@ -2017,7 +2024,7 @@ export class Trace<
     const annotationRecord: SpanAnnotationRecord = {}
     // Forward span to all still-running children (F-7), and merge result into annotation record
     for (const child of this.children) {
-      Object.assign(annotationRecord, child.processSpan(span))
+      Object.assign(annotationRecord, child.processSpan(span, tickMeta))
     }
 
     // the return value is used for reporting the annotation externally (e.g. to the RUM agent)
@@ -2040,6 +2047,62 @@ export class Trace<
     }
 
     return labels
+  }
+
+  /**
+   * Finds the first span matching the provided SpanMatch in the parent hierarchy
+   * of the given Span, starting with the span itself and traversing up
+   * through its parents.
+   */
+  findSpanInParentHierarchy = <
+    SpanT extends Partial<Span<RelationSchemasT>> & { id: string },
+  >(
+    span: SpanT,
+    spanMatch: SpanMatch<SelectedRelationNameT, RelationSchemasT, VariantsT>,
+  ): SpanAndAnnotation<RelationSchemasT> | undefined => {
+    // Convert SpanMatch to a matcher function if needed
+    const matcherFn = ensureMatcherFn<
+      SelectedRelationNameT,
+      RelationSchemasT,
+      VariantsT
+    >(spanMatch)
+
+    // Start with the current span
+    let currentSpanAndAnnotation = this.recordedItems.get(span.id)
+
+    while (currentSpanAndAnnotation) {
+      // Check if current span matches
+      if (matcherFn(currentSpanAndAnnotation, this)) {
+        return currentSpanAndAnnotation
+      }
+
+      // Move to parent span
+      const { span: currentSpan } = currentSpanAndAnnotation
+      const { parentSpanId: initialParentSpanId } = currentSpan
+      let parentSpanId = initialParentSpanId
+
+      // If parentSpanId is not set but getParentSpanId is available, try to resolve it
+      if (!parentSpanId && currentSpan.getParentSpanId) {
+        try {
+          parentSpanId = currentSpan.getParentSpanId({
+            traceContext: this,
+            thisSpanAndAnnotation: currentSpanAndAnnotation,
+          })
+        } catch {
+          // If getParentSpanId fails, we'll just continue without resolving the parent
+        }
+      }
+
+      // If no parent span ID, we've reached the top of the hierarchy
+      if (!parentSpanId) {
+        break
+      }
+
+      // Get the parent span
+      currentSpanAndAnnotation = this.recordedItems.get(parentSpanId)
+    }
+
+    return undefined
   }
 }
 

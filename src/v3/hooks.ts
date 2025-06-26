@@ -35,7 +35,6 @@ export const generateUseBeacon =
     const renderStartEntry = traceManager.startRenderSpan({
       ...config,
       relatedTo,
-      duration: 0,
       attributes,
       status,
       renderCount: renderCountRef.current,
@@ -53,9 +52,7 @@ export const generateUseBeacon =
       if (!renderStartRef.current) {
         return
       }
-      traceManager.endRenderSpan(renderStartRef.current.span, {
-        duration: performance.now() - renderStartRef.current.span.startTime.now,
-      })
+      traceManager.endRenderSpan(renderStartRef.current.span)
       renderStartRef.current = undefined
     })
 

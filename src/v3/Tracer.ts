@@ -281,17 +281,20 @@ export class Tracer<
     const trace = this.getCurrentTraceOrWarn()
     if (!trace) return
     if (error) {
-      trace.processSpan({
-        id: this.rootTraceUtilities.generateId('span'),
-        name: error.name,
-        startTime: ensureTimestamp(),
-        type: 'error',
-        status: 'error',
-        relatedTo: { ...trace.input.relatedTo },
-        attributes: {},
-        duration: 0,
-        error,
-      })
+      trace.processSpan(
+        {
+          id: this.rootTraceUtilities.generateId('span'),
+          name: error.name,
+          startTime: ensureTimestamp(),
+          type: 'error',
+          status: 'error',
+          relatedTo: { ...trace.input.relatedTo },
+          attributes: {},
+          duration: 0,
+          error,
+        },
+        undefined,
+      )
       trace.interrupt('aborted')
       return
     }
