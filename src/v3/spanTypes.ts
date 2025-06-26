@@ -198,6 +198,7 @@ export interface ComponentRenderSpan<
   isIdle: boolean
   errorInfo?: ErrorInfo
   renderCount: number
+  isHook?: boolean
 }
 
 export type InitiatorType =
