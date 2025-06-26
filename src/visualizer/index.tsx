@@ -15,7 +15,7 @@ import {
   MEASURES_TEXT,
   RESOURCES_TEXT,
 } from './constants'
-import { mapOperationForVisualization } from './mapOperationForVisualization'
+import { mapOperationForVisualizationHierarchical } from './mapOperationForVisualization'
 import type { RecordingInputFile } from './types'
 
 const STORAGE_KEY = {
@@ -120,7 +120,7 @@ const OperationVisualizer = ({ width, margin }: OperationVisualizerProps) => {
   const mappedFileContent = useMemo(() => {
     if (!fileContent) return null
 
-    return mapOperationForVisualization(fileContent, {
+    return mapOperationForVisualizationHierarchical(fileContent, {
       collapseRenders: displayOptions[COLLAPSE_RENDER_SPANS_TEXT],
       collapseAssets: displayOptions[COLLAPSE_ASSET_SPANS_TEXT],
       collapseEmberResources: displayOptions[COLLAPSE_EMBER_RESOURCE_SPANS],

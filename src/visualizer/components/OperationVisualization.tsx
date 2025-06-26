@@ -17,8 +17,8 @@ import {
   DETAILS_PANEL_WIDTH,
   type FilterOption,
 } from '../constants'
-import type { MappedOperation } from '../mapOperationForVisualization'
-import type { MappedSpanAndAnnotation } from '../types'
+import type { HierarchicalOperation, HierarchicalSpanAndAnnotation } from '../types'
+import { flattenHierarchicalSpans } from '../utils/buildSpanHierarchy'
 import { FilterGroup } from './FilterGroup'
 import InteractiveSpan from './InteractiveSpan'
 import { LegendGroup } from './Legend'
@@ -45,7 +45,7 @@ const MINIMAP_HEIGHT = 25
 
 export interface OperationVisualizationProps {
   width: number
-  operation: MappedOperation
+  operation: HierarchicalOperation
   setDisplayOptions: React.Dispatch<
     React.SetStateAction<Record<FilterOption, boolean>>
   >
@@ -80,10 +80,38 @@ const OperationVisualization: React.FC<OperationVisualizationProps> = ({
   setDisplayOptions,
   margin = DEFAULT_MARGIN,
 }) => {
-  const { spanEvents, spanTypes, uniqueGroups, spansWithDuration } = operation
+  // State for expansion management
+  const [expandedSpanIds, setExpandedSpanIds] = useState<Set<string>>(
+    operation.expandedSpanIds
+  )
+  
+  // Toggle span expansion
+  const toggleSpanExpansion = (spanId: string) => {
+    setExpandedSpanIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(spanId)) {
+        newSet.delete(spanId)
+      } else {
+        newSet.add(spanId)
+      }
+      return newSet
+    })
+  }
+  
+  const {
+    // spanEvents,
+    spanTypes,
+    uniqueGroups,
+  } = operation
+  
+  // Get visible spans based on expansion state
+  const spans: HierarchicalSpanAndAnnotation[] = useMemo(
+    () => flattenHierarchicalSpans(operation.spans, expandedSpanIds),
+    [operation.spans, expandedSpanIds]
+  )
 
   const [selectedSpan, setSelectedSpan] =
-    useState<MappedSpanAndAnnotation | null>(null)
+    useState<HierarchicalSpanAndAnnotation | null>(null)
 
   // Track zoom domain with state that can be overridden by brush interactions
   const [zoomOverride, setZoomOverride] = useState<[number, number] | null>(
@@ -154,12 +182,16 @@ const OperationVisualization: React.FC<OperationVisualizationProps> = ({
     tooltipData,
     hideTooltip,
     showTooltip,
-  } = useTooltip<MappedSpanAndAnnotation>()
-  const handleSpanClick = (span: MappedSpanAndAnnotation) => {
+  } = useTooltip<HierarchicalSpanAndAnnotation>()
+  const handleSpanClick = (span: HierarchicalSpanAndAnnotation) => {
+    // Handle expansion toggle for spans with children
+    if (span.children.length > 0) {
+      toggleSpanExpansion(span.span.id)
+    }
     setSelectedSpan(span)
   }
 
-  const getBarOpacity = (entry: MappedSpanAndAnnotation) => {
+  const getBarOpacity = (entry: HierarchicalSpanAndAnnotation) => {
     if (
       selectedSpan &&
       selectedSpan.span.name === entry.span.name &&
@@ -224,7 +256,7 @@ const OperationVisualization: React.FC<OperationVisualizationProps> = ({
                 height={yMax}
                 numTicksRows={uniqueGroups.length}
               />
-              {spanEvents.map((entry, index) => (
+              {/* {spanEvents.map((entry, index) => (
                 <InteractiveSpan
                   key={`spanEvent-${index}`}
                   type="line"
@@ -238,10 +270,10 @@ const OperationVisualization: React.FC<OperationVisualizationProps> = ({
                   onClick={() => void handleSpanClick(entry)}
                   scrollContainerRef={scrollContainerRef}
                 />
-              ))}
+              ))} */}
 
-              {spansWithDuration.map((entry, i) => (
-                <React.Fragment key={`entry-${i}`}>
+              {spans.map((entry, i) => (
+                <React.Fragment key={`entry-${i}-${entry.span.id}`}>
                   <InteractiveSpan
                     type="bar"
                     data={entry}
