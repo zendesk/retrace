@@ -76,6 +76,11 @@ interface SharedAnnotationProps {
     data: Partial<WithTooltipProvidedProps<HierarchicalSpanAndAnnotation>>,
   ) => void
   hideTooltip: () => void
+  depth?: number
+  hasChildren?: boolean
+  isExpanded?: boolean
+  onToggleExpansion?: (spanId: string) => void
+  isVisible?: boolean
 }
 
 interface InteractiveLineSpanProps
@@ -109,6 +114,11 @@ const InteractiveSpan: React.FC<InteractiveSpanProps> = (props) => {
     titleColor: color,
     title,
     annotateAt,
+    depth = 0,
+    hasChildren = false,
+    isExpanded = false,
+    onToggleExpansion,
+    isVisible = true,
     ...restProps
   } = props
   let tooltipTimeout: number
@@ -139,7 +149,18 @@ const InteractiveSpan: React.FC<InteractiveSpanProps> = (props) => {
 
   const handleClick = (event: React.MouseEvent) => {
     event.stopPropagation() // Prevent click from bubbling to container
-    onClick()
+    
+    // If this span has children and we have expansion handler, toggle expansion
+    if (hasChildren && onToggleExpansion) {
+      onToggleExpansion(data.span.id)
+    } else {
+      onClick()
+    }
+  }
+
+  // Don't render if not visible
+  if (!isVisible) {
+    return null
   }
   let element: React.ReactNode
   if (restProps.type === 'line') {
@@ -171,14 +192,18 @@ const InteractiveSpan: React.FC<InteractiveSpanProps> = (props) => {
       xScale(data.annotation.operationRelativeStartTime)
     const isTiny = scaledWidth < MIN_SPAN_WIDTH
     const width = isTiny ? MIN_SPAN_WIDTH : scaledWidth
-    const fill =
+    const baseFill =
       data.span.status === 'error'
         ? getColor({ theme, variable: 'background.dangerEmphasis' })
         : BAR_FILL_COLOR[data.type]
+    
+    // Slightly reduce opacity for child spans to show hierarchy
+    const opacity = Math.max(0.4, 1 - depth * 0.15)
 
     const height = isTiny ? yScale.bandwidth() / 2 : yScale.bandwidth()
+    const depthOffset = depth * 2 // Slight vertical offset for child spans
     const y =
-      (yScale(data.groupName) ?? 0) + (isTiny ? yScale.bandwidth() / 4 : 0)
+      (yScale(data.groupName) ?? 0) + (isTiny ? yScale.bandwidth() / 4 : 0) + depthOffset
 
     element = (
       <>
@@ -186,11 +211,14 @@ const InteractiveSpan: React.FC<InteractiveSpanProps> = (props) => {
           <StyledBar
             {...restProps}
             data-status={data.span.status}
+            data-depth={depth}
+            data-has-children={hasChildren}
             x={xScale(data.annotation.operationRelativeStartTime)}
             y={y}
             width={width}
             height={height}
-            fill={fill}
+            fill={baseFill}
+            fillOpacity={opacity}
             rx={2}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
@@ -204,7 +232,7 @@ const InteractiveSpan: React.FC<InteractiveSpanProps> = (props) => {
                 xScale(data.annotation.operationRelativeEndTime)) /
               2
             }
-            y={yScale(data.groupName)! + yScale.bandwidth() / 2}
+            y={yScale(data.groupName)! + yScale.bandwidth() / 2 + depthOffset}
             dy=".33em"
             fontSize={12}
             textAnchor="middle"
@@ -212,6 +240,19 @@ const InteractiveSpan: React.FC<InteractiveSpanProps> = (props) => {
             style={{ pointerEvents: 'none' }}
           >
             ❌
+          </Text>
+        )}
+        {hasChildren && (
+          <Text
+            x={xScale(data.annotation.operationRelativeStartTime) + 4}
+            y={y + height / 2}
+            dy=".33em"
+            fontSize={10}
+            textAnchor="start"
+            fill={getColor({ theme, variable: 'foreground.subtle' })}
+            style={{ pointerEvents: 'none' }}
+          >
+            {isExpanded ? '−' : '+'}
           </Text>
         )}
       </>

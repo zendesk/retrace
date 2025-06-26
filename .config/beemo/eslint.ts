@@ -9,6 +9,10 @@ const config: ESLintConfig = {
     'unicorn/prefer-at': 'off',
     'import/no-deprecated': 'off',
     'compat/compat': 'off',
+    'import/no-extraneous-dependencies': 'off',
+    'no-magic-numbers': 'off',
+    'eslint-comments/no-unused-disable': 'off',
+    'arrow-body-style': 'off',
   },
 }
 
