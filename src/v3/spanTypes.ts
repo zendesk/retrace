@@ -32,6 +32,9 @@ export type ComponentLifecycleSpanType =
   | 'component-render-start'
   | 'component-render'
   | 'component-unmount'
+  | 'hook-render-start'
+  | 'hook-render'
+  | 'hook-unmount'
 
 export interface DraftTraceConfig<RelationSchemaT, VariantsT extends string> {
   id?: string
@@ -198,7 +201,6 @@ export interface ComponentRenderSpan<
   isIdle: boolean
   errorInfo?: ErrorInfo
   renderCount: number
-  isHook?: boolean
 }
 
 export type InitiatorType =

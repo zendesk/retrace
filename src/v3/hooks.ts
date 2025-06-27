@@ -17,7 +17,10 @@ export const generateUseBeacon =
   >(
     traceManager: TraceManager<RelationSchemasT>,
   ): UseBeacon<RelationSchemasT, RequiredAttributesT> =>
-  (config: BeaconConfig<RelationSchemasT, RequiredAttributesT>) => {
+  ({
+    isHook = false,
+    ...config
+  }: BeaconConfig<RelationSchemasT, RequiredAttributesT>) => {
     const renderCountRef = useRef(0)
     renderCountRef.current += 1
 
@@ -34,6 +37,7 @@ export const generateUseBeacon =
 
     const renderStartEntry = traceManager.startRenderSpan({
       ...config,
+      kind: isHook ? 'hook' : 'component',
       relatedTo,
       attributes,
       status,
