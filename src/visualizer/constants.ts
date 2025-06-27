@@ -37,9 +37,9 @@ export type SupportedSpanTypes =
   | 'computed-span'
 
 export const BAR_FILL_COLOR: Record<SupportedSpanTypes, string> = {
-  'component-render-start': '#ffffff', // invisible
+  'component-render-start': '#000000', // invisible
   'component-render': '#ff7f0e',
-  'hook-render-start': '#ffffff', // invisible
+  'hook-render-start': '#000000', // invisible
   'hook-render': '#c0e0e0',
   measure: '#2ca02c',
   resource: '#1f77b4',

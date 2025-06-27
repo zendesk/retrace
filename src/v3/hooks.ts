@@ -9,6 +9,7 @@ import type { RelationSchemasBase, RelationsOnASpan } from './types'
 /**
  * The job of the beacon:
  * emit component-render-start, component-render, component-unmount entries
+ * (or hook-render-start, hook-render, hook-unmount based on the isHook option)
  */
 export const generateUseBeacon =
   <
