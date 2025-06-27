@@ -84,11 +84,16 @@ const OperationVisualization: React.FC<OperationVisualizationProps> = ({
   const [selectedSpan, setSelectedSpan] =
     useState<MappedSpanAndAnnotation | null>(null)
 
-  // Add new state to control zoom domain
-  const [zoomDomain, setZoomDomain] = useState<[number, number]>([
-    0,
-    operation.duration + 10,
-  ])
+  // Track zoom domain with state that can be overridden by brush interactions
+  const [zoomOverride, setZoomOverride] = useState<[number, number] | null>(
+    null,
+  )
+
+  // Derive zoom domain - use override if set, otherwise use full operation duration
+  const zoomDomain = useMemo<[number, number]>(() => {
+    const fullDomain: [number, number] = [0, operation.duration + 10]
+    return zoomOverride ?? fullDomain
+  }, [zoomOverride, operation.duration])
 
   // Adjust width when panel is open
   const width = selectedSpan
@@ -114,10 +119,10 @@ const OperationVisualization: React.FC<OperationVisualizationProps> = ({
   // Update domain on brush
   const handleMinimapBrushChange = (domain: Bounds | null) => {
     if (!domain) return
-    setZoomDomain([domain.x0, domain.x1])
+    setZoomOverride([domain.x0, domain.x1])
   }
   const handleMinimapReset = () => {
-    setZoomDomain([0, operation.duration + 10])
+    setZoomOverride(null) // Reset to show full operation duration
   }
 
   // Make main xScale use zoomDomain
@@ -274,6 +279,14 @@ const OperationVisualization: React.FC<OperationVisualizationProps> = ({
                   )}
                 </React.Fragment>
               ))}
+              {/* Force white background for y axis labels */}
+              <rect
+                x={-margin.left}
+                y={-10}
+                width={margin.left}
+                height={yMax + 20}
+                fill="white"
+              />
               <AxisLeft
                 scale={yScale}
                 numTicks={uniqueGroups.length}
