@@ -589,12 +589,15 @@ export class TraceManager<
     )
   }
 
-  startRenderSpan(
-    startSpanInput: Omit<RenderSpanInput<RelationSchemasT>, 'type'>,
-  ) {
+  startRenderSpan({
+    kind,
+    ...startSpanInput
+  }: Omit<RenderSpanInput<RelationSchemasT>, 'type'> & {
+    kind?: 'component' | 'hook'
+  }) {
     return this.createAndProcessSpan<ComponentRenderSpan<RelationSchemasT>>({
       ...startSpanInput,
-      type: 'component-render-start',
+      type: kind === 'hook' ? 'hook-render-start' : 'component-render-start',
     })
   }
 
@@ -606,7 +609,10 @@ export class TraceManager<
   ) {
     return this.endSpan<ComponentRenderSpan<RelationSchemasT>>(startSpan, {
       ...endSpanAttributes,
-      type: 'component-render',
+      type:
+        startSpan.type === 'hook-render-start'
+          ? 'hook-render'
+          : 'component-render',
     })
   }
 

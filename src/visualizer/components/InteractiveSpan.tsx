@@ -1,6 +1,3 @@
-/* eslint-disable no-magic-numbers */
-/* eslint-disable import/no-extraneous-dependencies */
-
 import * as React from 'react'
 import styled, { useTheme } from 'styled-components'
 import { Annotation, Label } from '@visx/annotation'
@@ -116,6 +113,7 @@ const InteractiveSpan: React.FC<InteractiveSpanProps> = (props) => {
     annotateAt,
     depth = 0,
     hasChildren = false,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     isExpanded = false,
     onToggleExpansion,
     isVisible = true,
@@ -149,7 +147,7 @@ const InteractiveSpan: React.FC<InteractiveSpanProps> = (props) => {
 
   const handleClick = (event: React.MouseEvent) => {
     event.stopPropagation() // Prevent click from bubbling to container
-    
+
     // If this span has children and we have expansion handler, toggle expansion
     if (hasChildren && onToggleExpansion) {
       onToggleExpansion(data.span.id)
@@ -196,14 +194,16 @@ const InteractiveSpan: React.FC<InteractiveSpanProps> = (props) => {
       data.span.status === 'error'
         ? getColor({ theme, variable: 'background.dangerEmphasis' })
         : BAR_FILL_COLOR[data.type]
-    
+
     // Slightly reduce opacity for child spans to show hierarchy
     const opacity = Math.max(0.4, 1 - depth * 0.15)
 
     const height = isTiny ? yScale.bandwidth() / 2 : yScale.bandwidth()
     const depthOffset = depth * 2 // Slight vertical offset for child spans
     const y =
-      (yScale(data.groupName) ?? 0) + (isTiny ? yScale.bandwidth() / 4 : 0) + depthOffset
+      (yScale(data.groupName) ?? 0) +
+      (isTiny ? yScale.bandwidth() / 4 : 0) +
+      depthOffset
 
     element = (
       <>
@@ -240,19 +240,6 @@ const InteractiveSpan: React.FC<InteractiveSpanProps> = (props) => {
             style={{ pointerEvents: 'none' }}
           >
             ❌
-          </Text>
-        )}
-        {hasChildren && (
-          <Text
-            x={xScale(data.annotation.operationRelativeStartTime) + 4}
-            y={y + height / 2}
-            dy=".33em"
-            fontSize={10}
-            textAnchor="start"
-            fill={getColor({ theme, variable: 'foreground.subtle' })}
-            style={{ pointerEvents: 'none' }}
-          >
-            {isExpanded ? '−' : '+'}
           </Text>
         )}
       </>

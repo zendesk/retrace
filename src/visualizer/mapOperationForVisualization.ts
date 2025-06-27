@@ -15,6 +15,7 @@ const orderArray = [
   'long-animation-frame',
   'computed-span',
   'component-render',
+  'hook-render',
   'measure',
   'resource',
   'resource-ember',
