@@ -584,14 +584,17 @@ export function createTraceRecording<
   })
 
   const recordedItemsArray: SpanAndAnnotation<RelationSchemasT>[] = []
-  const startSpanIdToEndSpanIdMap = new Map<string, string>()
+  const startSpanIdToFullDurationSpanIdMap = new Map<string, string>()
 
   for (const item of recordedItems.values()) {
     if (item.span.startSpanId) {
       // if the item has a startSpan, it is the full span
       // we'll want to add the startSpan to the list, and exclude it from the recorded items
       // These startSpans are unnecessary, since the same information is present in the span that contains the duration
-      startSpanIdToEndSpanIdMap.set(item.span.startSpanId, item.span.id)
+      startSpanIdToFullDurationSpanIdMap.set(
+        item.span.startSpanId,
+        item.span.id,
+      )
     }
     if (endOfOperationSpan) {
       // only keep items captured until the endOfOperationSpan or if not available, the lastRelevantSpan
@@ -606,10 +609,12 @@ export function createTraceRecording<
     }
   }
 
-  // we need to re-parent any span that referred to a startSpanId that was discarded
+  // we need to re-parent any span that referred to a startSpanId that will be discarded
   for (const item of recordedItemsArray) {
     if (item.span.parentSpanId) {
-      const newParent = startSpanIdToEndSpanIdMap.get(item.span.parentSpanId)
+      const newParent = startSpanIdToFullDurationSpanIdMap.get(
+        item.span.parentSpanId,
+      )
       if (newParent) {
         item.span.parentSpanId = newParent
       }
@@ -667,7 +672,10 @@ export function createTraceRecording<
       // exclude internalUse and spanIdsToDiscard
       const keep = !(
         // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-        (item.span.internalUse || startSpanIdToEndSpanIdMap.has(item.span.id))
+        (
+          item.span.internalUse ||
+          startSpanIdToFullDurationSpanIdMap.has(item.span.id)
+        )
       )
       if (keep) {
         return [item]

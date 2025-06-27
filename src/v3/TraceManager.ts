@@ -534,7 +534,9 @@ export class TraceManager<
     const endSpan = this.ensureCompleteSpan<SpanT>({
       // all properties from startSpan:
       ...startSpan,
-      type: startSpan.type === 'mark' ? 'measure' : startSpan.type,
+      type:
+        endSpanAttributes.type ??
+        (startSpan.type === 'mark' ? 'measure' : startSpan.type),
       // all overriding properties from endSpan:
       ...endSpanAttributes,
       // merge attributes:
