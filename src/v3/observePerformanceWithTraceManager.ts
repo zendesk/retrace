@@ -51,7 +51,7 @@ export const observePerformanceWithTraceManager = <
         deriveRelationFromPerformanceEntry,
       )
       if (traceEntry !== undefined) {
-        traceManager.processSpan(traceEntry)
+        traceManager.createAndProcessSpan(traceEntry)
       }
     })
   })

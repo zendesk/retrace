@@ -1,10 +1,10 @@
 import { getPerformanceEntryHash } from './getPerformanceEntryHash'
 import type { SpanAndAnnotation } from './spanAnnotationTypes'
 import type { Span } from './spanTypes'
-import type { SpanDeduplicationStrategy } from './types'
+import type { RelationSchemasBase, SpanDeduplicationStrategy } from './types'
 
 export function createDefaultPerformanceEntryDeduplicationStrategy<
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 >(): SpanDeduplicationStrategy<RelationSchemasT> {
   let processedPerformanceEntries = new WeakMap<
     PerformanceEntry,
@@ -36,10 +36,8 @@ export function createDefaultPerformanceEntryDeduplicationStrategy<
       return undefined
     },
 
-    recordSpan(
-      span: Span<RelationSchemasT>,
-      spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>,
-    ): void {
+    recordSpan(spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>): void {
+      const { span } = spanAndAnnotation
       if (!span.performanceEntry) {
         return
       }

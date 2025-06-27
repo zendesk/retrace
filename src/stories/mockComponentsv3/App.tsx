@@ -1,6 +1,7 @@
 /* eslint-disable import/no-extraneous-dependencies */
 /* eslint-disable no-magic-numbers */
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
+import * as React from 'react'
 import { Button } from '@zendeskgarden/react-buttons'
 import {
   Body,

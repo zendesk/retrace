@@ -3,7 +3,8 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
-    include: ['src/v3/**/*.test.ts'],
+    include: ['src/v3/**/*.test.ts', 'src/visualizer/**/*.test.ts'],
+    watch: false,
     typecheck: {
       enabled: true,
       include: ['src/v3/**/*.test-d.ts'],

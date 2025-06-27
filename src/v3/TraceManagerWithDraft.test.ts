@@ -5,36 +5,55 @@ import {
   describe,
   expect,
   it,
-  vitest as jest,
+  type Mock,
+  vitest,
 } from 'vitest'
 import * as matchSpan from './matchSpan'
 import { type TicketIdRelationSchemasFixture } from './testUtility/fixtures/relationSchemas'
 import { Check, getSpansFromTimeline, Render } from './testUtility/makeTimeline'
 import { processSpans } from './testUtility/processSpans'
 import { TraceManager } from './TraceManager'
-import type { AnyPossibleReportFn } from './types'
+import type { AnyPossibleReportFn, GenerateIdFn } from './types'
 
 describe('TraceManager', () => {
   let reportFn: jest.Mock
-  let generateId: jest.Mock
+  let generateId: Mock<GenerateIdFn>
   let reportErrorFn: jest.Mock
   let reportWarningFn: jest.Mock
 
   const DEFAULT_COLDBOOT_TIMEOUT_DURATION = 45_000
-  jest.useFakeTimers({
+  vitest.useFakeTimers({
     now: 0,
   })
 
+  let idPerType = {
+    span: 0,
+    trace: 0,
+    tick: 0,
+  }
+
   beforeEach(() => {
-    reportFn = jest.fn<AnyPossibleReportFn<TicketIdRelationSchemasFixture>>()
-    generateId = jest.fn().mockReturnValue('trace-id')
-    reportErrorFn = jest.fn()
-    reportWarningFn = jest.fn()
+    idPerType = {
+      span: 0,
+      trace: 0,
+      tick: 0,
+    }
+    generateId = vitest.fn((type) => {
+      const seq = idPerType[type]++
+      return type === 'span'
+        ? `id-${seq}`
+        : type === 'trace'
+        ? `trace-${seq}`
+        : `tick-${seq}`
+    })
+    reportFn = vitest.fn<AnyPossibleReportFn<TicketIdRelationSchemasFixture>>()
+    reportErrorFn = vitest.fn()
+    reportWarningFn = vitest.fn()
   })
 
   afterEach(() => {
-    jest.clearAllMocks()
-    jest.clearAllTimers()
+    vitest.clearAllMocks()
+    vitest.clearAllTimers()
   })
 
   it('tracks trace after creating a draft and transitioning to active trace', () => {
@@ -57,7 +76,7 @@ describe('TraceManager', () => {
     const traceId = tracer.createDraft({
       variant: 'cold_boot',
     })
-    expect(traceId).toBe('trace-id')
+    expect(traceId).toBe('trace-0')
 
     // prettier-ignore
     const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
@@ -108,7 +127,7 @@ describe('TraceManager', () => {
       startTime: { now: 0, epoch: 0 },
       variant: 'cold_boot',
     })
-    expect(traceId).toBe('trace-id')
+    expect(traceId).toBe('trace-0')
 
     tracer.transitionDraftToActive({ relatedTo: { ticketId: '1' } })
 

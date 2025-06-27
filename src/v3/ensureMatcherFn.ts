@@ -4,12 +4,16 @@ import {
   type SpanMatcherFn,
   type SpanMatcherTags,
 } from './matchSpan'
-import type { LabelMatchingFnsRecord, LabelMatchingInputRecord } from './types'
+import type {
+  LabelMatchingFnsRecord,
+  LabelMatchingInputRecord,
+  RelationSchemasBase,
+} from './types'
 import type { ArrayWithAtLeastOneElement } from './typeUtils'
 
 export function applyDefaultTags<
   const SelectedRelationNameT extends keyof RelationSchemasT,
-  const RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >(
   matcherFn: SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT>,
@@ -32,7 +36,7 @@ export function applyDefaultTags<
 
 export function ensureMatcherFn<
   const SelectedRelationNameT extends keyof RelationSchemasT,
-  const RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
   const MatcherInputT extends SpanMatch<
     SelectedRelationNameT,
@@ -61,7 +65,7 @@ function arrayHasAtLeastOneElement<T>(
 
 export function convertMatchersToFns<
   const SelectedRelationNameT extends keyof RelationSchemasT,
-  const RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >(
   matchers:
@@ -84,7 +88,7 @@ export function convertMatchersToFns<
 
 export function convertLabelMatchersToFns<
   const SelectedRelationNameT extends keyof RelationSchemasT,
-  const RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
 >(
   definitionLabelMatchers: LabelMatchingInputRecord<
@@ -115,7 +119,7 @@ export function convertLabelMatchersToFns<
  */
 export function ensureMatcherFnOrSpecialToken<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
   SpecialToken extends string,
 >(

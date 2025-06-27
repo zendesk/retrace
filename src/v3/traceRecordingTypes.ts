@@ -3,6 +3,7 @@ import type { SpanAndAnnotation } from './spanAnnotationTypes'
 import type { Attributes } from './spanTypes'
 import type {
   MapSchemaToTypes,
+  RelationSchemasBase,
   Timestamp,
   TraceInterruptionReason,
   TraceStatus,
@@ -28,6 +29,8 @@ export interface ComputedRenderSpan {
   renderCount: number
   /** the sum of all render durations */
   sumOfRenderDurations: number
+
+  attributes?: Attributes
 }
 
 export interface TraceRecordingBase<RelationSchemaT> {
@@ -35,6 +38,12 @@ export interface TraceRecordingBase<RelationSchemaT> {
    * random generated unique value or provided by the user at start
    */
   id: string
+
+  /**
+   * if this is a child trace, this is the id of the parent trace
+   * if this is a root trace, this is undefined
+   */
+  parentTraceId?: string
 
   /**
    * name of the trace / operation
@@ -83,11 +92,14 @@ export interface TraceRecordingBase<RelationSchemaT> {
   computedValues: {
     [valueName: string]: number | string | boolean
   }
+
+  /** The first unsupressed error that bubbled up to the trace, or undefined */
+  error?: Error
 }
 
 export interface TraceRecording<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 > extends TraceRecordingBase<RelationSchemasT[SelectedRelationNameT]> {
   entries: readonly SpanAndAnnotation<RelationSchemasT>[]
 }

@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style */
-import type { Span } from './spanTypes'
+import type { SpanMatch } from './matchSpan'
+import type { Span, SpanUpdateFunction } from './spanTypes'
+import type { TickMeta } from './TickParentResolver'
 import type { NonTerminalTraceStates } from './Trace'
+import type { RelationSchemasBase } from './types'
 
 export interface SpanAnnotation {
   /**
@@ -8,7 +11,7 @@ export interface SpanAnnotation {
    */
   id: string
   /**
-   * The occurrence of the span with the same name within the operation.
+   * The occurrence of the span with the same name and type within the operation.
    * Usually 1 (first span)
    */
   occurrence: number
@@ -50,7 +53,37 @@ export interface SpanAnnotationRecord {
   [operationName: string]: SpanAnnotation
 }
 
-export interface SpanAndAnnotation<RelationSchemasT> {
+export interface SpanAndAnnotation<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> {
   span: Span<RelationSchemasT>
   annotation: SpanAnnotation
+  tickMeta?: TickMeta<RelationSchemasT>
+}
+
+export interface ProcessedSpan<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+  SpanT extends Span<RelationSchemasT>,
+> {
+  readonly span: SpanT
+  readonly annotations: SpanAnnotationRecord | undefined
+  readonly resolveParent: () => SpanAndAnnotation<RelationSchemasT> | undefined
+  readonly tickMeta: TickMeta<RelationSchemasT> | undefined
+  /**
+   * While not usually needed, you can use this function
+   * to update some of the span's attributes AFTER it has been processed.
+   * Note that this will only work if the trace is still in progress.
+   * Object properties (such as attributes) are merged onto the original span,
+   * so if you want to remove a property, set it to `undefined`.
+   *
+   * This will re-process the span, so if, for example,
+   * your trace has a `requiredToEndSpan` matcher on an attribute
+   * that wasn't present in the span when it was processed, and you update the span
+   * to include that attribute, calling this function will trigger re-evaluation of the matchers.
+   */
+  readonly updateSpan: SpanUpdateFunction<RelationSchemasT, SpanT>
+  readonly findSpanInParentHierarchy: (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    spanMatch: SpanMatch<keyof RelationSchemasT, RelationSchemasT, any>,
+  ) => SpanAndAnnotation<RelationSchemasT> | undefined
 }

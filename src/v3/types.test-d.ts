@@ -1,4 +1,5 @@
 import { assertType, describe, expect, it } from 'vitest'
+import { INHERIT_FROM_PARENT } from './constants'
 import { generateUseBeacon } from './hooks'
 import type { GetRelationSchemasTFromTraceManager } from './hooksTypes'
 import * as match from './matchSpan'
@@ -6,6 +7,7 @@ import { TraceManager } from './TraceManager'
 import type { MapSchemaToTypes } from './types'
 
 const mockSpanWithoutRelation = {
+  id: 'mock-span-id',
   name: 'some-span',
   duration: 0,
   type: 'mark',
@@ -114,6 +116,14 @@ describe('type tests', () => {
       renderedOutput: 'content',
       relatedTo: { userId: '123' },
       attributes: { team: 'test' },
+    })
+
+    // valid beacon with heritable attributes
+    useBeaconWithRequiredAttributes({
+      name: 'UserPage',
+      renderedOutput: 'content',
+      relatedTo: { userId: '123' },
+      attributes: { team: INHERIT_FROM_PARENT },
     })
 
     // valid beacon required attributes and additional attributes
@@ -466,5 +476,38 @@ describe('type tests', () => {
         // https://github.com/microsoft/TypeScript/issues/61228
       },
     })
+  })
+
+  it('allows starting and stopping various spans', () => {
+    const { span, annotations } = traceManager.startRenderSpan({
+      name: 'Component',
+      isIdle: true,
+      renderCount: 0,
+      renderedOutput: 'content',
+    })
+
+    const { span: endSpan, annotations: endAnnotations } =
+      traceManager.endRenderSpan(span, {
+        duration: 4,
+      })
+
+    const {
+      span: errorSpan,
+      annotations: errorAnnotations,
+      resolveParent,
+    } = traceManager.processErrorSpan({
+      error: new Error('Test error'),
+      parentSpanMatcher: {
+        search: 'current-tick',
+        searchDirection: 'before-self',
+        match: {
+          name: 'Component',
+          matchingRelations: true,
+        },
+      },
+    })
+
+    // you can use this to e.g. report your error with a parentName tag, or the ownership attribute
+    const parentName = resolveParent()?.span.name
   })
 })

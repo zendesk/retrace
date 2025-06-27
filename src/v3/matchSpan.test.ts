@@ -1,20 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import * as matchSpan from './matchSpan'
 import type { SpanAnnotation } from './spanAnnotationTypes'
-import type {
-  ActiveTraceInput,
-  ComponentRenderSpan,
-  SpanBase,
-} from './spanTypes'
+import type { ComponentRenderSpan, SpanBase } from './spanTypes'
 import type {
   TicketIdRelationSchemasFixture,
   UserIdRelationSchemasFixture,
 } from './testUtility/fixtures/relationSchemas'
-import type {
-  CompleteTraceDefinition,
-  DraftTraceContext,
-  MapSchemaToTypes,
-} from './types'
+import type { DraftTraceContext, MapSchemaToTypes } from './types'
 
 const mockRelations: MapSchemaToTypes<
   TicketIdRelationSchemasFixture['ticket']
@@ -23,6 +15,7 @@ const mockRelations: MapSchemaToTypes<
 }
 
 const mockEntryBase = {
+  id: '123',
   type: 'element',
   name: 'testEntry',
   startTime: {
@@ -92,7 +85,7 @@ const mockContext = {
     },
   },
   recordedItemsByLabel: {},
-  recordedItems: new Set(),
+  recordedItems: new Map(),
 } as const satisfies DraftTraceContext<
   'ticket',
   TicketIdRelationSchemasFixture,
