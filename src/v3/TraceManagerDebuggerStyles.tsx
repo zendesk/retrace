@@ -394,6 +394,18 @@ export const CSS_STYLES = /* CSS */ `
   margin-bottom: var(--tmdb-space-m);
 }
 
+.tmdb-history-header-sticky {
+  position: sticky;
+  top: 0;
+  background-color: var(--tmdb-color-bg-content);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  margin: calc(-1 * var(--tmdb-space-xl)) calc(-1 * var(--tmdb-space-xl)) var(--tmdb-space-m) calc(-1 * var(--tmdb-space-xl));
+  padding: var(--tmdb-space-xl) var(--tmdb-space-xl) var(--tmdb-space-m) var(--tmdb-space-xl);
+  border-top-left-radius: var(--tmdb-border-radius-large);
+  border-top-right-radius: var(--tmdb-border-radius-large);
+}
+
 .tmdb-dismiss-button {
   background: none;
   border: none;
@@ -1034,6 +1046,27 @@ ul.tmdb-no-style-list {
 .tmdb-list-item button:hover {
   background-color: var(--tmdb-color-bg-medium-gray);
   transform: translateX(2px);
+}
+
+/* Child trace styles */
+.tmdb-history-item-child {
+  position: relative;
+}
+
+.tmdb-child-trace-indicator {
+  height: 2px;
+  background-color: var(--tmdb-color-border-light);
+}
+
+.tmdb-child-trace-connector {
+  width: 2px;
+  background-color: var(--tmdb-color-border-light);
+}
+
+.tmdb-child-trace-badge {
+  color: var(--tmdb-color-text-secondary);
+  font-weight: normal;
+  font-size: var(--tmdb-font-size-s);
 }
 `
 

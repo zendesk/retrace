@@ -30,6 +30,67 @@ const MAX_STRING_LENGTH = 20
 const LONG_STRING_THRESHOLD = 25
 const NAME = 'Retrace Debugger'
 
+// Helper function to organize traces into parent-child hierarchy
+function organizeTraces<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>(traces: TraceInfo<RelationSchemasT>[]): TraceInfo<RelationSchemasT>[] {
+  const organized: TraceInfo<RelationSchemasT>[] = []
+  const traceMap = new Map<string, TraceInfo<RelationSchemasT>>()
+
+  // Create a map for quick lookup
+  for (const trace of traces) {
+    traceMap.set(trace.traceId, trace)
+  }
+
+  // First pass: collect all parent traces
+  const parentTraces = traces.filter(trace => !trace.traceContext?.input.parentTraceId)
+
+  // Recursive function to add children
+  function addTraceWithChildren(trace: TraceInfo<RelationSchemasT>) {
+    organized.push(trace)
+
+    // Find and add children
+    const children = traces.filter(childTrace =>
+      childTrace.traceContext?.input.parentTraceId === trace.traceId
+    )
+
+    // Sort children by start time
+    children.sort((a, b) => a.startTime - b.startTime)
+
+    for (const child of children) {
+      addTraceWithChildren(child)
+    }
+  }
+
+  // Sort parent traces by start time
+  parentTraces.sort((a, b) => a.startTime - b.startTime)
+
+  // Add each parent and its children
+  for (const parent of parentTraces) {
+    addTraceWithChildren(parent)
+  }
+
+  return organized
+}
+
+// Helper function to check if a trace is a child trace
+function isChildTrace<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>(trace: TraceInfo<RelationSchemasT>): boolean {
+  return !!trace.traceContext?.input.parentTraceId
+}
+
+// Helper function to find parent trace
+function findParentTrace<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>(
+  trace: TraceInfo<RelationSchemasT>,
+  allTraces: Map<string, TraceInfo<RelationSchemasT>>
+): TraceInfo<RelationSchemasT> | undefined {
+  const parentId = trace.traceContext?.input.parentTraceId
+  return parentId ? allTraces.get(parentId) : undefined
+}
+
 interface RequiredSpan {
   name: string
   isMatched: boolean
@@ -779,12 +840,14 @@ function TraceItem<
   onToggleExpand,
   onDismiss,
   isCurrentTrace = false,
+  allTraces,
 }: {
   trace: TraceInfo<RelationSchemasT>
   isExpanded: boolean
   onToggleExpand: () => void
   onDismiss: () => void
   isCurrentTrace?: boolean
+  allTraces: Map<string, TraceInfo<RelationSchemasT>>
 }) {
   const [isDefinitionDetailsExpanded, setIsDefinitionDetailsExpanded] =
     useState(false)
@@ -793,6 +856,9 @@ function TraceItem<
     (trace.state === 'complete' || trace.state === 'interrupted') &&
     !!trace.traceContext &&
     !!trace.finalTransition
+
+  const isChild = isChildTrace(trace)
+  const parentTrace = isChild ? findParentTrace(trace, allTraces) : undefined
 
   const computedResults = useMemo(() => {
     if (trace.traceContext && trace.finalTransition) {
@@ -821,10 +887,36 @@ function TraceItem<
 
   return (
     <div
-      className="tmdb-history-item"
-      style={{ borderLeft: `3px solid ${borderLeftColor}` }}
+      className={`tmdb-history-item ${
+        isChild ? 'tmdb-history-item-child' : ''
+      }`}
+      style={{
+        borderLeft: `3px solid ${borderLeftColor}`,
+        marginLeft: isChild ? 'var(--tmdb-space-xl)' : '0',
+        position: 'relative',
+      }}
     >
-      <div className="tmdb-history-header" onClick={onToggleExpand}>
+      {isChild && (
+        <div
+          className="tmdb-child-trace-indicator"
+          style={{
+            position: 'absolute',
+            left: 'calc(-1 * var(--tmdb-space-xl) + 8px)',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: 'calc(var(--tmdb-space-xl) - 16px)',
+            height: '2px',
+            backgroundColor: 'var(--tmdb-color-border-light)',
+            zIndex: 1,
+          }}
+        />
+      )}
+      <div
+        className={`tmdb-history-header ${
+          isExpanded ? 'tmdb-history-header-sticky' : ''
+        }`}
+        onClick={onToggleExpand}
+      >
         <div
           style={{
             display: 'flex',
@@ -832,6 +924,22 @@ function TraceItem<
             gap: 'var(--tmdb-space-m)',
           }}
         >
+          {isChild && (
+            <span
+              className="tmdb-child-trace-badge"
+              title={`Child trace of ${
+                parentTrace?.traceName ?? 'unknown parent'
+              }`}
+              style={{
+                fontSize: 'var(--tmdb-font-size-s)',
+                color: 'var(--tmdb-color-text-secondary)',
+                fontWeight: 'normal',
+                marginRight: 'var(--tmdb-space-s)',
+              }}
+            >
+              ↳
+            </span>
+          )}
           <strong style={{ fontSize: 'var(--tmdb-font-size-l)' }}>
             {trace.traceName}
           </strong>
@@ -1173,9 +1281,9 @@ export default function TraceManagerDebugger<
   float = false,
   traceHistoryLimit = TRACE_HISTORY_LIMIT,
 }: TraceManagerDebuggerProps<RelationSchemasT>) {
-  const [traces, setTraces] = useState<Map<string, TraceInfo<RelationSchemasT>>>(
-    new Map()
-  )
+  const [traces, setTraces] = useState<
+    Map<string, TraceInfo<RelationSchemasT>>
+  >(new Map())
   const [expandedTraceId, setExpandedTraceId] = useState<string | null>(null)
 
   const removeTrace = (traceId: string) => {
@@ -1290,7 +1398,10 @@ export default function TraceManagerDebugger<
           // Keep only the most recent TRACE_HISTORY_LIMIT traces
           if (newTraces.size > traceHistoryLimit) {
             const entries = [...newTraces.entries()]
-            const oldestEntries = entries.slice(0, newTraces.size - traceHistoryLimit)
+            const oldestEntries = entries.slice(
+              0,
+              newTraces.size - traceHistoryLimit,
+            )
             for (const [oldTraceId] of oldestEntries) {
               newTraces.delete(oldTraceId)
             }
@@ -1424,8 +1535,7 @@ export default function TraceManagerDebugger<
                 : 0
             const totalSpanCount = entries.length
             const hasErrorSpan = entries.some(
-              (e) =>
-                e.span.status === 'error' && !isSuppressedError(trace, e),
+              (e) => e.span.status === 'error' && !isSuppressedError(trace, e),
             )
             const hasSuppressedErrorSpan = entries.some(
               (e) => e.span.status === 'error' && isSuppressedError(trace, e),
@@ -1482,11 +1592,13 @@ export default function TraceManagerDebugger<
     }
   }, [traceManager, traceHistoryLimit])
 
-  // Convert Map to array sorted by most recent first (newest entries are at the end of the Map)
-  const allTraces = [...traces.values()].reverse()
+  // Convert Map to array and organize with parent-child relationships
+  const organizedTraces = organizeTraces([...traces.values()])
 
   // Determine which traces are currently running (not in terminal state)
-  const runningTraces = allTraces.filter(trace => !isTerminalState(trace.state))
+  const runningTraces = organizedTraces.filter(
+    (trace) => !isTerminalState(trace.state),
+  )
 
   let content: JSX.Element
 
@@ -1527,12 +1639,12 @@ export default function TraceManagerDebugger<
 
         {/* Added a wrapper for padding when floating, as tmdb-floating-container itself has padding 0 */}
         <div className={float ? 'tmdb-floating-content-wrapper' : ''}>
-          {allTraces.length > 0 ? (
+          {organizedTraces.length > 0 ? (
             // Removed specific padding here, rely on tmdb-floating-content-wrapper or tmdb-container
             <div>
               <h3 className="tmdb-history-title">
                 <div className="tmdb-history-title-left">
-                  Traces ({allTraces.length})
+                  Traces ({organizedTraces.length})
                   <a
                     href="https://zendesk.github.io/retrace/iframe.html?globals=&id=stories-visualizer-viz--operation-visualizer-story&viewMode=story"
                     target="_blank"
@@ -1554,12 +1666,13 @@ export default function TraceManagerDebugger<
                   </button>
                 </div>
               </h3>
-              {allTraces.map((trace) => (
+              {organizedTraces.map((trace) => (
                 <TraceItem
                   key={trace.traceId}
                   trace={trace}
                   isExpanded={expandedTraceId === trace.traceId}
                   isCurrentTrace={runningTraces.includes(trace)}
+                  allTraces={traces}
                   onToggleExpand={() =>
                     void setExpandedTraceId(
                       expandedTraceId === trace.traceId ? null : trace.traceId,
