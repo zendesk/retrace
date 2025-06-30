@@ -1,13 +1,13 @@
-import { CustomerSidebarOpenedOperation } from './customerSidebarTracer'
 import { traceManager } from './traceManager'
 
-export const ticketOperationTracer = traceManager.createTracer({
-  name: `ticket-activation`,
+export const CustomerSidebarOpenedOperation = `ticket.customer_sidebar.opened`
+
+export const customerSidebarTracer = traceManager.createTracer({
+  name: CustomerSidebarOpenedOperation,
   type: 'operation',
-  adoptAsChildren: [CustomerSidebarOpenedOperation],
   requiredSpans: [
     {
-      name: 'TicketView',
+      name: 'CustomerSidebar',
       matchingRelations: true,
       type: 'component-render',
       isIdle: true,
@@ -15,17 +15,17 @@ export const ticketOperationTracer = traceManager.createTracer({
   ],
   relationSchemaName: 'ticket',
   variants: {
-    click: { timeout: 15_000 },
+    sidebar_open: { timeout: 10_000 },
   },
   debounceOnSpans: [
     {
-      name: 'TicketView',
+      name: 'CustomerSidebar',
       matchingRelations: true,
     },
   ],
   interruptOnSpans: [
     {
-      name: 'TicketView',
+      name: 'CustomerSidebar',
       matchingRelations: true,
       type: 'component-unmount',
     },
@@ -34,24 +34,36 @@ export const ticketOperationTracer = traceManager.createTracer({
     time_to_start_loading: {
       startSpan: 'operation-start',
       endSpan: {
-        name: 'TicketView',
+        name: 'CustomerSidebar',
         matchingRelations: true,
         fn: (s) =>
           s.span.type === 'component-render' &&
           s.span.renderedOutput === 'loading',
       },
     },
+    time_to_show_content: {
+      startSpan: 'operation-start',
+      endSpan: {
+        name: 'CustomerSidebar',
+        matchingRelations: true,
+        fn: (s) =>
+          s.span.type === 'component-render' &&
+          s.span.renderedOutput === 'content',
+      },
+    },
   },
   computedValueDefinitions: {
-    had_error: {
-      matches: [{ name: 'TicketView', type: 'component-render', isIdle: true }],
+    customer_found: {
+      matches: [
+        { name: 'CustomerSidebar', type: 'component-render', isIdle: true },
+      ],
       computeValueFromMatches: (matches) => {
-        const error = matches.find(
+        const contentMatch = matches.find(
           (m) =>
             m.span.type === 'component-render' &&
-            m.span.renderedOutput === 'error',
+            m.span.renderedOutput === 'content',
         )
-        return !!error
+        return !!contentMatch
       },
     },
   },

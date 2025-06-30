@@ -1,13 +1,5 @@
-/* eslint-disable import/no-extraneous-dependencies */
 import * as React from 'react'
-import {
-  Body,
-  Caption,
-  Head,
-  HeaderCell,
-  HeaderRow,
-  Table,
-} from '@zendeskgarden/react-tables'
+import { Table } from '@zendeskgarden/react-tables'
 import { XL } from '@zendeskgarden/react-typography'
 import type { Ticket as TicketType } from './mockTickets'
 import { Ticket } from './Ticket'
@@ -17,23 +9,20 @@ interface TicketListProps {
   onTicketClick: (id: number) => void
 }
 
-export const TicketList: React.FC<TicketListProps> = ({
-  tickets,
-  onTicketClick,
-}) => (
+export const TicketList: React.FC<TicketListProps> = ({ tickets, onTicketClick }) => (
   <div style={{ overflowX: 'auto' }}>
     <Table style={{ minWidth: 500 }}>
-      <Caption>
+      <Table.Caption>
         <XL>Ticket list</XL>
-      </Caption>
+      </Table.Caption>
 
-      <Head>
-        <HeaderRow>
-          <HeaderCell width={70}>ID</HeaderCell>
-          <HeaderCell>Title</HeaderCell>
-        </HeaderRow>
-      </Head>
-      <Body>
+      <Table.Head>
+        <Table.HeaderRow>
+          <Table.HeaderCell width={70}>ID</Table.HeaderCell>
+          <Table.HeaderCell>Title</Table.HeaderCell>
+        </Table.HeaderRow>
+      </Table.Head>
+      <Table.Body>
         {tickets.map((ticket) => (
           <Ticket
             key={ticket.id}
@@ -42,7 +31,7 @@ export const TicketList: React.FC<TicketListProps> = ({
             onClick={onTicketClick}
           />
         ))}
-      </Body>
+      </Table.Body>
     </Table>
   </div>
 )

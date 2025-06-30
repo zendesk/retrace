@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 import styled from 'styled-components'
 import { TooltipWithBounds } from '@visx/tooltip'
 import { getColor } from '@zendeskgarden/react-theming'
@@ -50,6 +49,7 @@ export const ScrollContainer = styled.div`
   height: 100%;
   display: flex;
   flex-direction: column;
+  max-width: calc(100vw - 380px);
 `
 
 export const Header = styled.header`

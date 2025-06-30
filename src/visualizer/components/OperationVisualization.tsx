@@ -468,7 +468,13 @@ const OperationVisualization: React.FC<OperationVisualizationProps> = ({
                 labelFormat={(label) => `${label.toUpperCase()}`}
               >
                 {(labels) => (
-                  <div style={{ display: 'flex', flexDirection: 'row' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'row',
+                      flexWrap: 'wrap',
+                    }}
+                  >
                     {labels.map((label, i) => (
                       <LegendItem key={`legend-${i}`} margin="0 5px">
                         <svg width={15} height={15}>
