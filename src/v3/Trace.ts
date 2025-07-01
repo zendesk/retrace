@@ -40,6 +40,7 @@ import type { TraceRecording } from './traceRecordingTypes'
 import type {
   CompleteTraceDefinition,
   DraftTraceContext,
+  PublicTraceInterruptionReason,
   RelationSchemasBase,
   ReportErrorFn,
   TraceContext,
@@ -430,7 +431,7 @@ export class TraceStateMachine<
         return undefined
       },
 
-      onInterrupt: (reason: TraceInterruptionReason) => ({
+      onInterrupt: (reason: PublicTraceInterruptionReason) => ({
         transitionToState: 'interrupted',
         interruptionReason: reason,
         lastRelevantSpanAndAnnotation: undefined,
@@ -567,7 +568,7 @@ export class TraceStateMachine<
         return undefined
       },
 
-      onInterrupt: (reason: TraceInterruptionReason) => ({
+      onInterrupt: (reason: PublicTraceInterruptionReason) => ({
         transitionToState: 'interrupted',
         interruptionReason: reason,
         lastRelevantSpanAndAnnotation: this.lastRelevant,
@@ -773,7 +774,7 @@ export class TraceStateMachine<
         return undefined
       },
 
-      onInterrupt: (reason: TraceInterruptionReason) => ({
+      onInterrupt: (reason: PublicTraceInterruptionReason) => ({
         transitionToState: 'interrupted',
         interruptionReason: reason,
         lastRelevantSpanAndAnnotation: this.lastRelevant,
@@ -1070,7 +1071,7 @@ export class TraceStateMachine<
         return undefined
       },
 
-      onInterrupt: (reason: TraceInterruptionReason) =>
+      onInterrupt: (reason: PublicTraceInterruptionReason) =>
         // we captured a complete trace, however the interactive data is missing
         ({
           transitionToState: 'complete',
@@ -1168,7 +1169,7 @@ export class TraceStateMachine<
         return undefined
       },
 
-      onInterrupt: (reason: TraceInterruptionReason) => ({
+      onInterrupt: (reason: PublicTraceInterruptionReason) => ({
         transitionToState: 'interrupted',
         interruptionReason: reason,
         lastRelevantSpanAndAnnotation: this.lastRelevant,
@@ -1745,7 +1746,7 @@ export class Trace<
   }
 
   // this is public API only and should not be called internally
-  interrupt(reason: TraceInterruptionReason) {
+  interrupt(reason: PublicTraceInterruptionReason) {
     this.stateMachine.emit('onInterrupt', reason)
   }
 

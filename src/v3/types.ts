@@ -133,6 +133,13 @@ export type TraceInterruptionReason =
   | TraceInterruptionReasonForInvalidTraces
   | TraceInterruptionReasonForValidTraces
 
+export type PublicTraceInterruptionReason =
+  | 'aborted'
+  | 'another-trace-started'
+  | 'parent-interrupted'
+  | 'draft-cancelled'
+  | 'definition-changed'
+
 export type SingleTraceReportFn<
   SelectedRelationNameT extends keyof RelationSchemasT,
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
