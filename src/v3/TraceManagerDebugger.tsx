@@ -7,7 +7,6 @@ import {
   getConfigSummary,
   isSuppressedError,
 } from './debugUtils'
-import { createTraceRecording } from './recordingComputeUtils'
 import type { SpanAndAnnotation } from './spanAnnotationTypes'
 import {
   type AllPossibleTraces,
@@ -17,7 +16,11 @@ import {
 } from './Trace'
 import type { TraceManager } from './TraceManager'
 import { CSS_STYLES, getDynamicStateStyle } from './TraceManagerDebuggerStyles'
-import type { ComputedRenderSpan, ComputedSpan } from './traceRecordingTypes'
+import type {
+  ComputedRenderSpan,
+  ComputedSpan,
+  TraceRecording,
+} from './traceRecordingTypes'
 import type {
   RelationSchemasBase,
   TraceContext,
@@ -43,15 +46,18 @@ function organizeTraces<
   }
 
   // First pass: collect all parent traces
-  const parentTraces = traces.filter(trace => !trace.traceContext?.input.parentTraceId)
+  const parentTraces = traces.filter(
+    (trace) => !trace.traceContext?.input.parentTraceId,
+  )
 
   // Recursive function to add children
   function addTraceWithChildren(trace: TraceInfo<RelationSchemasT>) {
     organized.push(trace)
 
     // Find and add children
-    const children = traces.filter(childTrace =>
-      childTrace.traceContext?.input.parentTraceId === trace.traceId
+    const children = traces.filter(
+      (childTrace) =>
+        childTrace.traceContext?.input.parentTraceId === trace.traceId,
     )
 
     // Sort children by start time
@@ -62,8 +68,8 @@ function organizeTraces<
     }
   }
 
-  // Sort parent traces by start time
-  parentTraces.sort((a, b) => a.startTime - b.startTime)
+  // Sort parent traces by start time (newest first)
+  parentTraces.sort((a, b) => b.startTime - a.startTime)
 
   // Add each parent and its children
   for (const parent of parentTraces) {
@@ -85,7 +91,7 @@ function findParentTrace<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 >(
   trace: TraceInfo<RelationSchemasT>,
-  allTraces: Map<string, TraceInfo<RelationSchemasT>>
+  allTraces: Map<string, TraceInfo<RelationSchemasT>>,
 ): TraceInfo<RelationSchemasT> | undefined {
   const parentId = trace.traceContext?.input.parentTraceId
   return parentId ? allTraces.get(parentId) : undefined
@@ -804,22 +810,15 @@ function RenderComputedRenderBeaconSpans({
 
 function downloadTraceRecording<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
->(trace: TraceInfo<RelationSchemasT>) {
-  if (!trace.traceContext || !trace.finalTransition) {
-    return
-  }
-
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+>(recording: TraceRecording<any, RelationSchemasT>) {
   try {
-    const recording = createTraceRecording(
-      trace.traceContext,
-      trace.finalTransition,
-    )
     const recordingJson = JSON.stringify(recording, null, 2)
     const blob = new Blob([recordingJson], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `trace-${trace.traceId}-${trace.traceName}.json`
+    a.download = `trace-${recording.id}-${recording.name}.json`
     document.body.append(a)
     a.click()
     setTimeout(() => {
@@ -860,16 +859,18 @@ function TraceItem<
   const isChild = isChildTrace(trace)
   const parentTrace = isChild ? findParentTrace(trace, allTraces) : undefined
 
-  const computedResults = useMemo(() => {
+  const traceRecording = useMemo(() => {
     if (trace.traceContext && trace.finalTransition) {
       return getComputedResults(trace.traceContext, trace.finalTransition)
     }
-    return {}
+    return undefined
   }, [trace.traceContext, trace.finalTransition])
 
   const handleDownloadClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    downloadTraceRecording(trace)
+    if (traceRecording) {
+      downloadTraceRecording(traceRecording)
+    }
   }
 
   const handleDismissClick = (e: React.MouseEvent) => {
@@ -1115,7 +1116,7 @@ function TraceItem<
               <div className="tmdb-def-chip-container">
                 {(trace.computedValues ?? []).map((name) => {
                   const value = getFromRecord(
-                    computedResults.computedValues,
+                    traceRecording?.computedValues,
                     name,
                   )
 
@@ -1158,7 +1159,7 @@ function TraceItem<
               <ul className="tmdb-no-style-list">
                 {(trace.computedSpans ?? []).map((name) => {
                   const value = getFromRecord(
-                    computedResults.computedSpans,
+                    traceRecording?.computedSpans,
                     name,
                   )
                   return (
@@ -1184,10 +1185,10 @@ function TraceItem<
               </ul>
             </div>
           )}
-          {computedResults.computedRenderBeaconSpans ? (
+          {traceRecording?.computedRenderBeaconSpans ? (
             <RenderComputedRenderBeaconSpans
               computedRenderBeaconSpans={
-                computedResults.computedRenderBeaconSpans
+                traceRecording.computedRenderBeaconSpans
               }
             />
           ) : null}

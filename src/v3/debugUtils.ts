@@ -67,12 +67,12 @@ export function getComputedResults<
   traceContext: TraceContext<any, RelationSchemasT, any>,
   finalTransition: FinalTransition<RelationSchemasT>,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Partial<TraceRecording<any, RelationSchemasT>> {
+): TraceRecording<any, RelationSchemasT> | undefined {
   try {
     const recording = createTraceRecording(traceContext, finalTransition)
     return recording
   } catch {
-    return {}
+    return undefined
   }
 }
 

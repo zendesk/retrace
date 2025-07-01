@@ -436,10 +436,8 @@ export function createConsoleTraceLogger<
         logTimingInfo(transition)
         // Log computed values and spans
         try {
-          const { computedValues, computedSpans } = getComputedResults(
-            trace,
-            transition,
-          )
+          const { computedValues, computedSpans } =
+            getComputedResults(trace, transition) ?? {}
           if (computedValues && Object.keys(computedValues).length > 0) {
             log(
               `   Computed Values: ${Object.entries(computedValues)
@@ -474,10 +472,11 @@ export function createConsoleTraceLogger<
         logTimingInfo(transition)
         // Log computed values and spans
         try {
-          const { computedValues, computedSpans } = getComputedResults(
-            trace,
-            transition as FinalTransition<RelationSchemasT>,
-          )
+          const { computedValues, computedSpans } =
+            getComputedResults(
+              trace,
+              transition as FinalTransition<RelationSchemasT>,
+            ) ?? {}
           if (computedValues && Object.keys(computedValues).length > 0) {
             log(
               `   Computed Values: ${Object.entries(computedValues)
