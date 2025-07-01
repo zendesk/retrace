@@ -25,7 +25,7 @@ export interface SpanSummaryAttributes {
 export interface RumTraceRecording<
   SelectedRelationNameT extends keyof RelationSchemasT,
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
-> extends TraceRecordingBase<RelationSchemasT[SelectedRelationNameT]> {
+> extends TraceRecordingBase<SelectedRelationNameT, RelationSchemasT> {
   // spans that don't exist as separate spans in the DB
   // useful for things like renders, which can repeat tens of times
   // during the same operation

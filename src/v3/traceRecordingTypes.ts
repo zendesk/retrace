@@ -2,6 +2,7 @@
 import type { SpanAndAnnotation } from './spanAnnotationTypes'
 import type { Attributes } from './spanTypes'
 import type {
+  InterruptionReasonPayload,
   MapSchemaToTypes,
   RelationSchemasBase,
   Timestamp,
@@ -33,7 +34,10 @@ export interface ComputedRenderSpan {
   attributes?: Attributes
 }
 
-export interface TraceRecordingBase<RelationSchemaT> {
+export interface TraceRecordingBase<
+  SelectedRelationNameT extends keyof RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> {
   /**
    * random generated unique value or provided by the user at start
    */
@@ -51,7 +55,9 @@ export interface TraceRecordingBase<RelationSchemaT> {
   name: string
 
   startTime: Timestamp
-  relatedTo: MapSchemaToTypes<RelationSchemaT> | undefined
+  relatedTo:
+    | MapSchemaToTypes<RelationSchemasT[SelectedRelationNameT]>
+    | undefined
 
   type: TraceType
 
@@ -100,6 +106,6 @@ export interface TraceRecordingBase<RelationSchemaT> {
 export interface TraceRecording<
   SelectedRelationNameT extends keyof RelationSchemasT,
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
-> extends TraceRecordingBase<RelationSchemasT[SelectedRelationNameT]> {
+> extends TraceRecordingBase<SelectedRelationNameT, RelationSchemasT> {
   entries: readonly SpanAndAnnotation<RelationSchemasT>[]
 }
