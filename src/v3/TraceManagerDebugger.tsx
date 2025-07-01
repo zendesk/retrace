@@ -240,7 +240,13 @@ function DefinitionChip({
 
 function RequiredSpansList<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
->({ requiredSpans }: { requiredSpans: RequiredSpan[] }) {
+>({
+  requiredSpans,
+  traceComplete,
+}: {
+  requiredSpans: RequiredSpan[]
+  traceComplete: boolean
+}) {
   return (
     <div className="tmdb-section">
       <div className="tmdb-section-title">
@@ -268,14 +274,18 @@ function RequiredSpansList<
               />
               {span.definition ? (
                 <div className="tmdb-def-chip-container">
-                  {Object.entries(span.definition).map(([key, value]) => (
-                    <DefinitionChip
-                      key={key}
-                      keyName={key}
-                      value={value}
-                      variant={span.isMatched ? 'default' : 'pending'}
-                    />
-                  ))}
+                  <DefinitionChip
+                    key={i}
+                    keyName={String(i)}
+                    value={span.name}
+                    variant={
+                      span.isMatched
+                        ? 'default'
+                        : traceComplete
+                        ? 'missing'
+                        : 'pending'
+                    }
+                  />
                 </div>
               ) : (
                 span.name
@@ -880,6 +890,8 @@ function TraceItem<
 
   const borderLeftColor = isCurrentTrace
     ? 'var(--tmdb-color-active-primary)'
+    : trace.hasErrorSpan
+    ? 'var(--tmdb-color-error-primary)'
     : trace.state === 'complete'
     ? 'var(--tmdb-color-completed-primary)'
     : trace.state === 'interrupted'
@@ -890,11 +902,16 @@ function TraceItem<
     <div
       className={`tmdb-history-item ${
         isChild ? 'tmdb-history-item-child' : ''
-      }`}
+      } ${trace.hasErrorSpan ? 'tmdb-history-item-error' : ''}`}
       style={{
         borderLeft: `3px solid ${borderLeftColor}`,
         marginLeft: isChild ? 'var(--tmdb-space-xl)' : '0',
         position: 'relative',
+        ...(trace.hasErrorSpan && {
+          border: '2px solid var(--tmdb-color-error-primary)',
+          borderRadius: 'var(--tmdb-border-radius-small)',
+          backgroundColor: 'var(--tmdb-color-error-bg)',
+        }),
       }}
     >
       {isChild && (
@@ -965,7 +982,7 @@ function TraceItem<
                   : 'Error span(s) seen'
               }
             >
-              ⚠️
+              {trace.hasErrorSpan ? '🚨' : '⚠️'}
             </span>
           )}
           {trace.definitionModifications &&
@@ -1108,8 +1125,29 @@ function TraceItem<
             void e.stopPropagation()
           }}
         >
+          {/* Error Details Section - Show at the top if trace has error */}
+          {traceRecording?.status === 'error' && traceRecording?.error && (
+            <div className="tmdb-section tmdb-error-section">
+              <div className="tmdb-section-title tmdb-error-title">
+                🚨 Error Details
+              </div>
+              <div className="tmdb-error-content">
+                <pre className="tmdb-error-text">
+                  {traceRecording.error instanceof Error
+                    ? `${traceRecording.error.name}: ${
+                        traceRecording.error.message
+                      }\n\n${traceRecording.error.stack ?? ''}`
+                    : JSON.stringify(traceRecording.error, null, 2)}
+                </pre>
+              </div>
+            </div>
+          )}
+
           <TraceAttributes attributes={trace.attributes} />
-          <RequiredSpansList requiredSpans={trace.requiredSpans} />
+          <RequiredSpansList
+            requiredSpans={trace.requiredSpans}
+            traceComplete={trace.state === 'interrupted'}
+          />
           {(trace.computedValues?.length ?? 0) > 0 && (
             <div className="tmdb-section">
               <div className="tmdb-section-title">Computed Values</div>

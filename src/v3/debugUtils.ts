@@ -2,7 +2,7 @@ import {
   DEFAULT_DEBOUNCE_DURATION,
   DEFAULT_INTERACTIVE_TIMEOUT_DURATION,
 } from './constants'
-import type { SpanMatchDefinition, SpanMatcherFn } from './matchSpan'
+import type { SpanMatch, SpanMatcherFn } from './matchSpan'
 import { createTraceRecording } from './recordingComputeUtils'
 import type { SpanAndAnnotation } from './spanAnnotationTypes'
 import type { FinalTransition, OnEnterStatePayload } from './Trace'
@@ -126,9 +126,13 @@ export function getMatcherLabelFromCombinator<
   SelectedRelationNameT extends keyof RelationSchemasT,
   VariantsT extends string,
 >(
-  def: SpanMatchDefinition<SelectedRelationNameT, RelationSchemasT, VariantsT>,
+  def: SpanMatch<SelectedRelationNameT, RelationSchemasT, VariantsT>,
   index?: number,
 ): string {
+  if ('fromDefinition' in def && def.fromDefinition) {
+    return getMatcherLabelFromCombinator(def.fromDefinition, index)
+  }
+
   const parts: string[] = []
 
   // Example: Prioritize 'label' if it exists
@@ -229,10 +233,7 @@ export function getMatcherLabelFromCombinator<
   try {
     const defString = JSON.stringify(def)
     // Limit length to avoid overly long strings
-    return defString.length > 100
-      ? // eslint-disable-next-line no-magic-numbers
-        `${defString.slice(0, 97)}...`
-      : defString
+    return defString.length > 100 ? `${defString.slice(0, 97)}...` : defString
   } catch {
     // Fallback if stringify fails
     return `<matcher#${index ?? '?'}>`

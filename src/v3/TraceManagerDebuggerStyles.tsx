@@ -51,6 +51,13 @@ export const CSS_STYLES = /* CSS */ `
   --tmdb-color-interrupted-bg-hover: #ffcdd2; /* Added for hover states */
   --tmdb-color-interrupted-border: #ffcdd2;
 
+  /* Error-specific colors */
+  --tmdb-color-error-primary: #dc3545;
+  --tmdb-color-error-primary-hover: #c82333;
+  --tmdb-color-error-bg: rgba(220, 53, 69, 0.05);
+  --tmdb-color-error-bg-hover: rgba(220, 53, 69, 0.1);
+  --tmdb-color-error-border: #dc3545;
+
   /* Time Marker Colors */
   --tmdb-color-fcr-primary: #0277bd; /* Deep blue */
   --tmdb-color-fcr-primary-hover: #0288d1;
@@ -384,6 +391,15 @@ export const CSS_STYLES = /* CSS */ `
 }
 .tmdb-history-item:hover {
   box-shadow: var(--tmdb-shadow-large);
+}
+
+.tmdb-history-item-error {
+  border: 2px solid var(--tmdb-color-error-primary);
+  background-color: var(--tmdb-color-error-bg);
+  box-shadow: 0 0 0 1px var(--tmdb-color-error-primary), var(--tmdb-shadow-small);
+}
+.tmdb-history-item-error:hover {
+  box-shadow: 0 0 0 1px var(--tmdb-color-error-primary), var(--tmdb-shadow-large);
 }
 
 .tmdb-history-header {
@@ -1067,6 +1083,43 @@ ul.tmdb-no-style-list {
   color: var(--tmdb-color-text-secondary);
   font-weight: normal;
   font-size: var(--tmdb-font-size-s);
+}
+
+/* Error section styles */
+.tmdb-error-section {
+  border: 2px solid var(--tmdb-color-error-primary);
+  border-radius: var(--tmdb-border-radius-medium);
+  background-color: var(--tmdb-color-error-bg);
+  padding: var(--tmdb-space-l);
+  margin-bottom: var(--tmdb-space-xl);
+}
+
+.tmdb-error-title {
+  color: var(--tmdb-color-error-primary);
+  font-weight: var(--tmdb-font-weight-bold);
+  display: flex;
+  align-items: center;
+  gap: var(--tmdb-space-s);
+}
+
+.tmdb-error-content {
+  margin-top: var(--tmdb-space-m);
+}
+
+.tmdb-error-text {
+  background-color: rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--tmdb-color-error-primary);
+  border-radius: var(--tmdb-border-radius-small);
+  padding: var(--tmdb-space-l);
+  margin: 0;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: var(--tmdb-font-size-xs);
+  color: var(--tmdb-color-error-primary);
+  overflow-x: auto;
+  max-height: 300px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 `
 
