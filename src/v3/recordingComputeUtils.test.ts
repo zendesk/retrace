@@ -169,7 +169,7 @@ describe('recordingComputeUtils', () => {
         },
         {
           transitionFromState: 'active',
-          interruptionReason: 'timeout',
+          interruptionReason: { reason: 'timeout' },
           transitionToState: 'interrupted',
           lastRelevantSpanAndAnnotation: undefined,
         },
@@ -928,7 +928,7 @@ describe('recordingComputeUtils', () => {
         {
           transitionFromState: 'active',
           transitionToState: 'interrupted',
-          interruptionReason: 'timeout',
+          interruptionReason: { reason: 'timeout' },
           lastRelevantSpanAndAnnotation: undefined,
         },
       )

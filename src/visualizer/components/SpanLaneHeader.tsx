@@ -8,13 +8,16 @@ const HeaderContainer = styled.div<{ depth: number }>`
   align-items: center;
   padding: 4px 8px;
   padding-left: ${({ depth }) => depth * 16 + 8}px;
-  background-color: ${({ theme }) => getColor({ theme, variable: 'background.default' })};
-  border-bottom: 1px solid ${({ theme }) => getColor({ theme, variable: 'border.default' })};
+  background-color: ${({ theme }) =>
+    getColor({ theme, variable: 'background.default' })};
+  border-bottom: 1px solid
+    ${({ theme }) => getColor({ theme, variable: 'border.default' })};
   user-select: none;
   cursor: pointer;
-  
+
   &:hover {
-    background-color: ${({ theme }) => getColor({ theme, variable: 'background.subtle' })};
+    background-color: ${({ theme }) =>
+      getColor({ theme, variable: 'background.subtle' })};
   }
 `
 
@@ -31,11 +34,12 @@ const ExpandCollapseIcon = styled.button<{ isExpanded: boolean }>`
   justify-content: center;
   font-size: 12px;
   color: ${({ theme }) => getColor({ theme, variable: 'foreground.subtle' })};
-  
+
   &:hover {
-    color: ${({ theme }) => getColor({ theme, variable: 'foreground.default' })};
+    color: ${({ theme }) =>
+      getColor({ theme, variable: 'foreground.default' })};
   }
-  
+
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
@@ -57,8 +61,9 @@ const HierarchyConnector = styled.div<{ depth: number }>`
   top: 0;
   bottom: 0;
   width: 1px;
-  background-color: ${({ theme }) => getColor({ theme, variable: 'border.subtle' })};
-  
+  background-color: ${({ theme }) =>
+    getColor({ theme, variable: 'border.subtle' })};
+
   &::before {
     content: '';
     position: absolute;
@@ -66,7 +71,8 @@ const HierarchyConnector = styled.div<{ depth: number }>`
     left: 0;
     width: 8px;
     height: 1px;
-    background-color: ${({ theme }) => getColor({ theme, variable: 'border.subtle' })};
+    background-color: ${({ theme }) =>
+      getColor({ theme, variable: 'border.subtle' })};
   }
 `
 
@@ -81,16 +87,16 @@ export function SpanLaneHeader({
   span,
   isExpanded,
   onToggleExpansion,
-  depth
+  depth,
 }: SpanLaneHeaderProps) {
   const hasChildren = span.children.length > 0
-  
+
   const handleToggle = () => {
     if (hasChildren) {
       onToggleExpansion(span.span.id)
     }
   }
-  
+
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
@@ -99,17 +105,19 @@ export function SpanLaneHeader({
   }
 
   return (
-    <HeaderContainer 
-      depth={depth} 
+    <HeaderContainer
+      depth={depth}
       onClick={handleToggle}
       onKeyDown={handleKeyDown}
       tabIndex={0}
       role="button"
       aria-expanded={hasChildren ? isExpanded : undefined}
-      aria-label={`${span.span.name} span ${hasChildren ? (isExpanded ? 'expanded' : 'collapsed') : ''}`}
+      aria-label={`${span.span.name} span ${
+        hasChildren ? (isExpanded ? 'expanded' : 'collapsed') : ''
+      }`}
     >
       {depth > 0 && <HierarchyConnector depth={depth} />}
-      
+
       <ExpandCollapseIcon
         isExpanded={isExpanded}
         disabled={!hasChildren}
@@ -117,7 +125,7 @@ export function SpanLaneHeader({
       >
         {hasChildren ? (isExpanded ? '−' : '+') : '•'}
       </ExpandCollapseIcon>
-      
+
       <SpanName>{span.span.name}</SpanName>
     </HeaderContainer>
   )

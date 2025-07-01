@@ -22,10 +22,10 @@ import type {
   TraceRecording,
 } from './traceRecordingTypes'
 import type {
+  InterruptionReasonPayload,
   RelationSchemasBase,
   TraceContext,
   TraceDefinitionModifications,
-  TraceInterruptionReason,
 } from './types'
 
 // Constants to avoid magic numbers
@@ -115,7 +115,7 @@ interface TraceInfo<
   lastRequiredSpanOffset?: number
   completeSpanOffset?: number
   cpuIdleSpanOffset?: number
-  interruptionReason?: TraceInterruptionReason
+  interruptionReason?: InterruptionReasonPayload<RelationSchemasT>
   startTime: number
   relatedTo?: Record<string, unknown>
   // Store the trace context to be able to generate trace recordings later
@@ -1058,7 +1058,7 @@ function TraceItem<
             <div className="tmdb-chip-group tmdb-reason-group">
               <span className="tmdb-chip-group-label">Reason</span>
               <span className="tmdb-chip-group-value">
-                {trace.interruptionReason}
+                {trace.interruptionReason.reason}
               </span>
             </div>
           )}

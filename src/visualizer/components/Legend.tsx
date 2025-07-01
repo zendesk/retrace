@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 import * as React from 'react'
 import styled from 'styled-components'
 import { Card, CardContent, CardTitle } from './styled/Card'

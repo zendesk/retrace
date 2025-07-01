@@ -92,7 +92,7 @@ function buildChildUtilities<
           // For other reasons, interrupt the current child and adopt the new one
           const currentChild = getChildTrace()
           if (currentChild) {
-            currentChild.interrupt(reason)
+            currentChild.interrupt({ reason })
           }
           parent.adoptChild(newTrace) // adds to children
           return
@@ -295,16 +295,16 @@ export class Tracer<
         },
         undefined,
       )
-      trace.interrupt('aborted')
+      trace.interrupt({ reason: 'aborted' })
       return
     }
 
     if (trace.isDraft) {
-      trace.interrupt('draft-cancelled')
+      trace.interrupt({ reason: 'draft-cancelled' })
       return
     }
 
-    trace.interrupt('aborted')
+    trace.interrupt({ reason: 'aborted' })
   }
 
   /**

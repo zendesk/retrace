@@ -96,7 +96,17 @@ export class TraceManager<
       ...configInput,
       replaceCurrentTrace: (newTrace, reason) => {
         if (this.currentTrace) {
-          this.currentTrace.interrupt(reason)
+          if (reason === 'another-trace-started') {
+            this.currentTrace.interrupt({
+              reason: 'another-trace-started',
+              anotherTrace: {
+                id: newTrace.input.id,
+                name: newTrace.definition.name,
+              },
+            })
+          } else {
+            this.currentTrace.interrupt({ reason })
+          }
         }
         this.currentTrace = newTrace
       },

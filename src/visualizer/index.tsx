@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 import '@zendeskgarden/css-bedrock'
 import { useEffect, useMemo, useState } from 'react'
 import * as React from 'react'

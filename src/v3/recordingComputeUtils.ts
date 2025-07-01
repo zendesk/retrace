@@ -671,11 +671,10 @@ export function createTraceRecording<
     ({ tickMeta: _, ...item }) => {
       // exclude internalUse and spanIdsToDiscard
       const keep = !(
+        // prettier-ignore
         // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-        (
-          item.span.internalUse ||
+        item.span.internalUse ||
           startSpanIdToFullDurationSpanIdMap.has(item.span.id)
-        )
       )
       if (keep) {
         return [item]
@@ -713,7 +712,7 @@ export function createTraceRecording<
     computedRenderBeaconSpans,
     computedValues,
     attributes: traceAttributes,
-    interruptionReason,
+    interruptionReason: interruptionReason?.reason,
     entries: filteredRecordedItemsArray,
   }
 }

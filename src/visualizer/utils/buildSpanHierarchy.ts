@@ -49,9 +49,7 @@ export function buildSpanHierarchy(
     for (const span of spansToProcess) {
       span.depth = depth
       // Sort children by start time
-      span.children.sort(
-        (a, b) => a.span.startTime.now - b.span.startTime.now,
-      )
+      span.children.sort((a, b) => a.span.startTime.now - b.span.startTime.now)
       // Recursively calculate depths for children
       calculateDepthsAndSort(span.children, depth + 1)
     }

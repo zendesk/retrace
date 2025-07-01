@@ -1380,9 +1380,7 @@
         "attributes": {
           "variables": {
             "channel": "CHAT",
-            "agentIds": [
-              "7618509308698"
-            ]
+            "agentIds": ["7618509308698"]
           }
         },
         "renderedOutput": "content",
@@ -1949,9 +1947,7 @@
         "attributes": {
           "variables": {
             "channel": "CHAT",
-            "agentIds": [
-              "7618509308698"
-            ]
+            "agentIds": ["7618509308698"]
           }
         },
         "renderedOutput": "content",
@@ -5531,9 +5527,7 @@
         "attributes": {
           "variables": {
             "channel": "CHAT",
-            "agentIds": [
-              ""
-            ]
+            "agentIds": [""]
           }
         },
         "renderedOutput": "content",
@@ -6292,9 +6286,7 @@
         "attributes": {
           "variables": {
             "channel": "CHAT",
-            "agentIds": [
-              ""
-            ]
+            "agentIds": [""]
           }
         },
         "renderedOutput": "content",
@@ -6802,9 +6794,7 @@
         "attributes": {
           "variables": {
             "channel": "CHAT",
-            "agentIds": [
-              ""
-            ]
+            "agentIds": [""]
           }
         },
         "renderedOutput": "content",
@@ -7251,9 +7241,7 @@
         "attributes": {
           "variables": {
             "channel": "CHAT",
-            "agentIds": [
-              ""
-            ]
+            "agentIds": [""]
           }
         },
         "renderedOutput": "content",
@@ -8067,9 +8055,7 @@
         "attributes": {
           "variables": {
             "channel": "CHAT",
-            "agentIds": [
-              ""
-            ]
+            "agentIds": [""]
           }
         },
         "renderedOutput": "content",
@@ -12413,9 +12399,7 @@
           "variables": {
             "first": 100,
             "channel": "SUPPORT",
-            "groupIds": [
-              "7618449559578"
-            ]
+            "groupIds": ["7618449559578"]
           },
           "feature": "lotus-react",
           "parentName": "apollo-link: groupStatesForChannel",
@@ -12975,9 +12959,7 @@
         "attributes": {
           "variables": {
             "channel": "CHAT",
-            "agentIds": [
-              ""
-            ]
+            "agentIds": [""]
           }
         },
         "renderedOutput": "content",
@@ -14811,9 +14793,7 @@
           "variables": {
             "first": 100,
             "channel": "SUPPORT",
-            "groupIds": [
-              "7618449559578"
-            ]
+            "groupIds": ["7618449559578"]
           },
           "feature": "react",
           "operationName": "groupStatesForChannel",
@@ -15599,9 +15579,7 @@
         "attributes": {
           "variables": {
             "channel": "CHAT",
-            "agentIds": [
-              ""
-            ]
+            "agentIds": [""]
           }
         },
         "renderedOutput": "content",
@@ -16928,9 +16906,7 @@
         "attributes": {
           "variables": {
             "channel": "CHAT",
-            "agentIds": [
-              "7618509308698"
-            ]
+            "agentIds": ["7618509308698"]
           }
         },
         "renderedOutput": "content",
@@ -18367,9 +18343,7 @@
         "attributes": {
           "variables": {
             "channel": "CHAT",
-            "agentIds": [
-              "7618509308698"
-            ]
+            "agentIds": ["7618509308698"]
           }
         },
         "renderedOutput": "content",
@@ -19900,9 +19874,7 @@
         "attributes": {
           "variables": {
             "channel": "CHAT",
-            "agentIds": [
-              "7618509308698"
-            ]
+            "agentIds": ["7618509308698"]
           }
         },
         "renderedOutput": "content",
@@ -21053,9 +21025,7 @@
         "attributes": {
           "variables": {
             "channel": "CHAT",
-            "agentIds": [
-              "7618509308698"
-            ]
+            "agentIds": ["7618509308698"]
           }
         },
         "renderedOutput": "content",
@@ -22239,9 +22209,7 @@
           "variables": {
             "first": 100,
             "channel": "SUPPORT",
-            "groupIds": [
-              "7618449559578"
-            ]
+            "groupIds": ["7618449559578"]
           },
           "feature": "lotus-react",
           "parentName": "apollo-link: groupStatesForChannel",
@@ -22636,9 +22604,7 @@
         "attributes": {
           "variables": {
             "channel": "CHAT",
-            "agentIds": [
-              "7618509308698"
-            ]
+            "agentIds": ["7618509308698"]
           }
         },
         "renderedOutput": "content",
@@ -23001,9 +22967,7 @@
           "variables": {
             "first": 100,
             "channel": "SUPPORT",
-            "groupIds": [
-              "7618449559578"
-            ]
+            "groupIds": ["7618449559578"]
           },
           "feature": "react",
           "operationName": "groupStatesForChannel",
@@ -23322,9 +23286,7 @@
         "attributes": {
           "variables": {
             "channel": "CHAT",
-            "agentIds": [
-              "7618509308698"
-            ]
+            "agentIds": ["7618509308698"]
           }
         },
         "renderedOutput": "content",
@@ -23875,9 +23837,7 @@
         "attributes": {
           "variables": {
             "channel": "CHAT",
-            "agentIds": [
-              "7618509308698"
-            ]
+            "agentIds": ["7618509308698"]
           }
         },
         "renderedOutput": "content",
@@ -26082,9 +26042,7 @@
         "attributes": {
           "variables": {
             "channel": "CHAT",
-            "agentIds": [
-              "7618509308698"
-            ]
+            "agentIds": ["7618509308698"]
           }
         },
         "renderedOutput": "content",

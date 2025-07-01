@@ -457,7 +457,7 @@ export function createConsoleTraceLogger<
         }
       } else {
         // interrupted
-        const reason = (
+        const { reason } = (
           transition as Extract<
             typeof transition,
             { interruptionReason: unknown }

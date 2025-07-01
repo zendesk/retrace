@@ -140,6 +140,59 @@ export type PublicTraceInterruptionReason =
   | 'draft-cancelled'
   | 'definition-changed'
 
+// New payload types for different interruption reasons
+export interface AnotherTraceStartedInterruptionPayload<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> {
+  readonly reason: 'another-trace-started'
+
+  readonly anotherTrace: {
+    readonly id: string
+    readonly name: string
+  }
+}
+
+export interface GenericInterruptionPayload {
+  readonly reason: Exclude<TraceInterruptionReason, 'another-trace-started'>
+}
+
+// Union type for all possible interruption payloads
+export type InterruptionReasonPayload<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> =
+  | AnotherTraceStartedInterruptionPayload<RelationSchemasT>
+  | GenericInterruptionPayload
+
+// Internal interruption payloads that include all possible reasons
+export interface InternalAnotherTraceStartedInterruptionPayload<
+  SelectedRelationNameT extends keyof RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+  VariantsT extends string,
+> {
+  reason: 'another-trace-started'
+  anotherTraceContext: TraceContext<
+    SelectedRelationNameT,
+    RelationSchemasT,
+    VariantsT
+  >
+}
+
+export interface InternalGenericInterruptionPayload {
+  reason: Exclude<TraceInterruptionReason, 'another-trace-started'>
+}
+
+export type InternalInterruptionReasonPayload<
+  SelectedRelationNameT extends keyof RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+  VariantsT extends string,
+> =
+  | InternalAnotherTraceStartedInterruptionPayload<
+      SelectedRelationNameT,
+      RelationSchemasT,
+      VariantsT
+    >
+  | InternalGenericInterruptionPayload
+
 export type SingleTraceReportFn<
   SelectedRelationNameT extends keyof RelationSchemasT,
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,

@@ -9,7 +9,10 @@ interface TicketListProps {
   onTicketClick: (id: number) => void
 }
 
-export const TicketList: React.FC<TicketListProps> = ({ tickets, onTicketClick }) => (
+export const TicketList: React.FC<TicketListProps> = ({
+  tickets,
+  onTicketClick,
+}) => (
   <div style={{ overflowX: 'auto' }}>
     <Table style={{ minWidth: 500 }}>
       <Table.Caption>

@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable import/no-extraneous-dependencies */
 import { expect } from 'vitest'
 import { generateAsciiTimeline } from './generateAsciiTimeline'
 
