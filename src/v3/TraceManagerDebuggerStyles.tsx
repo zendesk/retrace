@@ -803,6 +803,65 @@ export const CSS_STYLES = /* CSS */ `
   transform: scale(1);
 }
 
+.tmdb-tooltip-trigger {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  display: block;
+  width: 100%;
+  padding: var(--tmdb-space-xxs) var(--tmdb-space-m);
+}
+
+.tmdb-tooltip[popover] {
+  position: absolute;
+
+  top: anchor(bottom);
+  left: anchor(left);
+  /* translate: -50% 8px; */
+  margin: 0;
+  padding: var(--tmdb-space-l);
+  background: var(--tmdb-color-bg-handle);
+  color: var(--tmdb-color-white);
+  border: 1px solid var(--tmdb-color-border-light);
+  border-radius: var(--tmdb-border-radius-medium);
+  font-size: var(--tmdb-font-size-s);
+  z-index: var(--tmdb-z-index-tooltip);
+  max-width: 450px;
+  word-break: break-word;
+  white-space: pre-wrap;
+  box-shadow: var(--tmdb-shadow-large);
+}
+
+.tmdb-tooltip[popover]::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: calc(50% - 8px);
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 8px solid var(--tmdb-color-bg-handle);
+}
+
+@supports not (top: anchor(top)) {
+  .tmdb-tooltip[popover] {
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 8px;
+  }
+  .tmdb-tooltip[popover]::before {
+    top: 100%;
+    transform: rotate(180deg);
+  }
+}
+
 .tmdb-def-chip-container {
   display: flex;
   flex-wrap: wrap;
@@ -813,13 +872,12 @@ export const CSS_STYLES = /* CSS */ `
 .tmdb-def-chip {
   background-color: var(--tmdb-color-active-bg);
   color: var(--tmdb-color-active-primary);
-  padding: var(--tmdb-space-xxs) var(--tmdb-space-m);
+  padding: 0;
   border-radius: var(--tmdb-border-radius-xlarge);
   font-size: var(--tmdb-font-size-xxs);
   max-width: 200px;
   text-overflow: ellipsis;
   white-space: nowrap;
-  position: relative;
   border: 1px solid var(--tmdb-color-active-border-light);
   transition: background-color var(--tmdb-transition-fast);
 }
@@ -867,36 +925,6 @@ export const CSS_STYLES = /* CSS */ `
 }
 .tmdb-def-chip-error:hover {
   background-color: var(--tmdb-color-interrupted-bg-hover);
-}
-
-.tmdb-def-chip-hoverable {
-  cursor: help;
-}
-.tmdb-def-chip-hoverable:hover {
-  background-color: var(--tmdb-color-active-bg-hover);
-}
-.tmdb-def-chip-tooltip {
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: rgba(0,0,0,0.8);
-  color: var(--tmdb-color-white);
-  padding: var(--tmdb-space-ms) var(--tmdb-space-ml);
-  border-radius: var(--tmdb-border-radius-small);
-  font-size: var(--tmdb-font-size-xxs);
-  z-index: var(--tmdb-z-index-tooltip);
-  min-width: 200px;
-  max-width: 300px;
-  word-break: break-word;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity var(--tmdb-transition-slow), visibility var(--tmdb-transition-slow); /* Added visibility transition */
-  visibility: hidden;
-}
-.tmdb-def-chip-tooltip-visible {
-  opacity: 1;
-  visibility: visible;
 }
 
 .tmdb-item-content { /* In RequiredSpansList */

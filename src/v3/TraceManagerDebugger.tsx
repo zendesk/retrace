@@ -180,7 +180,6 @@ function DefinitionChip({
   value: unknown
   variant?: ChipVariant
 }) {
-  const [showTooltip, setShowTooltip] = useState(false)
   const valueIsComplex =
     value !== null &&
     (typeof value === 'object' ||
@@ -213,21 +212,21 @@ function DefinitionChip({
   const chipClassName = `tmdb-def-chip ${getVariantClass()} ${
     needsTooltip ? 'tmdb-def-chip-hoverable' : ''
   }`
-  const tooltipClassName = `tmdb-def-chip-tooltip ${
-    showTooltip ? 'tmdb-def-chip-tooltip-visible' : ''
-  }`
+  const popoverId = `tooltip-${keyName}-${Math.random()
+    .toString(36)
+    .slice(2, 9)}`
 
   return (
-    <div
-      className={chipClassName}
-      onMouseEnter={() => void setShowTooltip(true)}
-      onMouseLeave={() => void setShowTooltip(false)}
-    >
-      {keyName}: <span className="tmdb-def-chip-value">{displayValue}</span>
+    <div className={chipClassName}>
+      <button popoverTarget={popoverId} className="tmdb-tooltip-trigger">
+        {keyName}: <span className="tmdb-def-chip-value">{displayValue}</span>
+      </button>
       {needsTooltip && (
         <div
-          className={tooltipClassName}
-          // Opacity and visibility are handled by CSS classes now
+          id={popoverId}
+          role="tooltip"
+          popover="auto"
+          className="tmdb-tooltip"
         >
           {typeof value === 'object'
             ? JSON.stringify(value, null, 2)
