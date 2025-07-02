@@ -6,7 +6,6 @@ import type {
   MapSchemaToTypes,
   RelationSchemasBase,
   Timestamp,
-  TraceInterruptionReason,
   TraceStatus,
   TraceType,
 } from './types'
@@ -71,7 +70,7 @@ export interface TraceRecordingBase<
   variant: string
 
   // STRICTER TYPE TODO: separate out trace recording into a union of trace recording and interrupted trace recording (fields that will be different: interruption reason,duration, and status)
-  interruptionReason?: TraceInterruptionReason
+  interruption?: InterruptionReasonPayload<RelationSchemasT>
   duration: number | null
 
   additionalDurations: {

@@ -550,7 +550,7 @@ export function createTraceRecording<
 
   const {
     transitionToState,
-    interruptionReason,
+    interruption,
     cpuIdleSpanAndAnnotation,
     completeSpanAndAnnotation,
     lastRequiredSpanAndAnnotation,
@@ -712,7 +712,7 @@ export function createTraceRecording<
     computedRenderBeaconSpans,
     computedValues,
     attributes: traceAttributes,
-    interruptionReason: interruptionReason?.reason,
+    interruption,
     entries: filteredRecordedItemsArray,
   }
 }

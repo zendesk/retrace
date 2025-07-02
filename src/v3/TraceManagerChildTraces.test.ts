@@ -135,7 +135,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       expect(parentReport).toBeDefined()
 
       expect(parentReport?.status).toBe('ok')
-      expect(parentReport?.interruptionReason).toBeUndefined()
+      expect(parentReport?.interruption).toBeUndefined()
       expect(parentReport?.parentTraceId).toBeUndefined() // Parent has no parent
 
       // Verify child trace completed
@@ -144,7 +144,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       )?.[0]
       expect(childReport).toBeDefined()
       expect(childReport?.status).toBe('ok')
-      expect(childReport?.interruptionReason).toBeUndefined()
+      expect(childReport?.interruption).toBeUndefined()
       expect(childReport?.parentTraceId).toBe('parent-trace-id') // Child adopted by parent
       expect(reportErrorFn).not.toHaveBeenCalled()
     })
@@ -211,7 +211,9 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       )?.[0]
       expect(parentReport).toBeDefined()
       expect(parentReport?.status).toBe('interrupted')
-      expect(parentReport?.interruptionReason).toBe('another-trace-started')
+      expect(parentReport?.interruption).toMatchObject({
+        reason: 'another-trace-started',
+      })
       expect(parentReport?.parentTraceId).toBeUndefined() // Parent has no parent
 
       // Verify other trace completed
@@ -220,7 +222,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       )?.[0]
       expect(otherReport).toBeDefined()
       expect(otherReport?.status).toBe('ok')
-      expect(otherReport?.interruptionReason).toBeUndefined()
+      expect(otherReport?.interruption).toBeUndefined()
       expect(otherReport?.parentTraceId).toBeUndefined() // Other trace has no parent (it interrupted)
       expect(reportErrorFn).not.toHaveBeenCalled()
     })
@@ -308,7 +310,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       )?.[0]
       expect(parentReport).toBeDefined()
       expect(parentReport?.status).toBe('ok')
-      expect(parentReport?.interruptionReason).toBeUndefined()
+      expect(parentReport?.interruption).toBeUndefined()
       expect(parentReport?.parentTraceId).toBeUndefined() // Parent has no parent
 
       // Verify first child trace completed
@@ -317,7 +319,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       )?.[0]
       expect(child1Report).toBeDefined()
       expect(child1Report?.status).toBe('ok')
-      expect(child1Report?.interruptionReason).toBeUndefined()
+      expect(child1Report?.interruption).toBeUndefined()
       expect(child1Report?.parentTraceId).toBe('trace-0') // Child-1 adopted by parent
 
       // Verify second child trace completed
@@ -326,7 +328,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       )?.[0]
       expect(child2Report).toBeDefined()
       expect(child2Report?.status).toBe('ok')
-      expect(child2Report?.interruptionReason).toBeUndefined()
+      expect(child2Report?.interruption).toBeUndefined()
       expect(child2Report?.parentTraceId).toBe('trace-0') // Child-2 adopted by parent
       expect(reportErrorFn).not.toHaveBeenCalled()
     })
@@ -405,7 +407,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       )?.[0]
       expect(parentReport).toBeDefined()
       expect(parentReport?.status).toBe('ok')
-      expect(parentReport?.interruptionReason).toBeUndefined()
+      expect(parentReport?.interruption).toBeUndefined()
       expect(parentReport?.parentTraceId).toBeUndefined() // Parent has no parent
       expect(reportErrorFn).not.toHaveBeenCalled()
     })
@@ -515,7 +517,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       )?.[0]
       expect(parentReport).toBeDefined()
       expect(parentReport?.status).toBe('ok')
-      expect(parentReport?.interruptionReason).toBeUndefined()
+      expect(parentReport?.interruption).toBeUndefined()
       expect(parentReport?.parentTraceId).toBeUndefined() // Parent has no parent
       expect(reportErrorFn).not.toHaveBeenCalled()
     })
@@ -561,7 +563,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       const parentReport = reportFn.mock.calls[0]![0]
       expect(parentReport.name).toBe('ticket.parent-operation')
       expect(parentReport.status).toBe('ok')
-      expect(parentReport.interruptionReason).toBeUndefined()
+      expect(parentReport.interruption).toBeUndefined()
       expect(parentReport.parentTraceId).toBeUndefined() // Parent has no parent
     })
 
@@ -637,7 +639,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       )?.[0]
       expect(parentReport).toBeDefined()
       expect(parentReport?.status).toBe('ok')
-      expect(parentReport?.interruptionReason).toBeUndefined()
+      expect(parentReport?.interruption).toBeUndefined()
       expect(parentReport?.parentTraceId).toBeUndefined() // Parent has no parent
       expect(reportErrorFn).not.toHaveBeenCalled()
     })
@@ -705,7 +707,9 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       )?.[0]
       expect(parentReport).toBeDefined()
       expect(parentReport?.status).toBe('interrupted')
-      expect(parentReport?.interruptionReason).toBe('matched-on-interrupt')
+      expect(parentReport?.interruption).toMatchObject({
+        reason: 'matched-on-interrupt',
+      })
       expect(parentReport?.parentTraceId).toBeUndefined() // Parent has no parent
 
       // Verify child was interrupted with parent-interrupted
@@ -714,7 +718,9 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       )?.[0]
       expect(childReport).toBeDefined()
       expect(childReport?.status).toBe('interrupted')
-      expect(childReport?.interruptionReason).toBe('parent-interrupted')
+      expect(childReport?.interruption).toMatchObject({
+        reason: 'parent-interrupted',
+      })
       expect(childReport?.parentTraceId).toBe('trace-0') // Child was adopted by parent
       expect(reportErrorFn).not.toHaveBeenCalled()
     })
@@ -778,7 +784,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       )?.[0]
       expect(parentReport).toBeDefined()
       expect(parentReport?.status).toBe('interrupted')
-      expect(parentReport?.interruptionReason).toBe('timeout')
+      expect(parentReport?.interruption).toMatchObject({ reason: 'timeout' })
       expect(parentReport?.parentTraceId).toBeUndefined() // Parent has no parent
 
       // Verify child was interrupted with parent-interrupted
@@ -787,7 +793,9 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       )?.[0]
       expect(childReport).toBeDefined()
       expect(childReport?.status).toBe('interrupted')
-      expect(childReport?.interruptionReason).toBe('parent-interrupted')
+      expect(childReport?.interruption).toMatchObject({
+        reason: 'parent-interrupted',
+      })
       expect(childReport?.parentTraceId).toBe('trace-0') // Child was adopted by parent
       expect(reportErrorFn).not.toHaveBeenCalled()
     })
@@ -929,7 +937,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       )?.[0]
       expect(childReport).toBeDefined()
       expect(childReport?.status).toBe('interrupted')
-      expect(childReport?.interruptionReason).toBe('timeout')
+      expect(childReport?.interruption).toMatchObject({ reason: 'timeout' })
       expect(childReport?.parentTraceId).toBe('trace-0') // Child was adopted by parent
 
       // Verify parent was interrupted due to child timeout
@@ -938,7 +946,9 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       )?.[0]
       expect(parentReport).toBeDefined()
       expect(parentReport?.status).toBe('interrupted')
-      expect(parentReport?.interruptionReason).toBe('child-timeout')
+      expect(parentReport?.interruption).toMatchObject({
+        reason: 'child-timeout',
+      })
       expect(parentReport?.parentTraceId).toBeUndefined() // Parent has no parent
       expect(reportErrorFn).not.toHaveBeenCalled()
     })
@@ -1004,7 +1014,9 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       )?.[0]
       expect(childReport).toBeDefined()
       expect(childReport?.status).toBe('interrupted')
-      expect(childReport?.interruptionReason).toBe('matched-on-interrupt')
+      expect(childReport?.interruption).toMatchObject({
+        reason: 'matched-on-interrupt',
+      })
       expect(childReport?.parentTraceId).toBe('trace-0') // Child was adopted by parent
 
       // Verify parent was interrupted due to child interruption
@@ -1013,7 +1025,9 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       )?.[0]
       expect(parentReport).toBeDefined()
       expect(parentReport?.status).toBe('interrupted')
-      expect(parentReport?.interruptionReason).toBe('child-interrupted')
+      expect(parentReport?.interruption).toMatchObject({
+        reason: 'child-interrupted',
+      })
       expect(parentReport?.parentTraceId).toBeUndefined() // Parent has no parent
       expect(reportErrorFn).not.toHaveBeenCalled()
     })
@@ -1085,7 +1099,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
 
       // Verify new child completed successfully
       expect(completedChildReport?.status).toBe('ok')
-      expect(completedChildReport?.interruptionReason).toBeUndefined()
+      expect(completedChildReport?.interruption).toBeUndefined()
       expect(completedChildReport?.parentTraceId).toBe('trace-0')
 
       // Verify parent was NOT interrupted (continued successfully)
@@ -1093,7 +1107,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
         (call) => call[0].name === 'ticket.parent-operation',
       )?.[0]
       expect(parentReport?.status).toBe('ok')
-      expect(parentReport?.interruptionReason).toBeUndefined()
+      expect(parentReport?.interruption).toBeUndefined()
       expect(parentReport?.parentTraceId).toBeUndefined()
       expect(reportErrorFn).not.toHaveBeenCalled()
     })
@@ -1885,7 +1899,9 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       const secondReport = reports.find((r) => r.id === secondTraceId)
 
       expect(firstReport?.status).toBe('interrupted')
-      expect(firstReport?.interruptionReason).toBe('another-trace-started')
+      expect(firstReport?.interruption).toMatchObject({
+        reason: 'another-trace-started',
+      })
       expect(firstReport?.parentTraceId).toBeUndefined() // First trace has no parent
       expect(secondReport?.status).toBe('ok')
       expect(secondReport?.parentTraceId).toBeUndefined() // Second trace has no parent (interrupted first)
@@ -1976,9 +1992,9 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       expect(childReport?.status).toBe('ok')
       expect(grandchildReport?.status).toBe('ok')
 
-      expect(parentReport?.interruptionReason).toBeUndefined()
-      expect(childReport?.interruptionReason).toBeUndefined()
-      expect(grandchildReport?.interruptionReason).toBeUndefined()
+      expect(parentReport?.interruption).toBeUndefined()
+      expect(childReport?.interruption).toBeUndefined()
+      expect(grandchildReport?.interruption).toBeUndefined()
 
       // Verify parentTraceId hierarchy
       expect(parentReport?.parentTraceId).toBeUndefined() // Parent has no parent
@@ -2286,7 +2302,9 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
         (call) => call[0].name === 'ticket.first-operation',
       )?.[0]
       expect(firstReport?.status).toBe('interrupted')
-      expect(firstReport?.interruptionReason).toBe('another-trace-started')
+      expect(firstReport?.interruption).toMatchObject({
+        reason: 'another-trace-started',
+      })
       expect(firstReport?.parentTraceId).toBeUndefined() // First trace has no parent
 
       // Verify second trace completed successfully
@@ -2294,7 +2312,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
         (call) => call[0].name === 'ticket.second-operation',
       )?.[0]
       expect(secondReport?.status).toBe('ok')
-      expect(secondReport?.interruptionReason).toBeUndefined()
+      expect(secondReport?.interruption).toBeUndefined()
       expect(secondReport?.parentTraceId).toBeUndefined() // Second trace has no parent (interrupted first)
     })
 
@@ -2357,7 +2375,9 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
         (call) => call[0].id === firstTraceId,
       )?.[0]
       expect(firstReport?.status).toBe('interrupted')
-      expect(firstReport?.interruptionReason).toBe('another-trace-started')
+      expect(firstReport?.interruption).toMatchObject({
+        reason: 'another-trace-started',
+      })
       expect(firstReport?.parentTraceId).toBeUndefined()
 
       // Verify second trace completed successfully
@@ -2365,7 +2385,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
         (call) => call[0].id === secondTraceId,
       )?.[0]
       expect(secondReport?.status).toBe('ok')
-      expect(secondReport?.interruptionReason).toBeUndefined()
+      expect(secondReport?.interruption).toBeUndefined()
       expect(secondReport?.parentTraceId).toBeUndefined() // Not a child
       expect(reportErrorFn).not.toHaveBeenCalled()
     })

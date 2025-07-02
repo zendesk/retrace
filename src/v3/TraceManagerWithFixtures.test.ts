@@ -135,7 +135,7 @@ describe('TraceManager with Fixtures', () => {
         "duration": 1504.4000000059605,
         "error": undefined,
         "id": "trace-0",
-        "interruptionReason": undefined,
+        "interruption": undefined,
         "name": "ticket.activated",
         "parentTraceId": undefined,
         "relatedTo": {
@@ -151,7 +151,7 @@ describe('TraceManager with Fixtures', () => {
       }
     `)
     expect(report.duration).toBeCloseTo(1_504.4)
-    expect(report.interruptionReason).toBeUndefined()
+    expect(report.interruption).toBeUndefined()
     expect(report.additionalDurations.startTillInteractive).toBeCloseTo(1_504.4)
   })
 
@@ -231,7 +231,7 @@ describe('TraceManager with Fixtures', () => {
         "duration": 1302.3999999910593,
         "error": undefined,
         "id": "trace-0",
-        "interruptionReason": undefined,
+        "interruption": undefined,
         "name": "ticket.activated",
         "parentTraceId": undefined,
         "relatedTo": {
@@ -247,7 +247,7 @@ describe('TraceManager with Fixtures', () => {
       }
     `)
     expect(report.duration).toBeCloseTo(1_302.4)
-    expect(report.interruptionReason).toBeUndefined()
+    expect(report.interruption).toBeUndefined()
     expect(report.additionalDurations.startTillInteractive).toBeCloseTo(1_302.4)
   })
 })

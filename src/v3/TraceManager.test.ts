@@ -105,7 +105,7 @@ describe('TraceManager', () => {
     expect(report.name).toBe('ticket.basic-operation')
     expect(report.duration).toBe(100)
     expect(report.status).toBe('ok')
-    expect(report.interruptionReason).toBeUndefined()
+    expect(report.interruption).toBeUndefined()
   })
 
   it('correctly calculates a computed span', () => {
@@ -154,7 +154,7 @@ describe('TraceManager', () => {
     expect(report.name).toBe('ticket.computed-span-operation')
     expect(report.duration).toBe(200)
     expect(report.status).toBe('ok')
-    expect(report.interruptionReason).toBeUndefined()
+    expect(report.interruption).toBeUndefined()
     expect(report.computedSpans[computedSpanName]?.startOffset).toBe(50)
     expect(report.computedSpans[computedSpanName]?.duration).toBe(150)
     expect(
@@ -212,7 +212,7 @@ describe('TraceManager', () => {
     expect(report.name).toBe('ticket.computed-value-operation')
     expect(report.duration).toBe(150)
     expect(report.status).toBe('ok')
-    expect(report.interruptionReason).toBeUndefined()
+    expect(report.interruption).toBeUndefined()
     expect(report.computedValues).toEqual({
       feature: 2,
     })
@@ -272,7 +272,7 @@ describe('TraceManager', () => {
       time (ms) | 0           50                       100
     `)
     expect(report.name).toBe('ticket.computedRenderBeaconSpans')
-    expect(report.interruptionReason).toBeUndefined()
+    expect(report.interruption).toBeUndefined()
     expect(report.status).toBe('ok')
     expect(report.duration).toBe(150)
     expect(report.computedRenderBeaconSpans).toEqual({
@@ -333,7 +333,7 @@ describe('TraceManager', () => {
       time (ms) | 0           50          100
     `)
     expect(report.name).toBe('ticket.relatedTo-operation')
-    expect(report.interruptionReason).toBeUndefined()
+    expect(report.interruption).toBeUndefined()
     expect(report.duration).toBe(100)
     expect(report.status).toBe('ok')
     expect(report.relatedTo).toEqual(relatedTo)
@@ -388,7 +388,7 @@ describe('TraceManager', () => {
       expect(report.name).toBe('ticket.operation')
       expect(report.duration).toBe(100)
       expect(report.status).toBe('ok')
-      expect(report.interruptionReason).toBeUndefined()
+      expect(report.interruption).toBeUndefined()
     })
 
     it('tracks trace correctly when debounced entries are seen', () => {
@@ -443,7 +443,7 @@ describe('TraceManager', () => {
       expect(report.name).toBe('ticket.debounce-operation')
       expect(report.duration).toBe(451) // 50 + 1 + 200 + 200
       expect(report.status).toBe('ok')
-      expect(report.interruptionReason).toBeUndefined()
+      expect(report.interruption).toBeUndefined()
     })
   })
 
@@ -497,7 +497,9 @@ describe('TraceManager', () => {
       expect(report.name).toBe('ticket.interrupt-on-basic-operation')
       expect(report.duration).toBeNull()
       expect(report.status).toBe('interrupted')
-      expect(report.interruptionReason).toBe('matched-on-interrupt')
+      expect(report.interruption).toMatchObject({
+        reason: 'matched-on-interrupt',
+      })
     })
 
     it('interrupts itself when another trace is started', () => {
@@ -558,7 +560,9 @@ describe('TraceManager', () => {
       expect(report.name).toBe('ticket.interrupt-itself-operation')
       expect(report.duration).toBeNull()
       expect(report.status).toBe('interrupted')
-      expect(report.interruptionReason).toBe('another-trace-started')
+      expect(report.interruption).toMatchObject({
+        reason: 'another-trace-started',
+      })
     })
 
     it('tracks a regression: interrupts a trace when a component is no longer idle', () => {
@@ -608,7 +612,9 @@ describe('TraceManager', () => {
         time (ms) | 0            100                            200
       `)
       expect(report.name).toBe('ticket.interrupt-on-basic-operation')
-      expect(report.interruptionReason).toBe('idle-component-no-longer-idle')
+      expect(report.interruption).toMatchObject({
+        reason: 'idle-component-no-longer-idle',
+      })
 
       expect(report.status).toBe('interrupted')
       expect(report.duration).toBeNull()
@@ -660,13 +666,13 @@ describe('TraceManager', () => {
           timeline  | |
           time (ms) | 0
         `)
-        expect(report.interruptionReason).toBe('timeout')
+        expect(report.interruption).toMatchObject({ reason: 'timeout' })
         expect(report.duration).toBeNull()
 
         expect(report.name).toBe('ticket.timeout-operation')
         expect(report.status).toBe('interrupted')
 
-        expect(report.interruptionReason).toBe('timeout')
+        expect(report.interruption).toMatchObject({ reason: 'timeout' })
         expect(report.duration).toBeNull()
       })
 
@@ -710,7 +716,7 @@ describe('TraceManager', () => {
         >[0] = reportFn.mock.calls[0]![0]
 
         expect(report.status).toBe('interrupted')
-        expect(report.interruptionReason).toBe('timeout')
+        expect(report.interruption).toMatchObject({ reason: 'timeout' })
         expect(
           report.entries.map(
             (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,
@@ -777,7 +783,7 @@ describe('TraceManager', () => {
         expect(report.name).toBe('ticket.timeout-operation')
         expect(report.duration).toBeNull()
         expect(report.status).toBe('interrupted')
-        expect(report.interruptionReason).toBe('timeout')
+        expect(report.interruption).toMatchObject({ reason: 'timeout' })
       })
     })
   })

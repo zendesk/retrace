@@ -96,7 +96,7 @@ describe('Trace Definitions', () => {
       expect(report.name).toBe('ticket.computed-span-operation')
       expect(report.duration).toBe(200)
       expect(report.status).toBe('ok')
-      expect(report.interruptionReason).toBeUndefined()
+      expect(report.interruption).toBeUndefined()
       expect(report.computedSpans[computedSpanName]?.startOffset).toBe(50)
       expect(report.computedSpans[computedSpanName]?.duration).toBe(150)
     })
@@ -186,9 +186,9 @@ describe('Trace Definitions', () => {
 
       const report = reportFn.mock.calls[0]![0]
       expect(report.status).toBe('interrupted')
-      expect(report.interruptionReason).toBe(
-        'matched-on-required-span-with-error',
-      )
+      expect(report.interruption).toMatchObject({
+        reason: 'matched-on-required-span-with-error',
+      })
     })
 
     it('does not interrupt trace when required span error is explicitly ignored', () => {
@@ -230,7 +230,7 @@ describe('Trace Definitions', () => {
 
       const report = reportFn.mock.calls[0]![0]
       expect(report.status).toBe('error')
-      expect(report.interruptionReason).toBeUndefined()
+      expect(report.interruption).toBeUndefined()
     })
 
     it('interrupts trace when one of multiple required spans has an error', () => {
@@ -267,9 +267,9 @@ describe('Trace Definitions', () => {
 
       const report = reportFn.mock.calls[0]![0]
       expect(report.status).toBe('interrupted')
-      expect(report.interruptionReason).toBe(
-        'matched-on-required-span-with-error',
-      )
+      expect(report.interruption).toMatchObject({
+        reason: 'matched-on-required-span-with-error',
+      })
     })
   })
 

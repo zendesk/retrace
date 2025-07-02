@@ -390,7 +390,7 @@ describe('Tracer', () => {
       expect(report.name).toBe('ticket.basic-operation')
       expect(report.duration).toBe(150)
       expect(report.status).toBe('ok')
-      expect(report.interruptionReason).toBeUndefined()
+      expect(report.interruption).toBeUndefined()
     })
 
     it('adds requiredSpans when creating a trace, and then again after transitioning to active, and again after start', () => {
@@ -486,7 +486,7 @@ describe('Tracer', () => {
       expect(report.name).toBe('ticket.basic-operation')
       expect(report.duration).toBe(250)
       expect(report.status).toBe('ok')
-      expect(report.interruptionReason).toBeUndefined()
+      expect(report.interruption).toBeUndefined()
     })
   })
 })

@@ -103,7 +103,7 @@ describe('TraceManager with Capture Interactivity', () => {
     expect(report.duration).toBe(2_000)
     expect(report.additionalDurations.startTillInteractive).toBe(2_000)
     expect(report.status).toBe('ok')
-    expect(report.interruptionReason).toBeUndefined()
+    expect(report.interruption).toBeUndefined()
   })
 
   it('completes the trace with waiting-for-interactive-timeout', () => {
@@ -158,7 +158,9 @@ describe('TraceManager with Capture Interactivity', () => {
       `)
     expect(report.name).toBe('ticket.operation')
     expect(report.duration).toBe(2_000)
-    expect(report.interruptionReason).toBe('waiting-for-interactive-timeout')
+    expect(report.interruption).toMatchObject({
+      reason: 'waiting-for-interactive-timeout',
+    })
     expect(report.additionalDurations.startTillInteractive).toBeNull()
     expect(report.status).toBe('ok')
   })
@@ -215,7 +217,9 @@ describe('TraceManager with Capture Interactivity', () => {
     expect(report.duration).toBe(200)
     expect(report.additionalDurations.startTillInteractive).toBeNull()
     expect(report.status).toBe('ok')
-    expect(report.interruptionReason).toBe('matched-on-interrupt')
+    expect(report.interruption).toMatchObject({
+      reason: 'matched-on-interrupt',
+    })
   })
 
   it('timeouts the trace while deboucing AND the last span is past the timeout duration', () => {
@@ -269,7 +273,7 @@ describe('TraceManager with Capture Interactivity', () => {
     expect(report.name).toBe('ticket.debounce-then-interrupted-operation')
     expect(report.status).toBe('interrupted')
     expect(report.duration).toBeNull()
-    expect(report.interruptionReason).toBe('timeout')
+    expect(report.interruption).toMatchObject({ reason: 'timeout' })
     expect(report.additionalDurations.startTillInteractive).toBeNull()
   })
 
@@ -329,7 +333,7 @@ describe('TraceManager with Capture Interactivity', () => {
     expect(report.duration).toBe(44_500)
     expect(report.additionalDurations.startTillInteractive).toBeNull()
     expect(report.status).toBe('ok')
-    expect(report.interruptionReason).toBe('timeout')
+    expect(report.interruption).toMatchObject({ reason: 'timeout' })
   })
 
   it('uses getQuietWindowDuration from capture interactive config', () => {
@@ -392,7 +396,9 @@ describe('TraceManager with Capture Interactivity', () => {
     expect(report.duration).toBe(TRACE_DURATION)
     expect(report.additionalDurations.startTillInteractive).toBeNull()
     expect(report.status).toBe('ok')
-    expect(report.interruptionReason).toBe('waiting-for-interactive-timeout')
+    expect(report.interruption).toMatchObject({
+      reason: 'waiting-for-interactive-timeout',
+    })
     expect(getQuietWindowDuration).toHaveBeenCalled()
     expect(getQuietWindowDuration).toHaveBeenCalledWith(1_055, TRACE_DURATION)
   })
@@ -454,7 +460,9 @@ describe('TraceManager with Capture Interactivity', () => {
     expect(report.duration).toBe(TRACE_DURATION)
     expect(report.additionalDurations.startTillInteractive).toBeNull()
     expect(report.status).toBe('ok')
-    expect(report.interruptionReason).toBe('waiting-for-interactive-timeout')
+    expect(report.interruption).toMatchObject({
+      reason: 'waiting-for-interactive-timeout',
+    })
   })
 
   it('No long tasks after FMP, FirstCPUIdle immediately after FMP + quiet window', () => {
@@ -509,7 +517,7 @@ describe('TraceManager with Capture Interactivity', () => {
     expect(report.duration).toBe(200)
     expect(report.additionalDurations.startTillInteractive).toBe(200)
     expect(report.status).toBe('ok')
-    expect(report.interruptionReason).toBeUndefined()
+    expect(report.interruption).toBeUndefined()
   })
 
   it('One light cluster after FMP, FirstCPUIdle at FMP', () => {
@@ -564,7 +572,7 @@ describe('TraceManager with Capture Interactivity', () => {
     expect(report.duration).toBe(200)
     expect(report.additionalDurations.startTillInteractive).toBe(200)
     expect(report.status).toBe('ok')
-    expect(report.interruptionReason).toBeUndefined()
+    expect(report.interruption).toBeUndefined()
   })
 
   it('One heavy cluster after FMP, FirstCPUIdle after the cluster', () => {
@@ -621,7 +629,7 @@ describe('TraceManager with Capture Interactivity', () => {
     // TESTING TODO: are we testing enough of first idle time?
     expect(report.additionalDurations.completeTillInteractive).toBe(500)
     expect(report.status).toBe('ok')
-    expect(report.interruptionReason).toBeUndefined()
+    expect(report.interruption).toBeUndefined()
   })
 
   it('Multiple heavy clusters, FirstCPUIdle updated to end of last cluster', () => {
@@ -679,7 +687,7 @@ describe('TraceManager with Capture Interactivity', () => {
     expect(report.duration).toBe(200)
     expect(report.additionalDurations.startTillInteractive).toBe(expectedResult)
     expect(report.status).toBe('ok')
-    expect(report.interruptionReason).toBeUndefined()
+    expect(report.interruption).toBeUndefined()
   })
 
   it('Checking before the quiet window has passed - no long tasks processed, FirstCPUIdle not found', () => {
@@ -734,7 +742,7 @@ describe('TraceManager with Capture Interactivity', () => {
     expect(report.duration).toBe(200)
     expect(report.additionalDurations.startTillInteractive).toBe(200)
     expect(report.status).toBe('ok')
-    expect(report.interruptionReason).toBeUndefined()
+    expect(report.interruption).toBeUndefined()
   })
 
   it('completes the trace with one heavy cluster followed by two light clusters, value is after 1st heavy cluster', () => {
@@ -794,7 +802,7 @@ describe('TraceManager with Capture Interactivity', () => {
     expect(report.duration).toBe(200)
     expect(report.additionalDurations.startTillInteractive).toBe(expectedResult)
     expect(report.status).toBe('ok')
-    expect(report.interruptionReason).toBeUndefined()
+    expect(report.interruption).toBeUndefined()
   })
 
   it('completes the trace with continuous heavy clusters', () => {
@@ -850,7 +858,7 @@ describe('TraceManager with Capture Interactivity', () => {
     expect(report.duration).toBe(200)
     expect(report.additionalDurations.startTillInteractive).toBe(5_400)
     expect(report.status).toBe('ok')
-    expect(report.interruptionReason).toBeUndefined()
+    expect(report.interruption).toBeUndefined()
   })
 
   it('completes the trace with a light cluster followed by a heavy cluster a second later, FirstCPUIdle updated', () => {
@@ -909,7 +917,7 @@ describe('TraceManager with Capture Interactivity', () => {
     expect(report.duration).toBe(200)
     expect(report.additionalDurations.startTillInteractive).toBe(expectedResult)
     expect(report.status).toBe('ok')
-    expect(report.interruptionReason).toBeUndefined()
+    expect(report.interruption).toBeUndefined()
   })
 
   it('completes the trace with a long task overlapping FMP, FirstCPUIdle after the long task', () => {
@@ -967,6 +975,6 @@ describe('TraceManager with Capture Interactivity', () => {
     expect(report.duration).toBe(200)
     expect(report.additionalDurations.startTillInteractive).toBe(expectedResult)
     expect(report.status).toBe('ok')
-    expect(report.interruptionReason).toBeUndefined()
+    expect(report.interruption).toBeUndefined()
   })
 })

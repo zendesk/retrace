@@ -458,11 +458,8 @@ export function createConsoleTraceLogger<
       } else {
         // interrupted
         const { reason } = (
-          transition as Extract<
-            typeof transition,
-            { interruptionReason: unknown }
-          >
-        ).interruptionReason
+          transition as Extract<typeof transition, { interruption: unknown }>
+        ).interruption
         log(
           `${colorize('❌ Trace', RED)} ${traceName} interrupted (${colorize(
             reason,

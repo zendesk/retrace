@@ -110,7 +110,7 @@ interface OnEnterInterrupted<
 > {
   transitionToState: 'interrupted'
   transitionFromState: NonTerminalTraceStates
-  interruptionReason: InterruptionReasonPayload<RelationSchemasT>
+  interruption: InterruptionReasonPayload<RelationSchemasT>
   lastRelevantSpanAndAnnotation: SpanAndAnnotation<RelationSchemasT> | undefined
 }
 
@@ -119,7 +119,7 @@ interface OnEnterComplete<
 > {
   transitionToState: 'complete'
   transitionFromState: NonTerminalTraceStates
-  interruptionReason?: InterruptionReasonPayload<RelationSchemasT>
+  interruption?: InterruptionReasonPayload<RelationSchemasT>
   cpuIdleSpanAndAnnotation: SpanAndAnnotation<RelationSchemasT> | undefined
   completeSpanAndAnnotation: SpanAndAnnotation<RelationSchemasT> | undefined
   lastRequiredSpanAndAnnotation: SpanAndAnnotation<RelationSchemasT> | undefined
@@ -189,7 +189,7 @@ interface ChildEndEvent<
 > {
   childTrace: AllPossibleTraces<RelationSchemasT>
   terminalState: 'complete' | 'interrupted'
-  interruptionReason?: InterruptionReasonPayload<RelationSchemasT>
+  interruption?: InterruptionReasonPayload<RelationSchemasT>
 }
 
 type StatesBase<
@@ -403,7 +403,7 @@ export class TraceStateMachine<
           // it's best to compare like-to-like
           return {
             transitionToState: 'interrupted',
-            interruptionReason: { reason: 'timeout' },
+            interruption: { reason: 'timeout' },
             lastRelevantSpanAndAnnotation: undefined,
           } as const
         }
@@ -419,7 +419,7 @@ export class TraceStateMachine<
             if (doesSpanMatch(spanAndAnnotation, this.#context)) {
               return {
                 transitionToState: 'interrupted',
-                interruptionReason: {
+                interruption: {
                   reason: doesSpanMatch.requiredSpan
                     ? 'matched-on-required-span-with-error'
                     : 'matched-on-interrupt',
@@ -438,7 +438,7 @@ export class TraceStateMachine<
       ) =>
         ({
           transitionToState: 'interrupted',
-          interruptionReason: reasonPayload,
+          interruption: reasonPayload,
           lastRelevantSpanAndAnnotation: undefined,
         } as const),
 
@@ -446,7 +446,7 @@ export class TraceStateMachine<
         if (deadlineType === 'global') {
           return {
             transitionToState: 'interrupted',
-            interruptionReason: { reason: 'timeout' },
+            interruption: { reason: 'timeout' },
             lastRelevantSpanAndAnnotation: undefined,
           } as const
         }
@@ -456,11 +456,9 @@ export class TraceStateMachine<
 
       onChildEnd: (event: ChildEndEvent<RelationSchemasT>) => {
         // Check if child was interrupted and handle accordingly
-        if (event.terminalState === 'interrupted' && event.interruptionReason) {
+        if (event.terminalState === 'interrupted' && event.interruption) {
           if (
-            !shouldPropagateChildInterruptToParent(
-              event.interruptionReason.reason,
-            )
+            !shouldPropagateChildInterruptToParent(event.interruption.reason)
           ) {
             // no transition - ignore child interruption
             return undefined
@@ -468,13 +466,13 @@ export class TraceStateMachine<
 
           // Interrupt parent based on child interruption
           const parentInterruptionReason =
-            event.interruptionReason.reason === 'timeout'
+            event.interruption.reason === 'timeout'
               ? 'child-timeout'
               : 'child-interrupted'
 
           return {
             transitionToState: 'interrupted',
-            interruptionReason: { reason: parentInterruptionReason },
+            interruption: { reason: parentInterruptionReason },
             lastRelevantSpanAndAnnotation: undefined,
           } as const
         }
@@ -512,7 +510,7 @@ export class TraceStateMachine<
           // it's best to compare like-to-like
           return {
             transitionToState: 'interrupted',
-            interruptionReason: { reason: 'timeout' },
+            interruption: { reason: 'timeout' },
             lastRelevantSpanAndAnnotation: this.lastRelevant,
           }
         }
@@ -526,7 +524,7 @@ export class TraceStateMachine<
               this.sideEffectFns.addSpanToRecording(spanAndAnnotation)
               return {
                 transitionToState: 'interrupted',
-                interruptionReason: {
+                interruption: {
                   reason: doesSpanMatch.requiredSpan
                     ? 'matched-on-required-span-with-error'
                     : 'matched-on-interrupt',
@@ -581,7 +579,7 @@ export class TraceStateMachine<
         reasonPayload: InterruptionReasonPayload<RelationSchemasT>,
       ) => ({
         transitionToState: 'interrupted',
-        interruptionReason: reasonPayload,
+        interruption: reasonPayload,
         lastRelevantSpanAndAnnotation: this.lastRelevant,
       }),
 
@@ -589,7 +587,7 @@ export class TraceStateMachine<
         if (deadlineType === 'global') {
           return {
             transitionToState: 'interrupted',
-            interruptionReason: { reason: 'timeout' },
+            interruption: { reason: 'timeout' },
             lastRelevantSpanAndAnnotation: this.lastRelevant,
           }
         }
@@ -599,11 +597,9 @@ export class TraceStateMachine<
 
       onChildEnd: (event: ChildEndEvent<RelationSchemasT>) => {
         // Check if child was interrupted and handle accordingly
-        if (event.terminalState === 'interrupted' && event.interruptionReason) {
+        if (event.terminalState === 'interrupted' && event.interruption) {
           if (
-            !shouldPropagateChildInterruptToParent(
-              event.interruptionReason.reason,
-            )
+            !shouldPropagateChildInterruptToParent(event.interruption.reason)
           ) {
             // no transition - ignore child interruption
             return undefined
@@ -611,13 +607,13 @@ export class TraceStateMachine<
 
           // Interrupt parent based on child interruption
           const parentInterruptionReason =
-            event.interruptionReason.reason === 'timeout'
+            event.interruption.reason === 'timeout'
               ? 'child-timeout'
               : 'child-interrupted'
 
           return {
             transitionToState: 'interrupted',
-            interruptionReason: { reason: parentInterruptionReason },
+            interruption: { reason: parentInterruptionReason },
             lastRelevantSpanAndAnnotation: this.lastRelevant,
           }
         }
@@ -639,7 +635,7 @@ export class TraceStateMachine<
           // this should never happen
           return {
             transitionToState: 'interrupted',
-            interruptionReason: { reason: 'invalid-state-transition' },
+            interruption: { reason: 'invalid-state-transition' },
 
             lastRelevantSpanAndAnnotation: this.lastRelevant,
           }
@@ -667,7 +663,7 @@ export class TraceStateMachine<
         if (deadlineType === 'global') {
           return {
             transitionToState: 'interrupted',
-            interruptionReason: { reason: 'timeout' },
+            interruption: { reason: 'timeout' },
             lastRelevantSpanAndAnnotation: this.lastRelevant,
           }
         }
@@ -707,7 +703,7 @@ export class TraceStateMachine<
           // it's best to compare like-to-like
           return {
             transitionToState: 'interrupted',
-            interruptionReason: { reason: 'timeout' },
+            interruption: { reason: 'timeout' },
             lastRelevantSpanAndAnnotation: this.lastRelevant,
           }
         }
@@ -750,7 +746,7 @@ export class TraceStateMachine<
               // check if we regressed on "isIdle", and if so, transition to interrupted with reason
               return {
                 transitionToState: 'interrupted',
-                interruptionReason: { reason: 'idle-component-no-longer-idle' },
+                interruption: { reason: 'idle-component-no-longer-idle' },
                 lastRelevantSpanAndAnnotation: this.lastRelevant,
               }
             }
@@ -791,17 +787,15 @@ export class TraceStateMachine<
         reasonPayload: InterruptionReasonPayload<RelationSchemasT>,
       ) => ({
         transitionToState: 'interrupted',
-        interruptionReason: reasonPayload,
+        interruption: reasonPayload,
         lastRelevantSpanAndAnnotation: this.lastRelevant,
       }),
 
       onChildEnd: (event: ChildEndEvent<RelationSchemasT>) => {
         // Check if child was interrupted and handle accordingly
-        if (event.terminalState === 'interrupted' && event.interruptionReason) {
+        if (event.terminalState === 'interrupted' && event.interruption) {
           if (
-            !shouldPropagateChildInterruptToParent(
-              event.interruptionReason.reason,
-            )
+            !shouldPropagateChildInterruptToParent(event.interruption.reason)
           ) {
             // no transition - ignore child interruption
             return undefined
@@ -809,13 +803,13 @@ export class TraceStateMachine<
 
           // Interrupt parent based on child interruption
           const parentInterruptionReason =
-            event.interruptionReason.reason === 'timeout'
+            event.interruption.reason === 'timeout'
               ? 'child-timeout'
               : 'child-interrupted'
 
           return {
             transitionToState: 'interrupted',
-            interruptionReason: { reason: parentInterruptionReason },
+            interruption: { reason: parentInterruptionReason },
             lastRelevantSpanAndAnnotation: this.lastRelevant,
           }
         }
@@ -830,7 +824,7 @@ export class TraceStateMachine<
           // this should never happen
           return {
             transitionToState: 'interrupted',
-            interruptionReason: { reason: 'invalid-state-transition' },
+            interruption: { reason: 'invalid-state-transition' },
             lastRelevantSpanAndAnnotation: this.lastRelevant,
           }
         }
@@ -910,7 +904,7 @@ export class TraceStateMachine<
           // a global timeout will interrupt any children traces
           return {
             transitionToState: 'complete',
-            interruptionReason: { reason: 'timeout' },
+            interruption: { reason: 'timeout' },
             completeSpanAndAnnotation: this.completeSpan,
             lastRequiredSpanAndAnnotation: this.lastRequiredSpan,
             lastRelevantSpanAndAnnotation: this.lastRelevant,
@@ -949,7 +943,7 @@ export class TraceStateMachine<
             // we consider this complete, because we have a complete trace
             // it's just missing the bonus data from when the browser became "interactive"
             return {
-              interruptionReason: { reason: 'timeout' },
+              interruption: { reason: 'timeout' },
               transitionToState: 'complete',
               lastRequiredSpanAndAnnotation: this.lastRequiredSpan,
               completeSpanAndAnnotation: this.completeSpan,
@@ -1022,7 +1016,7 @@ export class TraceStateMachine<
           // it's just missing the bonus data from when the browser became "interactive"
           return {
             transitionToState: 'complete',
-            interruptionReason: { reason: 'timeout' },
+            interruption: { reason: 'timeout' },
             lastRequiredSpanAndAnnotation: this.lastRequiredSpan,
             completeSpanAndAnnotation: this.completeSpan,
             lastRelevantSpanAndAnnotation: this.lastRelevant,
@@ -1042,7 +1036,7 @@ export class TraceStateMachine<
           // it's just missing the bonus data from when the browser became "interactive"
           return {
             transitionToState: 'complete',
-            interruptionReason: { reason: 'waiting-for-interactive-timeout' },
+            interruption: { reason: 'waiting-for-interactive-timeout' },
             lastRequiredSpanAndAnnotation: this.lastRequiredSpan,
             completeSpanAndAnnotation: this.completeSpan,
             lastRelevantSpanAndAnnotation: this.lastRelevant,
@@ -1067,7 +1061,7 @@ export class TraceStateMachine<
               }
               return {
                 transitionToState: 'complete',
-                interruptionReason: doesSpanMatch.requiredSpan
+                interruption: doesSpanMatch.requiredSpan
                   ? { reason: 'matched-on-required-span-with-error' }
                   : { reason: 'matched-on-interrupt' },
                 lastRequiredSpanAndAnnotation: this.lastRequiredSpan,
@@ -1094,7 +1088,7 @@ export class TraceStateMachine<
         // we captured a complete trace, however the interactive data is missing
         ({
           transitionToState: 'complete',
-          interruptionReason: reasonPayload,
+          interruption: reasonPayload,
           lastRequiredSpanAndAnnotation: this.lastRequiredSpan,
           completeSpanAndAnnotation: this.completeSpan,
           lastRelevantSpanAndAnnotation: this.lastRelevant,
@@ -1102,11 +1096,9 @@ export class TraceStateMachine<
         }),
       onChildEnd: (event: ChildEndEvent<RelationSchemasT>) => {
         // Check if child was interrupted and handle accordingly
-        if (event.terminalState === 'interrupted' && event.interruptionReason) {
+        if (event.terminalState === 'interrupted' && event.interruption) {
           if (
-            !shouldPropagateChildInterruptToParent(
-              event.interruptionReason.reason,
-            )
+            !shouldPropagateChildInterruptToParent(event.interruption.reason)
           ) {
             // no transition - ignore child interruption
             return undefined
@@ -1114,13 +1106,13 @@ export class TraceStateMachine<
 
           // Interrupt parent based on child interruption
           const parentInterruptionReason =
-            event.interruptionReason.reason === 'timeout'
+            event.interruption.reason === 'timeout'
               ? 'child-timeout'
               : 'child-interrupted'
 
           return {
             transitionToState: 'interrupted',
-            interruptionReason: { reason: parentInterruptionReason },
+            interruption: { reason: parentInterruptionReason },
             lastRelevantSpanAndAnnotation: this.lastRelevant,
           }
         }
@@ -1147,11 +1139,9 @@ export class TraceStateMachine<
 
       onChildEnd: (event: ChildEndEvent<RelationSchemasT>) => {
         // Check if child was interrupted and handle accordingly
-        if (event.terminalState === 'interrupted' && event.interruptionReason) {
+        if (event.terminalState === 'interrupted' && event.interruption) {
           if (
-            !shouldPropagateChildInterruptToParent(
-              event.interruptionReason.reason,
-            )
+            !shouldPropagateChildInterruptToParent(event.interruption.reason)
           ) {
             // no transition - ignore child interruption
             return undefined
@@ -1159,13 +1149,13 @@ export class TraceStateMachine<
 
           // Interrupt parent based on child interruption
           const parentInterruptionReason =
-            event.interruptionReason.reason === 'timeout'
+            event.interruption.reason === 'timeout'
               ? 'child-timeout'
               : 'child-interrupted'
 
           return {
             transitionToState: 'interrupted',
-            interruptionReason: { reason: parentInterruptionReason },
+            interruption: { reason: parentInterruptionReason },
             lastRelevantSpanAndAnnotation: this.lastRelevant,
           }
         }
@@ -1196,7 +1186,7 @@ export class TraceStateMachine<
         reasonPayload: InterruptionReasonPayload<RelationSchemasT>,
       ) => ({
         transitionToState: 'interrupted',
-        interruptionReason: reasonPayload,
+        interruption: reasonPayload,
         lastRelevantSpanAndAnnotation: this.lastRelevant,
       }),
 
@@ -1204,7 +1194,7 @@ export class TraceStateMachine<
         if (deadlineType === 'global') {
           return {
             transitionToState: 'interrupted',
-            interruptionReason: { reason: 'timeout' },
+            interruption: { reason: 'timeout' },
             lastRelevantSpanAndAnnotation: this.lastRelevant,
           }
         }
@@ -1218,9 +1208,7 @@ export class TraceStateMachine<
         // depending on the reason, if we're coming from draft, we want to flush the buffer:
         if (
           transition.transitionFromState === 'draft' &&
-          !isInvalidTraceInterruptionReason(
-            transition.interruptionReason.reason,
-          )
+          !isInvalidTraceInterruptionReason(transition.interruption.reason)
         ) {
           let span: SpanAndAnnotation<RelationSchemasT> | undefined
           // eslint-disable-next-line no-cond-assign
@@ -1410,8 +1398,8 @@ export class Trace<
 
     const terminalState = stateTransition.transitionToState
     const interruptionReason =
-      terminalState === 'interrupted' && 'interruptionReason' in stateTransition
-        ? stateTransition.interruptionReason
+      terminalState === 'interrupted' && 'interruption' in stateTransition
+        ? stateTransition.interruption
         : undefined
 
     if (
@@ -1436,7 +1424,7 @@ export class Trace<
     this.stateMachine.emit('onChildEnd', {
       childTrace,
       terminalState,
-      interruptionReason,
+      interruption: interruptionReason,
     })
   }
 
@@ -1715,7 +1703,7 @@ export class Trace<
         | undefined
       // we never report after definition-changed;
       // it just means the Trace object has just been recreated
-      if (transition.interruptionReason?.reason !== 'definition-changed') {
+      if (transition.interruption?.reason !== 'definition-changed') {
         // this is an actual interruption:
         // interrupt all children
         for (const child of this.children) {
