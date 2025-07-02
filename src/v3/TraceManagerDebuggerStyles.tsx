@@ -1097,25 +1097,36 @@ ul.tmdb-no-style-list {
   position: relative;
 }
 
-.tmdb-child-trace-indicator {
-  height: 2px;
-  background-color: var(--tmdb-color-border-light);
+/* Border state classes for trace items */
+.tmdb-history-item-current {
+  border-left: var(--tmdb-space-xxs) solid var(--tmdb-color-active-primary);
 }
 
-.tmdb-child-trace-connector {
-  width: 2px;
-  background-color: var(--tmdb-color-border-light);
+.tmdb-history-item-error-border {
+  border-left: var(--tmdb-space-xxs) solid var(--tmdb-color-error-primary);
 }
 
-.tmdb-child-trace-badge {
-  color: var(--tmdb-color-text-secondary);
-  font-weight: normal;
-  font-size: var(--tmdb-font-size-s);
+.tmdb-history-item-complete {
+  border-left: var(--tmdb-space-xxs) solid var(--tmdb-color-completed-primary);
+}
+
+.tmdb-history-item-interrupted {
+  border-left: var(--tmdb-space-xxs) solid var(--tmdb-color-interrupted-primary);
+}
+
+.tmdb-history-item-default {
+  border-left: var(--tmdb-space-xxs) solid var(--tmdb-color-border-dark);
+}
+
+/* Special handling for error state with border classes */
+.tmdb-history-item-error {
+  border: var(--tmdb-space-xxs) solid var(--tmdb-color-error-primary);
+  background-color: var(--tmdb-color-error-bg);
 }
 
 /* Error section styles */
 .tmdb-error-section {
-  border: 2px solid var(--tmdb-color-error-primary);
+  border: var(--tmdb-space-xxs) solid var(--tmdb-color-error-primary);
   border-radius: var(--tmdb-border-radius-medium);
   background-color: var(--tmdb-color-error-bg);
   padding: var(--tmdb-space-l);

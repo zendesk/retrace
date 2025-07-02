@@ -59,6 +59,8 @@ export function getComputedValues<
 
     // Single pass through recordedItems
     for (const item of context.recordedItems.values()) {
+      // TODO: refactor findMatchingSpan to be a generator function
+      // that returns multiple matches and use it here
       matches.forEach((doesSpanMatch, index) => {
         if (doesSpanMatch(item, context)) {
           matchingEntriesByMatcher[index]!.push(item)
@@ -622,16 +624,16 @@ export function createTraceRecording<
   }
 
   // CODE CLEAN UP TODO: let's get this information (wasInterrupted) from up top (in FinalState)
-  const wasInterrupted = transitionToState === 'interrupted'
-  const computedSpans = !wasInterrupted
+  const isIncompleteTrace = transitionToState === 'interrupted'
+  const computedSpans = !isIncompleteTrace
     ? getComputedSpans(context, {
         completeSpanAndAnnotation,
         cpuIdleSpanAndAnnotation,
       })
     : {}
-  const computedValues = !wasInterrupted ? getComputedValues(context) : {}
+  const computedValues = !isIncompleteTrace ? getComputedValues(context) : {}
   const computedRenderBeaconSpans =
-    !wasInterrupted && isActiveTraceInput(input)
+    !isIncompleteTrace && isActiveTraceInput(input)
       ? getComputedRenderBeaconSpans(recordedItemsArray, input)
       : {}
 
@@ -702,7 +704,7 @@ export function createTraceRecording<
           : null,
     },
     // ?: If we have any error entries then should we mark the status as 'error'
-    status: wasInterrupted
+    status: isIncompleteTrace
       ? 'interrupted'
       : markTraceAsErrored
       ? 'error'

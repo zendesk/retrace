@@ -887,30 +887,23 @@ function TraceItem<
     onDismiss()
   }
 
-  const borderLeftColor = isCurrentTrace
-    ? 'var(--tmdb-color-active-primary)'
-    : trace.hasErrorSpan
-    ? 'var(--tmdb-color-error-primary)'
-    : trace.state === 'complete'
-    ? 'var(--tmdb-color-completed-primary)'
-    : trace.state === 'interrupted'
-    ? 'var(--tmdb-color-interrupted-primary)'
-    : 'var(--tmdb-color-border-dark)'
+  // Determine the appropriate border class based on trace state
+  const getBorderClass = () => {
+    if (isCurrentTrace) return 'tmdb-history-item-current'
+    if (trace.hasErrorSpan) return 'tmdb-history-item-error-border'
+    if (trace.state === 'complete') return 'tmdb-history-item-complete'
+    if (trace.state === 'interrupted') return 'tmdb-history-item-interrupted'
+    return 'tmdb-history-item-default'
+  }
 
   return (
     <div
-      className={`tmdb-history-item ${
+      className={`tmdb-history-item ${getBorderClass()} ${
         isChild ? 'tmdb-history-item-child' : ''
       } ${trace.hasErrorSpan ? 'tmdb-history-item-error' : ''}`}
       style={{
-        borderLeft: `3px solid ${borderLeftColor}`,
         marginLeft: isChild ? 'var(--tmdb-space-xl)' : '0',
         position: 'relative',
-        ...(trace.hasErrorSpan && {
-          border: '2px solid var(--tmdb-color-error-primary)',
-          borderRadius: 'var(--tmdb-border-radius-small)',
-          backgroundColor: 'var(--tmdb-color-error-bg)',
-        }),
       }}
     >
       {isChild && (
