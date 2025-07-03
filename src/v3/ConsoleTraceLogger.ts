@@ -6,11 +6,11 @@ import type {
 import {
   extractTimingOffsets,
   formatMatcher,
-  getComputedResults,
   getConfigSummary,
   isSuppressedError,
 } from './debugUtils'
 import type { SpanMatcherFn } from './matchSpan'
+import { createTraceRecording } from './recordingComputeUtils'
 import type { FinalTransition, OnEnterStatePayload } from './Trace'
 import { isTerminalState } from './Trace'
 import type { TraceManager } from './TraceManager'
@@ -445,13 +445,39 @@ export function createConsoleTraceLogger<
     handleStateChanges(trace, traceInfo)
 
     if (isTerminalState(traceState)) {
+      // Create full trace recording to get comprehensive results
+      let traceRecording
+      try {
+        traceRecording = createTraceRecording(
+          trace,
+          transition as FinalTransition<RelationSchemasT>,
+        )
+      } catch (error) {
+        log(`   Failed to create trace recording: ${error}`)
+      }
+
       if (traceState === 'complete') {
-        log(`${colorize('✅ Trace', GREEN)} ${traceName} complete`)
+        log(
+          colorize(
+            `${
+              traceRecording?.status === 'error' ? '❗' : '✅'
+            } Trace ${traceName} complete`,
+            traceRecording?.status === 'error' ? RED : GREEN,
+          ),
+        )
+
+        // Show error if present
+        if (traceRecording?.error) {
+          log(`   ${colorize('Error:', RED)} %o`, 'log', traceRecording.error)
+        }
+
         logTimingInfo(transition, traceInfo)
-        // Log computed values and spans
-        try {
-          const { computedValues, computedSpans } =
-            getComputedResults(trace, transition) ?? {}
+
+        // Log computed results from trace recording
+        if (traceRecording) {
+          const { computedValues, computedSpans, computedRenderBeaconSpans } =
+            traceRecording
+
           if (computedValues && Object.keys(computedValues).length > 0) {
             log(
               `   Computed Values: ${Object.entries(computedValues)
@@ -459,6 +485,7 @@ export function createConsoleTraceLogger<
                 .join(', ')}`,
             )
           }
+
           if (computedSpans && Object.keys(computedSpans).length > 0) {
             log(
               `   Computed Spans: ${Object.entries(computedSpans)
@@ -466,28 +493,61 @@ export function createConsoleTraceLogger<
                 .join(', ')}`,
             )
           }
-        } catch {
-          // ignore
+
+          if (
+            computedRenderBeaconSpans &&
+            Object.keys(computedRenderBeaconSpans).length > 0
+          ) {
+            log(`   Render Beacon Spans:`)
+            Object.entries(computedRenderBeaconSpans).forEach(
+              ([name, data]) => {
+                log(
+                  `     ${name}: ${
+                    data.renderCount
+                  } renders, ${data.firstRenderTillContent.toFixed(
+                    2,
+                  )}ms till content`,
+                )
+              },
+            )
+          }
         }
       } else {
         // interrupted
-        const { reason } = (
-          transition as Extract<typeof transition, { interruption: unknown }>
-        ).interruption
+        const {
+          interruption: { reason: interruptionReason, ...interruptionMeta },
+        } = transition as Extract<typeof transition, { interruption: unknown }>
+
+        const statusIndicator =
+          traceRecording?.status === 'error'
+            ? colorize('❌❗', RED) // Double error indicator
+            : colorize('❌', RED)
+
         log(
-          `${colorize('❌ Trace', RED)} ${traceName} interrupted (${colorize(
-            reason,
+          `${statusIndicator} Trace ${traceName} interrupted (${colorize(
+            interruptionReason,
             RED,
-          )})`,
+          )}, %o)`,
+          'log',
+          interruptionMeta,
         )
+
+        // Show trace error if present
+        if (traceRecording?.error) {
+          log(
+            `   ${colorize('Trace Error:', RED)} %o`,
+            'log',
+            traceRecording.error,
+          )
+        }
+
         logTimingInfo(transition, traceInfo)
-        // Log computed values and spans
-        try {
-          const { computedValues, computedSpans } =
-            getComputedResults(
-              trace,
-              transition as FinalTransition<RelationSchemasT>,
-            ) ?? {}
+
+        // Log computed results from trace recording (even for interrupted traces)
+        if (traceRecording) {
+          const { computedValues, computedSpans, computedRenderBeaconSpans } =
+            traceRecording
+
           if (computedValues && Object.keys(computedValues).length > 0) {
             log(
               `   Computed Values: ${Object.entries(computedValues)
@@ -495,6 +555,7 @@ export function createConsoleTraceLogger<
                 .join(', ')}`,
             )
           }
+
           if (computedSpans && Object.keys(computedSpans).length > 0) {
             log(
               `   Computed Spans: ${Object.entries(computedSpans)
@@ -502,8 +563,24 @@ export function createConsoleTraceLogger<
                 .join(', ')}`,
             )
           }
-        } catch {
-          // ignore
+
+          if (
+            computedRenderBeaconSpans &&
+            Object.keys(computedRenderBeaconSpans).length > 0
+          ) {
+            log(`   Render Beacon Spans:`)
+            Object.entries(computedRenderBeaconSpans).forEach(
+              ([name, data]) => {
+                log(
+                  `     ${name}: ${
+                    data.renderCount
+                  } renders, ${data.firstRenderTillContent.toFixed(
+                    2,
+                  )}ms till content`,
+                )
+              },
+            )
+          }
         }
       }
       // Remove trace from active map on terminal state
