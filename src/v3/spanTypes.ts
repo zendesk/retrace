@@ -355,4 +355,8 @@ export type UpdatableSpanProperties =
 export type SpanUpdateFunction<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   SpanT extends Span<RelationSchemasT>,
-> = (spanUpdates: Partial<OpenPick<SpanT, UpdatableSpanProperties>>) => void
+> = (
+  spanUpdates: Partial<OpenPick<SpanT, UpdatableSpanProperties>> & {
+    reprocess?: boolean
+  },
+) => void
