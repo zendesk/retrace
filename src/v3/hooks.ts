@@ -69,7 +69,7 @@ export const generateUseBeacon =
         >({
           ...config,
           relatedTo,
-          type: 'component-unmount',
+          type: isHook ? 'hook-unmount' : 'component-unmount',
           attributes,
           error: errorBoundaryMetadata?.error,
           errorInfo: errorBoundaryMetadata?.errorInfo,
