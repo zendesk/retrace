@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style */
 import type { SpanMatch } from './matchSpan'
 import type { Span, SpanUpdateFunction } from './spanTypes'
-import type { TickMeta } from './TickParentResolver'
 import type { NonTerminalTraceStates } from './Trace'
 import type { RelationSchemasBase } from './types'
 
@@ -58,7 +57,6 @@ export interface SpanAndAnnotation<
 > {
   span: Span<RelationSchemasT>
   annotation: SpanAnnotation
-  tickMeta?: TickMeta<RelationSchemasT>
 }
 
 export interface ProcessedSpan<
@@ -67,8 +65,7 @@ export interface ProcessedSpan<
 > {
   readonly span: SpanT
   readonly annotations: SpanAnnotationRecord | undefined
-  readonly resolveParent: () => SpanAndAnnotation<RelationSchemasT> | undefined
-  readonly tickMeta: TickMeta<RelationSchemasT> | undefined
+  readonly resolveParent: () => Span<RelationSchemasT> | undefined
   /**
    * While not usually needed, you can use this function
    * to update some of the span's attributes AFTER it has been processed.

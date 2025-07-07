@@ -15,15 +15,15 @@ export function buildSpanHierarchy(
   const orphanedSpans: HierarchicalSpanAndAnnotation[] = []
 
   // First pass: Convert all spans to hierarchical format and build lookup map
-  for (const span of spans) {
+  for (const spAnn of spans) {
     const hierarchicalSpan: HierarchicalSpanAndAnnotation = {
-      ...span,
+      ...spAnn,
       children: [],
       isExpanded: false, // Default to collapsed
       depth: 0, // Will be calculated later
-      parentId: span.span.parentSpanId,
+      parentId: spAnn.span.parentSpanId,
     }
-    spanMap.set(span.span.id, hierarchicalSpan)
+    spanMap.set(spAnn.span.id, hierarchicalSpan)
   }
 
   // Second pass: Build parent-child relationships

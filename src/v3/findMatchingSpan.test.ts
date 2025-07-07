@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { findMatchingSpan, fromDefinition } from './matchSpan'
+import {
+  findMatchingSpan,
+  fromDefinition,
+  type SpanAndAnnotationForMatching,
+} from './matchSpan'
 import type { SpanAndAnnotation, SpanAnnotation } from './spanAnnotationTypes'
 import type { PerformanceEntrySpan, Span } from './spanTypes'
 import type { TicketIdRelationSchemasFixture } from './testUtility/fixtures/relationSchemas'
@@ -92,7 +96,11 @@ describe('findMatchingSpan', () => {
         TicketIdRelationSchemasFixture,
         'origin'
       >({ name: 'testEntry' })
-      const result = findMatchingSpan(matcher, [], mockContext)
+      const result = findMatchingSpan(
+        matcher,
+        [] as SpanAndAnnotation<TicketIdRelationSchemasFixture>[],
+        mockContext,
+      )
       expect(result).toBeUndefined()
     })
 
@@ -161,7 +169,7 @@ describe('findMatchingSpan', () => {
     })
   })
 
-  describe('matchingIndex functionality', () => {
+  describe('nthMatch functionality', () => {
     const createTestData = () => [
       createMockSpanAndAnnotation({ name: 'testEntry', id: 'span1' }),
       createMockSpanAndAnnotation({ name: 'nonMatch', id: 'span2' }),
@@ -170,7 +178,7 @@ describe('findMatchingSpan', () => {
       createMockSpanAndAnnotation({ name: 'nonMatch', id: 'span5' }),
     ]
 
-    it('should return first match when matchingIndex is undefined', () => {
+    it('should return first match when nthMatch is undefined', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
@@ -182,7 +190,7 @@ describe('findMatchingSpan', () => {
       expect(result?.span.id).toBe('span1')
     })
 
-    it('should return first match when matchingIndex is 0', () => {
+    it('should return first match when nthMatch is 0', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
@@ -194,12 +202,12 @@ describe('findMatchingSpan', () => {
         matcher,
         spanAndAnnotations,
         mockContext,
-        { matchingIndex: 0 },
+        { nthMatch: 0 },
       )
       expect(result?.span.id).toBe('span1')
     })
 
-    it('should return second match when matchingIndex is 1', () => {
+    it('should return second match when nthMatch is 1', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
@@ -211,12 +219,12 @@ describe('findMatchingSpan', () => {
         matcher,
         spanAndAnnotations,
         mockContext,
-        { matchingIndex: 1 },
+        { nthMatch: 1 },
       )
       expect(result?.span.id).toBe('span3')
     })
 
-    it('should return third match when matchingIndex is 2', () => {
+    it('should return third match when nthMatch is 2', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
@@ -228,12 +236,12 @@ describe('findMatchingSpan', () => {
         matcher,
         spanAndAnnotations,
         mockContext,
-        { matchingIndex: 2 },
+        { nthMatch: 2 },
       )
       expect(result?.span.id).toBe('span4')
     })
 
-    it('should return undefined when matchingIndex exceeds available matches', () => {
+    it('should return undefined when nthMatch exceeds available matches', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
@@ -245,12 +253,12 @@ describe('findMatchingSpan', () => {
         matcher,
         spanAndAnnotations,
         mockContext,
-        { matchingIndex: 5 },
+        { nthMatch: 5 },
       )
       expect(result).toBeUndefined()
     })
 
-    it('should return last match when matchingIndex is -1', () => {
+    it('should return last match when nthMatch is -1', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
@@ -262,12 +270,12 @@ describe('findMatchingSpan', () => {
         matcher,
         spanAndAnnotations,
         mockContext,
-        { matchingIndex: -1 },
+        { nthMatch: -1 },
       )
       expect(result?.span.id).toBe('span4')
     })
 
-    it('should return second-to-last match when matchingIndex is -2', () => {
+    it('should return second-to-last match when nthMatch is -2', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
@@ -279,12 +287,12 @@ describe('findMatchingSpan', () => {
         matcher,
         spanAndAnnotations,
         mockContext,
-        { matchingIndex: -2 },
+        { nthMatch: -2 },
       )
       expect(result?.span.id).toBe('span3')
     })
 
-    it('should return first match when matchingIndex is -3', () => {
+    it('should return first match when nthMatch is -3', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
@@ -296,12 +304,12 @@ describe('findMatchingSpan', () => {
         matcher,
         spanAndAnnotations,
         mockContext,
-        { matchingIndex: -3 },
+        { nthMatch: -3 },
       )
       expect(result?.span.id).toBe('span1')
     })
 
-    it('should return undefined when negative matchingIndex exceeds available matches', () => {
+    it('should return undefined when negative nthMatch exceeds available matches', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
@@ -313,18 +321,18 @@ describe('findMatchingSpan', () => {
         matcher,
         spanAndAnnotations,
         mockContext,
-        { matchingIndex: -5 },
+        { nthMatch: -5 },
       )
       expect(result).toBeUndefined()
     })
 
-    it('should override matcher matchingIndex with config matchingIndex', () => {
+    it('should override matcher nthMatch with config nthMatch', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
         'origin'
       >({ name: 'testEntry' })
-      matcher.matchingIndex = 0 // Set matcher to return first match
+      matcher.nthMatch = 0 // Set matcher to return first match
       const spanAndAnnotations = createTestData()
 
       // Override with config to return second match
@@ -332,13 +340,13 @@ describe('findMatchingSpan', () => {
         matcher,
         spanAndAnnotations,
         mockContext,
-        { matchingIndex: 1 },
+        { nthMatch: 1 },
       )
       expect(result?.span.id).toBe('span3')
     })
   })
 
-  describe('startFromIndex functionality', () => {
+  describe('lowestIndexToConsider functionality', () => {
     const createTestData = () => [
       createMockSpanAndAnnotation({ name: 'testEntry', id: 'span1' }),
       createMockSpanAndAnnotation({ name: 'testEntry', id: 'span2' }),
@@ -358,7 +366,7 @@ describe('findMatchingSpan', () => {
       expect(result?.span.id).toBe('span1')
     })
 
-    it('should start from specified startFromIndex', () => {
+    it('should start from specified lowestIndexToConsider', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
@@ -370,12 +378,12 @@ describe('findMatchingSpan', () => {
         matcher,
         spanAndAnnotations,
         mockContext,
-        { startFromIndex: 2 },
+        { lowestIndexToConsider: 2 },
       )
       expect(result?.span.id).toBe('span3')
     })
 
-    it('should return undefined when startFromIndex is beyond array length', () => {
+    it('should return undefined when lowestIndexToConsider is beyond array length', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
@@ -387,12 +395,12 @@ describe('findMatchingSpan', () => {
         matcher,
         spanAndAnnotations,
         mockContext,
-        { startFromIndex: 10 },
+        { lowestIndexToConsider: 10 },
       )
       expect(result).toBeUndefined()
     })
 
-    it('should work with startFromIndex and matchingIndex together', () => {
+    it('should work with lowestIndexToConsider and nthMatch together', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
@@ -406,33 +414,33 @@ describe('findMatchingSpan', () => {
         spanAndAnnotations,
         mockContext,
         {
-          startFromIndex: 1,
-          matchingIndex: 1,
+          lowestIndexToConsider: 1,
+          nthMatch: 1,
         },
       )
       expect(result?.span.id).toBe('span3')
     })
 
-    it('should override matcher startFromIndex with config startFromIndex', () => {
+    it('should override matcher lowestIndexToConsider with config lowestIndexToConsider', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
         'origin'
       >({ name: 'testEntry' })
-      matcher.startFromIndex = 0
+      matcher.lowestIndexToConsider = 0
       const spanAndAnnotations = createTestData()
 
       const result = findMatchingSpan(
         matcher,
         spanAndAnnotations,
         mockContext,
-        { startFromIndex: 2 },
+        { lowestIndexToConsider: 2 },
       )
       expect(result?.span.id).toBe('span3')
     })
   })
 
-  describe('endAtIndex functionality', () => {
+  describe('highestIndexToConsider functionality', () => {
     const createTestData = () => [
       createMockSpanAndAnnotation({ name: 'testEntry', id: 'span1' }),
       createMockSpanAndAnnotation({ name: 'testEntry', id: 'span2' }),
@@ -452,12 +460,12 @@ describe('findMatchingSpan', () => {
         matcher,
         spanAndAnnotations,
         mockContext,
-        { matchingIndex: -1 },
+        { nthMatch: -1 },
       )
       expect(result?.span.id).toBe('span4') // Last match in entire array
     })
 
-    it('should limit search to endAtIndex', () => {
+    it('should limit search to highestIndexToConsider', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
@@ -471,14 +479,14 @@ describe('findMatchingSpan', () => {
         spanAndAnnotations,
         mockContext,
         {
-          endAtIndex: 1,
-          matchingIndex: -1,
+          highestIndexToConsider: 1,
+          nthMatch: -1,
         },
       )
       expect(result?.span.id).toBe('span2') // Last match in limited range
     })
 
-    it('should handle endAtIndex beyond array length', () => {
+    it('should handle highestIndexToConsider beyond array length', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
@@ -491,14 +499,14 @@ describe('findMatchingSpan', () => {
         spanAndAnnotations,
         mockContext,
         {
-          endAtIndex: 100,
-          matchingIndex: -1,
+          highestIndexToConsider: 100,
+          nthMatch: -1,
         },
       )
       expect(result?.span.id).toBe('span4') // Should not exceed actual array length
     })
 
-    it('should work with startFromIndex and endAtIndex together', () => {
+    it('should work with lowestIndexToConsider and highestIndexToConsider together', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
@@ -512,14 +520,14 @@ describe('findMatchingSpan', () => {
         spanAndAnnotations,
         mockContext,
         {
-          startFromIndex: 1,
-          endAtIndex: 2,
+          lowestIndexToConsider: 1,
+          highestIndexToConsider: 2,
         },
       )
       expect(result?.span.id).toBe('span2') // First match in range
     })
 
-    it('should return undefined when startFromIndex > endAtIndex', () => {
+    it('should return undefined when lowestIndexToConsider > highestIndexToConsider', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
@@ -532,20 +540,20 @@ describe('findMatchingSpan', () => {
         spanAndAnnotations,
         mockContext,
         {
-          startFromIndex: 3,
-          endAtIndex: 1,
+          lowestIndexToConsider: 3,
+          highestIndexToConsider: 1,
         },
       )
       expect(result).toBeUndefined()
     })
 
-    it('should override matcher endAtIndex with config endAtIndex', () => {
+    it('should override matcher highestIndexToConsider with config highestIndexToConsider', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
         'origin'
       >({ name: 'testEntry' })
-      matcher.endAtIndex = 3
+      matcher.highestIndexToConsider = 3
       const spanAndAnnotations = createTestData()
 
       const result = findMatchingSpan(
@@ -553,8 +561,8 @@ describe('findMatchingSpan', () => {
         spanAndAnnotations,
         mockContext,
         {
-          endAtIndex: 1,
-          matchingIndex: -1,
+          highestIndexToConsider: 1,
+          nthMatch: -1,
         },
       )
       expect(result?.span.id).toBe('span2')
@@ -562,7 +570,7 @@ describe('findMatchingSpan', () => {
   })
 
   describe('complex scenarios', () => {
-    it('should handle all config options together with positive matchingIndex', () => {
+    it('should handle all config options together with positive nthMatch', () => {
       const spanAndAnnotations = [
         createMockSpanAndAnnotation({ name: 'testEntry', id: 'span1' }), // index 0
         createMockSpanAndAnnotation({ name: 'nonMatch', id: 'span2' }), // index 1
@@ -584,15 +592,15 @@ describe('findMatchingSpan', () => {
         spanAndAnnotations,
         mockContext,
         {
-          startFromIndex: 2,
-          endAtIndex: 4,
-          matchingIndex: 1,
+          lowestIndexToConsider: 2,
+          highestIndexToConsider: 4,
+          nthMatch: 1,
         },
       )
       expect(result?.span.id).toBe('span4')
     })
 
-    it('should handle all config options together with negative matchingIndex', () => {
+    it('should handle all config options together with negative nthMatch', () => {
       const spanAndAnnotations = [
         createMockSpanAndAnnotation({ name: 'testEntry', id: 'span1' }), // index 0
         createMockSpanAndAnnotation({ name: 'nonMatch', id: 'span2' }), // index 1
@@ -614,9 +622,9 @@ describe('findMatchingSpan', () => {
         spanAndAnnotations,
         mockContext,
         {
-          startFromIndex: 2,
-          endAtIndex: 4,
-          matchingIndex: -1,
+          lowestIndexToConsider: 2,
+          highestIndexToConsider: 4,
+          nthMatch: -1,
         },
       )
       expect(result?.span.id).toBe('span5')
@@ -632,30 +640,30 @@ describe('findMatchingSpan', () => {
         createMockSpanAndAnnotation({ name: 'testEntry', id: 'span1' }),
       ]
 
-      // Test various matchingIndex values
+      // Test various nthMatch values
       expect(
         findMatchingSpan(matcher, spanAndAnnotations, mockContext, {
-          matchingIndex: 0,
+          nthMatch: 0,
         })?.span.id,
       ).toBe('span1')
       expect(
         findMatchingSpan(matcher, spanAndAnnotations, mockContext, {
-          matchingIndex: -1,
+          nthMatch: -1,
         })?.span.id,
       ).toBe('span1')
       expect(
         findMatchingSpan(matcher, spanAndAnnotations, mockContext, {
-          matchingIndex: 1,
+          nthMatch: 1,
         }),
       ).toBeUndefined()
       expect(
         findMatchingSpan(matcher, spanAndAnnotations, mockContext, {
-          matchingIndex: -2,
+          nthMatch: -2,
         }),
       ).toBeUndefined()
     })
 
-    it('should handle edge case where startFromIndex equals endAtIndex', () => {
+    it('should handle edge case where lowestIndexToConsider equals highestIndexToConsider', () => {
       const spanAndAnnotations = [
         createMockSpanAndAnnotation({ name: 'nonMatch', id: 'span1' }),
         createMockSpanAndAnnotation({ name: 'testEntry', id: 'span2' }),
@@ -673,8 +681,8 @@ describe('findMatchingSpan', () => {
         spanAndAnnotations,
         mockContext,
         {
-          startFromIndex: 1,
-          endAtIndex: 1,
+          lowestIndexToConsider: 1,
+          highestIndexToConsider: 1,
         },
       )
       expect(result?.span.id).toBe('span2')
@@ -686,16 +694,16 @@ describe('findMatchingSpan', () => {
         TicketIdRelationSchemasFixture,
         'origin'
       >({ name: 'testEntry' })
-      matcher.matchingIndex = 1
-      matcher.startFromIndex = 1
-      matcher.endAtIndex = 3
+      matcher.nthMatch = 1
+      matcher.lowestIndexToConsider = 1
+      matcher.highestIndexToConsider = 3
 
       const spanAndAnnotations = [
-        createMockSpanAndAnnotation({ name: 'testEntry', id: 'span1' }), // index 0 - excluded by startFromIndex
+        createMockSpanAndAnnotation({ name: 'testEntry', id: 'span1' }), // index 0 - excluded by lowestIndexToConsider
         createMockSpanAndAnnotation({ name: 'testEntry', id: 'span2' }), // index 1 - first match in range
         createMockSpanAndAnnotation({ name: 'testEntry', id: 'span3' }), // index 2 - second match in range
         createMockSpanAndAnnotation({ name: 'testEntry', id: 'span4' }), // index 3 - third match in range
-        createMockSpanAndAnnotation({ name: 'testEntry', id: 'span5' }), // index 4 - excluded by endAtIndex
+        createMockSpanAndAnnotation({ name: 'testEntry', id: 'span5' }), // index 4 - excluded by highestIndexToConsider
       ]
 
       // Should use matcher's settings (second match in range 1-3 = span3)
@@ -744,18 +752,18 @@ describe('findMatchingSpan', () => {
       // Test boundary conditions
       expect(
         findMatchingSpan(matcher, spanAndAnnotations, mockContext, {
-          startFromIndex: 0,
+          lowestIndexToConsider: 0,
         })?.span.id,
       ).toBe('span1')
       expect(
         findMatchingSpan(matcher, spanAndAnnotations, mockContext, {
-          endAtIndex: 0,
+          highestIndexToConsider: 0,
         })?.span.id,
       ).toBe('span1')
       expect(
         findMatchingSpan(matcher, spanAndAnnotations, mockContext, {
-          startFromIndex: 0,
-          endAtIndex: 0,
+          lowestIndexToConsider: 0,
+          highestIndexToConsider: 0,
         })?.span.id,
       ).toBe('span1')
     })
@@ -771,14 +779,14 @@ describe('findMatchingSpan', () => {
         createMockSpanAndAnnotation({ name: 'testEntry', id: 'span2' }),
       ]
 
-      // Test with endAtIndex beyond array length
+      // Test with highestIndexToConsider beyond array length
       const result = findMatchingSpan(
         matcher,
         spanAndAnnotations,
         mockContext,
         {
-          endAtIndex: 100,
-          matchingIndex: -1,
+          highestIndexToConsider: 100,
+          nthMatch: -1,
         },
       )
       expect(result?.span.id).toBe('span2')
@@ -789,7 +797,7 @@ describe('findMatchingSpan', () => {
     it('should iterate from start to end for positive indices', () => {
       const callOrder: string[] = []
       const matcher = (
-        spanAndAnnotation: SpanAndAnnotation<TicketIdRelationSchemasFixture>,
+        spanAndAnnotation: SpanAndAnnotationForMatching<TicketIdRelationSchemasFixture>,
       ) => {
         callOrder.push(spanAndAnnotation.span.id)
         return spanAndAnnotation.span.name === 'target'
@@ -809,7 +817,7 @@ describe('findMatchingSpan', () => {
     it('should iterate from end to start for negative indices', () => {
       const callOrder: string[] = []
       const matcher = (
-        spanAndAnnotation: SpanAndAnnotation<TicketIdRelationSchemasFixture>,
+        spanAndAnnotation: SpanAndAnnotationForMatching<TicketIdRelationSchemasFixture>,
       ) => {
         callOrder.push(spanAndAnnotation.span.id)
         return spanAndAnnotation.span.name === 'target'
@@ -823,15 +831,15 @@ describe('findMatchingSpan', () => {
       ]
 
       findMatchingSpan(matcher, spanAndAnnotations, mockContext, {
-        matchingIndex: -1,
+        nthMatch: -1,
       })
       expect(callOrder).toEqual(['span4', 'span3', 'span2'])
     })
 
-    it('should stop early when target matchingIndex is found for positive indices', () => {
+    it('should stop early when target nthMatch is found for positive indices', () => {
       const callOrder: string[] = []
       const matcher = (
-        spanAndAnnotation: SpanAndAnnotation<TicketIdRelationSchemasFixture>,
+        spanAndAnnotation: SpanAndAnnotationForMatching<TicketIdRelationSchemasFixture>,
       ) => {
         callOrder.push(spanAndAnnotation.span.id)
         return spanAndAnnotation.span.name === 'target'
@@ -846,7 +854,7 @@ describe('findMatchingSpan', () => {
 
       // Should stop after finding the second match (index 1)
       findMatchingSpan(matcher, spanAndAnnotations, mockContext, {
-        matchingIndex: 1,
+        nthMatch: 1,
       })
       expect(callOrder).toEqual(['span1', 'span2'])
     })
@@ -861,14 +869,14 @@ describe('findMatchingSpan', () => {
       createMockSpanAndAnnotation({ name: 'nonMatch', id: 'span5' }),
     ]
 
-    it('should use matchingIndex from fromDefinition', () => {
+    it('should use nthMatch from fromDefinition', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
         'origin'
       >({
         name: 'testEntry',
-        matchingIndex: 1,
+        nthMatch: 1,
       })
       const spanAndAnnotations = createTestData()
 
@@ -876,14 +884,14 @@ describe('findMatchingSpan', () => {
       expect(result?.span.id).toBe('span3')
     })
 
-    it('should use negative matchingIndex from fromDefinition', () => {
+    it('should use negative nthMatch from fromDefinition', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
         'origin'
       >({
         name: 'testEntry',
-        matchingIndex: -1,
+        nthMatch: -1,
       })
       const spanAndAnnotations = createTestData()
 
@@ -891,14 +899,14 @@ describe('findMatchingSpan', () => {
       expect(result?.span.id).toBe('span4')
     })
 
-    it('should use startFromIndex from fromDefinition', () => {
+    it('should use lowestIndexToConsider from fromDefinition', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
         'origin'
       >({
         name: 'testEntry',
-        startFromIndex: 2,
+        lowestIndexToConsider: 2,
       })
       const spanAndAnnotations = createTestData()
 
@@ -906,14 +914,14 @@ describe('findMatchingSpan', () => {
       expect(result?.span.id).toBe('span3')
     })
 
-    it('should use endAtIndex from fromDefinition and matchingIndex from config', () => {
+    it('should use highestIndexToConsider from fromDefinition and nthMatch from config', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
         'origin'
       >({
         name: 'testEntry',
-        endAtIndex: 2,
+        highestIndexToConsider: 2,
       })
       const spanAndAnnotations = createTestData()
 
@@ -922,10 +930,10 @@ describe('findMatchingSpan', () => {
         spanAndAnnotations,
         mockContext,
         {
-          matchingIndex: -1,
+          nthMatch: -1,
         },
       )
-      expect(result?.span.id).toBe('span3') // Last match within endAtIndex range (indices 0-2)
+      expect(result?.span.id).toBe('span3') // Last match within highestIndexToConsider range (indices 0-2)
     })
 
     it('should use multiple tags from fromDefinition together', () => {
@@ -935,16 +943,16 @@ describe('findMatchingSpan', () => {
         'origin'
       >({
         name: 'testEntry',
-        startFromIndex: 1,
-        endAtIndex: 3,
-        matchingIndex: 1,
+        lowestIndexToConsider: 1,
+        highestIndexToConsider: 3,
+        nthMatch: 1,
       })
       const spanAndAnnotations = [
-        createMockSpanAndAnnotation({ name: 'testEntry', id: 'span1' }), // index 0 - excluded by startFromIndex
+        createMockSpanAndAnnotation({ name: 'testEntry', id: 'span1' }), // index 0 - excluded by lowestIndexToConsider
         createMockSpanAndAnnotation({ name: 'nonMatch', id: 'span2' }), // index 1
         createMockSpanAndAnnotation({ name: 'testEntry', id: 'span3' }), // index 2 - first match in range
         createMockSpanAndAnnotation({ name: 'testEntry', id: 'span4' }), // index 3 - second match in range
-        createMockSpanAndAnnotation({ name: 'testEntry', id: 'span5' }), // index 4 - excluded by endAtIndex
+        createMockSpanAndAnnotation({ name: 'testEntry', id: 'span5' }), // index 4 - excluded by highestIndexToConsider
       ]
 
       const result = findMatchingSpan(matcher, spanAndAnnotations, mockContext)
@@ -958,9 +966,9 @@ describe('findMatchingSpan', () => {
         'origin'
       >({
         name: 'testEntry',
-        matchingIndex: 0,
-        startFromIndex: 0,
-        endAtIndex: 4,
+        nthMatch: 0,
+        lowestIndexToConsider: 0,
+        highestIndexToConsider: 4,
       })
       const spanAndAnnotations = createTestData()
 
@@ -970,24 +978,24 @@ describe('findMatchingSpan', () => {
         spanAndAnnotations,
         mockContext,
         {
-          matchingIndex: 1,
-          startFromIndex: 2,
-          endAtIndex: 3,
+          nthMatch: 1,
+          lowestIndexToConsider: 2,
+          highestIndexToConsider: 3,
         },
       )
       expect(result?.span.id).toBe('span4') // Should use config override, not fromDefinition
     })
 
-    it('should handle negative matchingIndex with range from fromDefinition', () => {
+    it('should handle negative nthMatch with range from fromDefinition', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
         'origin'
       >({
         name: 'testEntry',
-        startFromIndex: 0,
-        endAtIndex: 2,
-        matchingIndex: -1,
+        lowestIndexToConsider: 0,
+        highestIndexToConsider: 2,
+        nthMatch: -1,
       })
       const spanAndAnnotations = createTestData()
 
@@ -995,16 +1003,16 @@ describe('findMatchingSpan', () => {
       expect(result?.span.id).toBe('span3') // Last match within range [0, 2]
     })
 
-    it('should return undefined when fromDefinition matchingIndex exceeds matches in range', () => {
+    it('should return undefined when fromDefinition nthMatch exceeds matches in range', () => {
       const matcher = fromDefinition<
         'ticket',
         TicketIdRelationSchemasFixture,
         'origin'
       >({
         name: 'testEntry',
-        startFromIndex: 2,
-        endAtIndex: 3,
-        matchingIndex: 5, // Only 2 matches in range, requesting 6th match
+        lowestIndexToConsider: 2,
+        highestIndexToConsider: 3,
+        nthMatch: 5, // Only 2 matches in range, requesting 6th match
       })
       const spanAndAnnotations = createTestData()
 

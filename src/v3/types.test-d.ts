@@ -508,6 +508,6 @@ describe('type tests', () => {
     })
 
     // you can use this to e.g. report your error with a parentName tag, or the ownership attribute
-    const parentName = resolveParent()?.span.name
+    const parentName = resolveParent()?.name
   })
 })

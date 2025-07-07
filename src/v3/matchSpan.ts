@@ -1,5 +1,6 @@
-import type { SpanAndAnnotation } from './spanAnnotationTypes'
-import type { Attributes, SpanStatus, SpanType } from './spanTypes'
+import type { SpanAnnotation } from './spanAnnotationTypes'
+import type { Attributes, Span, SpanStatus, SpanType } from './spanTypes'
+import type { RecordedSpan } from './traceRecordingTypes'
 import type {
   DraftTraceContext,
   MapSchemaToTypes,
@@ -17,23 +18,23 @@ export interface PublicSpanMatcherTags {
 
   /**
    * If multiple matches are found, this specifies which match to use.
-   * It can be set to a negative number to match from the end of the operation (like Array.prototype.slice()).
+   * It can be set to a negative number to match from the end of the operation (backwards, with syntax like Array.prototype.slice()).
    * This only has an effect on matchers that run when the recording is complete,
    * e.g. in startSpan and endSpan for defining computed spans.
    */
-  matchingIndex?: number
+  nthMatch?: number
 
   /**
    * Do not consider entries before this index.
    * This only has an effect on matchers that run when the recording is complete.
    */
-  startFromIndex?: number
+  lowestIndexToConsider?: number
 
   /**
    * Index of last entry to consider. Will stop considering entries beyond this index.
    * This only has an effect on matchers that run when the recording is complete.
    */
-  endAtIndex?: number
+  highestIndexToConsider?: number
 }
 
 export interface SpanMatcherTags extends PublicSpanMatcherTags {
@@ -50,6 +51,13 @@ export interface SpanMatcherTags extends PublicSpanMatcherTags {
   requiredSpan?: boolean
 }
 
+export interface SpanAndAnnotationForMatching<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> {
+  span: Span<RelationSchemasT> | RecordedSpan<RelationSchemasT>
+  annotation?: SpanAnnotation
+}
+
 /**
  * Function type for matching performance entries.
  */
@@ -59,7 +67,7 @@ export interface SpanMatcherFn<
   VariantsT extends string,
 > extends SpanMatcherTags {
   (
-    spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>,
+    spanAndAnnotation: SpanAndAnnotationForMatching<RelationSchemasT>,
     context: DraftTraceContext<
       SelectedRelationNameT,
       RelationSchemasT,
@@ -123,6 +131,12 @@ export interface ParentSpanMatcher<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > {
+  /**
+   * Define the scope of the search for the parent span.
+   * 'current-tick' will only search for spans created in the current tick,
+   * while 'entire-recording' will search through all recorded spans
+   * in the trace that was running when the span was created.
+   */
   search: 'current-tick' | 'entire-recording'
   searchDirection: 'after-self' | 'before-self'
   match: SpanMatch<SelectedRelationNameT, RelationSchemasT, VariantsT>
@@ -165,7 +179,7 @@ export function withLabel<
     SelectedRelationNameT,
     RelationSchemasT,
     VariantsT
-  > = ({ annotation }) => annotation.labels?.includes(value) ?? false
+  > = ({ annotation }) => annotation?.labels?.includes(value) ?? false
   matcher.fromDefinition = { label: value }
   return matcher
 }
@@ -244,7 +258,7 @@ export function withAttributes<
   > = ({ span }) => {
     if (!span.attributes) return false
     return Object.entries(attrs).every(
-      ([key, value]) => span.attributes![key] === value,
+      ([key, value]) => span.attributes[key] === value,
     )
   }
   matcher.fromDefinition = { attributes: attrs }
@@ -309,6 +323,7 @@ export function withOccurrence<
     RelationSchemasT,
     VariantsT
   > = ({ annotation }) => {
+    if (!annotation) return false
     if (typeof value === 'number') return annotation.occurrence === value
     return value(annotation.occurrence)
   }
@@ -596,14 +611,14 @@ export function fromDefinition<
   if (typeof definition.continueWithErrorStatus === 'boolean') {
     combined.continueWithErrorStatus = definition.continueWithErrorStatus
   }
-  if (typeof definition.matchingIndex === 'number') {
-    combined.matchingIndex = definition.matchingIndex
+  if (typeof definition.nthMatch === 'number') {
+    combined.nthMatch = definition.nthMatch
   }
-  if (typeof definition.startFromIndex === 'number') {
-    combined.startFromIndex = definition.startFromIndex
+  if (typeof definition.lowestIndexToConsider === 'number') {
+    combined.lowestIndexToConsider = definition.lowestIndexToConsider
   }
-  if (typeof definition.endAtIndex === 'number') {
-    combined.endAtIndex = definition.endAtIndex
+  if (typeof definition.highestIndexToConsider === 'number') {
+    combined.highestIndexToConsider = definition.highestIndexToConsider
   }
 
   return combined
@@ -611,36 +626,38 @@ export function fromDefinition<
 
 /**
  * Evaluates a span matcher against an entry array.
- * Respects matching index, startFromIndex, and endAtIndex.
+ * Respects matching index, lowestIndexToConsider, and highestIndexToConsider.
  */
 export function findMatchingSpan<
   const SelectedRelationNameT extends keyof RelationSchemasT,
   const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
+  const RecordedItem extends SpanAndAnnotationForMatching<RelationSchemasT>,
 >(
   matcher: SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT>,
-  recordedItemsArray: readonly SpanAndAnnotation<RelationSchemasT>[],
+  recordedItemsArray: readonly RecordedItem[],
   context: TraceContext<SelectedRelationNameT, RelationSchemasT, VariantsT>,
   /** config argument can be used to override tags from matcher: */
   {
-    startFromIndex = matcher.startFromIndex ?? 0,
-    endAtIndex: endAtIndexInput = matcher.endAtIndex,
-    matchingIndex = matcher.matchingIndex,
+    lowestIndexToConsider = matcher.lowestIndexToConsider ?? 0,
+    highestIndexToConsider:
+      highestIndexToConsiderInput = matcher.highestIndexToConsider,
+    nthMatch = matcher.nthMatch,
   }: PublicSpanMatcherTags = {},
-): SpanAndAnnotation<RelationSchemasT> | undefined {
-  const endAtIndex =
-    endAtIndexInput === undefined
+): RecordedItem | undefined {
+  const highestIndexToConsider =
+    highestIndexToConsiderInput === undefined
       ? recordedItemsArray.length - 1
-      : Math.min(endAtIndexInput, recordedItemsArray.length - 1)
+      : Math.min(highestIndexToConsiderInput, recordedItemsArray.length - 1)
 
   let matchedCount = 0
 
   // For positive or undefined indices - find with specified index offset
-  if (matchingIndex === undefined || matchingIndex >= 0) {
-    for (let i = startFromIndex; i <= endAtIndex; i++) {
+  if (nthMatch === undefined || nthMatch >= 0) {
+    for (let i = lowestIndexToConsider; i <= highestIndexToConsider; i++) {
       const spanAndAnnotation = recordedItemsArray[i]!
       if (matcher(spanAndAnnotation, context)) {
-        if (matchingIndex === undefined || matchingIndex === matchedCount) {
+        if (nthMatch === undefined || nthMatch === matchedCount) {
           return spanAndAnnotation
         }
         matchedCount++
@@ -651,15 +668,15 @@ export function findMatchingSpan<
   }
 
   // For negative indices - iterate from the end
-  // If matchingIndex is -1, we need the last match (index 0 from reverse)
-  // If matchingIndex is -2, we need the second-to-last match (index 1 from reverse), etc.
-  const targetIndex = Math.abs(matchingIndex) - 1
+  // If nthMatch is -1, we need the last match (index 0 from reverse)
+  // If nthMatch is -2, we need the second-to-last match (index 1 from reverse), etc.
+  const targetIndex = Math.abs(nthMatch) - 1
 
   // Iterate from the end of the array
   // TODO: I'm wondering if we should sort recordedItemsArrayReversed by the end time...?
   // For that matter, should recordedItemsArray be sorted by their start time?
   // If yes, it might be good to do this in createTraceRecording and pass in both recordedItemsArray and recordedItemsArrayReversed pre-sorted, so we don't sort every time we need to calculate a computed span.
-  for (let i = endAtIndex; i >= 0; i--) {
+  for (let i = highestIndexToConsider; i >= 0; i--) {
     const spanAndAnnotation = recordedItemsArray[i]!
     if (matcher(spanAndAnnotation, context)) {
       if (matchedCount === targetIndex) {

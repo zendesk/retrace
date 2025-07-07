@@ -76,7 +76,7 @@ export const generateUseBeacon =
           status: errorBoundaryMetadata?.error ? 'error' : 'ok',
           renderCount: renderCountRef.current,
           isIdle,
-          parentSpanId: renderStartRef.current?.span.id,
+          parentSpan: renderStartRef.current?.span,
         })
       },
       [config.name],

@@ -265,8 +265,8 @@ describe('recordingComputeUtils', () => {
       expect(result['operation-span']).toBeDefined()
     })
 
-    describe('matchingIndex', () => {
-      it('should select the correct start span using a positive matchingIndex', () => {
+    describe('nthMatch', () => {
+      it('should select the correct start span using a positive nthMatch', () => {
         const definition: CompleteTraceDefinition<
           'global',
           AnyRelation,
@@ -277,7 +277,7 @@ describe('recordingComputeUtils', () => {
             'test-computed-span': {
               startSpan: fromDefinition({
                 name: 'start-span',
-                matchingIndex: 1, // starts at 0th index
+                nthMatch: 1, // starts at 0th index
               }),
               endSpan: fromDefinition({ name: 'end-span' }),
             },
@@ -308,7 +308,7 @@ describe('recordingComputeUtils', () => {
         })
       })
 
-      it('should select the correct start span using a negative matchingIndex', () => {
+      it('should select the correct start span using a negative nthMatch', () => {
         const definition: CompleteTraceDefinition<
           'global',
           AnyRelation,
@@ -319,7 +319,7 @@ describe('recordingComputeUtils', () => {
             'test-computed-span': {
               startSpan: fromDefinition({
                 name: 'start-span',
-                matchingIndex: -3,
+                nthMatch: -3,
               }),
               endSpan: fromDefinition({ name: 'end-span' }),
             },
@@ -350,7 +350,7 @@ describe('recordingComputeUtils', () => {
         })
       })
 
-      it('should select the correct end span using a positive matchingIndex', () => {
+      it('should select the correct end span using a positive nthMatch', () => {
         const definition: CompleteTraceDefinition<
           'global',
           AnyRelation,
@@ -362,7 +362,7 @@ describe('recordingComputeUtils', () => {
               startSpan: fromDefinition({ name: 'start-span' }),
               endSpan: fromDefinition({
                 name: 'end-span',
-                matchingIndex: 2,
+                nthMatch: 2,
               }),
             },
           },
@@ -404,7 +404,7 @@ describe('recordingComputeUtils', () => {
         })
       })
 
-      it('should select the correct end span using a negative matchingIndex', () => {
+      it('should select the correct end span using a negative nthMatch', () => {
         const definition: CompleteTraceDefinition<
           'global',
           AnyRelation,
@@ -416,7 +416,7 @@ describe('recordingComputeUtils', () => {
               startSpan: fromDefinition({ name: 'start-span' }),
               endSpan: fromDefinition({
                 name: 'end-span',
-                matchingIndex: -1,
+                nthMatch: -1,
               }),
             },
           },
@@ -457,7 +457,7 @@ describe('recordingComputeUtils', () => {
         })
       })
 
-      it('should not return any computed spans using a invalid matchingIndex', () => {
+      it('should not return any computed spans using a invalid nthMatch', () => {
         const definition: CompleteTraceDefinition<
           'global',
           AnyRelation,
@@ -469,7 +469,7 @@ describe('recordingComputeUtils', () => {
               startSpan: fromDefinition({ name: 'start-span' }),
               endSpan: fromDefinition({
                 name: 'end-span',
-                matchingIndex: -100,
+                nthMatch: -100,
               }),
             },
           },
@@ -507,7 +507,7 @@ describe('recordingComputeUtils', () => {
         expect(result).toEqual({})
       })
 
-      it('should work with span definition objects containing matchingIndex', () => {
+      it('should work with span definition objects containing nthMatch', () => {
         const definition: CompleteTraceDefinition<
           'global',
           AnyRelation,
@@ -518,9 +518,9 @@ describe('recordingComputeUtils', () => {
             'test-computed-span': {
               startSpan: fromDefinition({
                 name: 'start-span',
-                matchingIndex: 1,
+                nthMatch: 1,
               }),
-              endSpan: fromDefinition({ name: 'end-span', matchingIndex: -1 }),
+              endSpan: fromDefinition({ name: 'end-span', nthMatch: -1 }),
             },
           },
         }

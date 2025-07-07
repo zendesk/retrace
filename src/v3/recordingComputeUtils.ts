@@ -6,9 +6,17 @@ import {
 } from './ensureMatcherFn'
 import { findMatchingSpan } from './matchSpan'
 import type { SpanAndAnnotation } from './spanAnnotationTypes'
-import type { ActiveTraceInput, DraftTraceInput } from './spanTypes'
+import {
+  type ActiveTraceInput,
+  type DraftTraceInput,
+  PARENT_SPAN,
+  type Span,
+} from './spanTypes'
 import type { FinalTransition } from './Trace'
-import type { TraceRecording } from './traceRecordingTypes'
+import type {
+  RecordedSpanAndAnnotation,
+  TraceRecording,
+} from './traceRecordingTypes'
 import type {
   PromoteSpanAttributesDefinition,
   RelationSchemasBase,
@@ -352,7 +360,7 @@ function promoteSpanAttributesForTrace<
       RelationSchemasT,
       VariantsT
     >(rule.span)
-    if (matcher.matchingIndex === undefined) {
+    if (matcher.nthMatch === undefined) {
       // if no specific index is provided, we accumulate attributes from all matches
       // last one wins
       for (const spanAnn of recordedItemsArray) {
@@ -412,12 +420,12 @@ function buildChildrenMap<
   const kids = new Map<string, string[]>()
 
   for (const { span } of spanMap.values()) {
-    const parent = span.parentSpanId
+    const parent = span[PARENT_SPAN]
     if (!parent) continue
 
-    const childrenIds = kids.get(parent) ?? []
+    const childrenIds = kids.get(parent.id) ?? []
     childrenIds.push(span.id)
-    kids.set(parent, childrenIds)
+    kids.set(parent.id, childrenIds)
   }
   return kids // O(n) time, O(n) memory
 }
@@ -444,7 +452,10 @@ export function propagateStatusAndAttributes<
   const roots: string[] = []
 
   for (const { span } of idToSpanAndAnnotationMap.values()) {
-    if (!span.parentSpanId || !idToSpanAndAnnotationMap.has(span.parentSpanId))
+    if (
+      !span[PARENT_SPAN] ||
+      !idToSpanAndAnnotationMap.has(span[PARENT_SPAN].id)
+    )
       roots.push(span.id)
   }
 
@@ -469,8 +480,8 @@ export function propagateStatusAndAttributes<
       const node = idToSpanAndAnnotationMap.get(id)
       if (!node) continue
 
-      const parentHeritableAttributes = node.span.parentSpanId
-        ? inherited.get(node.span.parentSpanId)
+      const parentHeritableAttributes = node.span[PARENT_SPAN]
+        ? inherited.get(node.span[PARENT_SPAN].id)
         : undefined
 
       if (!parentHeritableAttributes && !node.span.attributes) {
@@ -586,17 +597,17 @@ export function createTraceRecording<
   })
 
   const recordedItemsArray: SpanAndAnnotation<RelationSchemasT>[] = []
-  const startSpanIdToFullDurationSpanIdMap = new Map<string, string>()
+  const startSpanIdToFullDurationSpanMap = new Map<
+    string,
+    Span<RelationSchemasT>
+  >()
 
   for (const item of recordedItems.values()) {
     if (item.span.startSpanId) {
       // if the item has a startSpan, it is the full span
       // we'll want to add the startSpan to the list, and exclude it from the recorded items
       // These startSpans are unnecessary, since the same information is present in the span that contains the duration
-      startSpanIdToFullDurationSpanIdMap.set(
-        item.span.startSpanId,
-        item.span.id,
-      )
+      startSpanIdToFullDurationSpanMap.set(item.span.startSpanId, item.span)
     }
     if (endOfOperationSpan) {
       // only keep items captured until the endOfOperationSpan or if not available, the lastRelevantSpan
@@ -613,12 +624,12 @@ export function createTraceRecording<
 
   // we need to re-parent any span that referred to a startSpanId that will be discarded
   for (const item of recordedItemsArray) {
-    if (item.span.parentSpanId) {
-      const newParent = startSpanIdToFullDurationSpanIdMap.get(
-        item.span.parentSpanId,
+    if (item.span[PARENT_SPAN]) {
+      const newParent = startSpanIdToFullDurationSpanMap.get(
+        item.span[PARENT_SPAN].id,
       )
       if (newParent) {
-        item.span.parentSpanId = newParent
+        item.span[PARENT_SPAN] = newParent
       }
     }
   }
@@ -668,18 +679,31 @@ export function createTraceRecording<
   const startTillRequirementsMet =
     lastRequiredSpanAndAnnotation?.annotation.operationRelativeEndTime ?? null
 
-  const filteredRecordedItemsArray = recordedItemsArray.flatMap(
+  const filteredRecordedItemsArray = recordedItemsArray.flatMap<
+    RecordedSpanAndAnnotation<RelationSchemasT>
+  >(
     // remove the currentTick attributes from the array
-    ({ tickMeta: _, ...item }) => {
+    ({ span: { getParentSpan: _, ...span }, annotation }) => {
       // exclude internalUse and spanIdsToDiscard
       const keep = !(
         // prettier-ignore
         // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-        item.span.internalUse ||
-          startSpanIdToFullDurationSpanIdMap.has(item.span.id)
+        span.internalUse ||
+          startSpanIdToFullDurationSpanMap.has(span.id)
       )
+      // remove getParentSpan function
+
       if (keep) {
-        return [item]
+        return [
+          {
+            annotation,
+            span: {
+              ...span,
+              // bake-in parentSpanId
+              parentSpanId: span[PARENT_SPAN]?.id,
+            },
+          },
+        ]
       }
       return []
     },

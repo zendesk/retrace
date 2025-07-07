@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { IGardenTheme } from '@zendeskgarden/react-theming'
 import type { SpanAnnotation } from '../v3/spanAnnotationTypes'
-import type { Attributes, Span, SpanBase } from '../v3/spanTypes'
-import type { TraceRecording } from '../v3/traceRecordingTypes'
+import type { Attributes } from '../v3/spanTypes'
+import type { RecordedSpan, TraceRecording } from '../v3/traceRecordingTypes'
 import type { Timestamp } from '../v3/types'
 import type { SupportedSpanTypes } from './constants'
 import type { MappedOperation } from './mapOperationForVisualization'
@@ -16,7 +16,7 @@ export type MinimalSpanAnnotation = Omit<
 > &
   Partial<SpanAnnotation>
 export type MinimalSpan = DistributiveOmit<
-  Span<any> | SpanBase<any>,
+  RecordedSpan<any>,
   'startTime' | 'attributes'
 > & {
   startTime: Pick<Timestamp, 'now'> & Partial<Timestamp>

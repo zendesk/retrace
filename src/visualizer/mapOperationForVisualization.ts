@@ -197,7 +197,7 @@ export const mapOperationForVisualization = (
     type: 'computed-span',
     span: {
       id: `computed-span-${name}-${traceRecording.id}`,
-      type: 'computed-span',
+      type: 'measure',
       duration: computedSpan.duration,
       name,
       startTime: adjustTimestampBy(
@@ -224,7 +224,7 @@ export const mapOperationForVisualization = (
       type: 'computed-span',
       span: {
         id: `computed-span-${beaconName}-${traceRecording.id}`,
-        type: 'computed-span',
+        type: 'measure',
         duration: beaconSpan.firstRenderTillContent,
         name: `${beaconName}/firstRenderTillContent`,
         startTime: adjustTimestampBy(
@@ -246,7 +246,7 @@ export const mapOperationForVisualization = (
       type: 'computed-span',
       span: {
         id: `computed-span-${beaconName}-${traceRecording.id}`,
-        type: 'computed-span',
+        type: 'measure',
         duration: beaconSpan.firstRenderTillLoading,
         name: `${beaconName}/firstRenderTillLoading`,
         startTime: adjustTimestampBy(
@@ -268,7 +268,7 @@ export const mapOperationForVisualization = (
       type: 'computed-span',
       span: {
         id: `computed-span-${beaconName}-${traceRecording.id}`,
-        type: 'computed-span',
+        type: 'measure',
         duration: beaconSpan.firstRenderTillData,
         name: `${beaconName}/firstRenderTillData`,
         startTime: adjustTimestampBy(

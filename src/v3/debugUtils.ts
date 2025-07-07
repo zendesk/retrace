@@ -220,9 +220,9 @@ export function getMatcherLabelFromCombinator<
     parts.push('<customMatcherFn>')
   }
 
-  // matchingIndex
-  if ('matchingIndex' in def && typeof def.matchingIndex === 'number') {
-    parts.push(`matchingIndex=${def.matchingIndex}`)
+  // nthMatch
+  if ('nthMatch' in def && typeof def.nthMatch === 'number') {
+    parts.push(`nthMatch=${def.nthMatch}`)
   }
 
   if (parts.length > 0) {

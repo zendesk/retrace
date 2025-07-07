@@ -34,8 +34,12 @@ import type {
   SpanAnnotation,
   SpanAnnotationRecord,
 } from './spanAnnotationTypes'
-import type { ActiveTraceConfig, DraftTraceInput, Span } from './spanTypes'
-import type { TickMeta } from './TickParentResolver'
+import {
+  type ActiveTraceConfig,
+  type DraftTraceInput,
+  PARENT_SPAN,
+  type Span,
+} from './spanTypes'
 import type { TraceRecording } from './traceRecordingTypes'
 import type {
   CompleteTraceDefinition,
@@ -1407,17 +1411,13 @@ export class Trace<
       childRecording.status !== 'interrupted'
     ) {
       // TODO: should this be sent to TraceManager, or just this Trace (parent)?
-      this.processSpan(
-        {
-          ...childRecording,
-          parentSpanId: this.input.id,
-          // these below just to satisfy TS, they're already in ...childRecording:
-          duration: childRecording.duration,
-          status: childRecording.status,
-          relatedTo: { ...childRecording.relatedTo },
-        },
-        undefined,
-      )
+      this.processSpan({
+        ...childRecording,
+        // these below just to satisfy TS, they're already in ...childRecording:
+        duration: childRecording.duration,
+        status: childRecording.status,
+        relatedTo: { ...childRecording.relatedTo },
+      })
     }
 
     // Notify the state machine about the child end
@@ -1744,18 +1744,18 @@ export class Trace<
   }
 
   private postProcessSpans() {
-    // assigns parentSpanId to spans that have it defined in getParentSpanId
+    // assigns parentSpan to spans that have it defined in getParentSpan
     for (const spanAndAnnotation of this.recordedItems.values()) {
       if (
-        !spanAndAnnotation.span.parentSpanId &&
-        typeof spanAndAnnotation.span.getParentSpanId === 'function'
+        !spanAndAnnotation.span[PARENT_SPAN] &&
+        typeof spanAndAnnotation.span.getParentSpan === 'function'
       ) {
-        spanAndAnnotation.span.parentSpanId =
-          spanAndAnnotation.span.getParentSpanId({
+        spanAndAnnotation.span[PARENT_SPAN] =
+          spanAndAnnotation.span.getParentSpan({
             thisSpanAndAnnotation: spanAndAnnotation,
             traceContext: this,
           })
-        spanAndAnnotation.span.getParentSpanId = undefined
+        spanAndAnnotation.span.getParentSpan = undefined
       }
     }
   }
@@ -1952,10 +1952,7 @@ export class Trace<
     }
   }
 
-  processSpan(
-    span: Span<RelationSchemasT>,
-    tickMeta: TickMeta<RelationSchemasT> | undefined,
-  ): SpanAnnotationRecord | undefined {
+  processSpan(span: Span<RelationSchemasT>): SpanAnnotationRecord | undefined {
     const spanEndTime = span.startTime.now + span.duration
     // check if valid for this trace:
     if (spanEndTime < this.input.startTime.now) {
@@ -2003,7 +2000,6 @@ export class Trace<
             existingAnnotation.span,
             span,
           ) ?? span
-        spanAndAnnotation.tickMeta = tickMeta
       }
     } else {
       const spanKey = getSpanKey(span)
@@ -2024,7 +2020,6 @@ export class Trace<
       spanAndAnnotation = {
         span,
         annotation,
-        tickMeta,
       }
     }
 
@@ -2040,7 +2035,7 @@ export class Trace<
     const annotationRecord: SpanAnnotationRecord = {}
     // Forward span to all still-running children (F-7), and merge result into annotation record
     for (const child of this.children) {
-      Object.assign(annotationRecord, child.processSpan(span, tickMeta))
+      Object.assign(annotationRecord, child.processSpan(span))
     }
 
     // the return value is used for reporting the annotation externally (e.g. to the RUM agent)
@@ -2093,14 +2088,12 @@ export class Trace<
       }
 
       // Move to parent span
-      const { span: currentSpan } = currentSpanAndAnnotation
-      const { parentSpanId: initialParentSpanId } = currentSpan
-      let parentSpanId = initialParentSpanId
+      let parentSpan = currentSpanAndAnnotation.span[PARENT_SPAN]
 
       // If parentSpanId is not set but getParentSpanId is available, try to resolve it
-      if (!parentSpanId && currentSpan.getParentSpanId) {
+      if (!parentSpan && currentSpanAndAnnotation.span.getParentSpan) {
         try {
-          parentSpanId = currentSpan.getParentSpanId({
+          parentSpan = currentSpanAndAnnotation.span.getParentSpan({
             traceContext: this,
             thisSpanAndAnnotation: currentSpanAndAnnotation,
           })
@@ -2110,12 +2103,12 @@ export class Trace<
       }
 
       // If no parent span ID, we've reached the top of the hierarchy
-      if (!parentSpanId) {
+      if (!parentSpan) {
         break
       }
 
       // Get the parent span
-      currentSpanAndAnnotation = this.recordedItems.get(parentSpanId)
+      currentSpanAndAnnotation = this.recordedItems.get(parentSpan.id)
     }
 
     return undefined

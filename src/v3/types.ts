@@ -649,14 +649,14 @@ export interface ComputedSpanDefinition<
 > {
   /**
    * the *first* span matching the condition that will be considered as the start of the computed span
-   * if you want the *last* matching span, use `matchingIndex: -1`
+   * if you want the *last* matching span, use `nthMatch: -1`
    */
   startSpan:
     | SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT>
     | SpecialStartToken
   /**
    * the *first* span matching the condition that will be considered as the end of the computed span
-   * if you want the *last* matching span, use `matchingIndex: -1`
+   * if you want the *last* matching span, use `nthMatch: -1`
    */
   endSpan:
     | SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT>

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style */
-import type { SpanAndAnnotation } from './spanAnnotationTypes'
-import type { Attributes } from './spanTypes'
+import type { SpanAnnotation } from './spanAnnotationTypes'
+import type { Attributes, PARENT_SPAN, Span } from './spanTypes'
 import type {
   InterruptionReasonPayload,
   MapSchemaToTypes,
@@ -102,9 +102,30 @@ export interface TraceRecordingBase<
   error?: Error
 }
 
+export type RecordedSpan<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+  SpansT extends Span<RelationSchemasT> = Span<RelationSchemasT>,
+> = SpansT extends SpansT
+  ? Readonly<Omit<SpansT, typeof PARENT_SPAN | 'getParentSpan'>> & {
+      /**
+       * The ID of the span that indicates the parent of this span.
+       * Resolved from [PARENT_SPAN].
+       * If [PARENT_SPAN] was not set, this will be undefined.
+       */
+      readonly parentSpanId?: string
+    }
+  : never
+
+export interface RecordedSpanAndAnnotation<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> {
+  readonly span: RecordedSpan<RelationSchemasT>
+  readonly annotation: SpanAnnotation
+}
+
 export interface TraceRecording<
   SelectedRelationNameT extends keyof RelationSchemasT,
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 > extends TraceRecordingBase<SelectedRelationNameT, RelationSchemasT> {
-  entries: readonly SpanAndAnnotation<RelationSchemasT>[]
+  entries: readonly RecordedSpanAndAnnotation<RelationSchemasT>[]
 }

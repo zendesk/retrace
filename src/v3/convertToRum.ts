@@ -1,9 +1,13 @@
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style */
 import { getSpanKey } from './getSpanKey'
-import type { SpanMatcherFn } from './matchSpan'
+import type { SpanAndAnnotationForMatching, SpanMatcherFn } from './matchSpan'
 import type { SpanAndAnnotation } from './spanAnnotationTypes'
 import type { ComponentRenderSpan, Span } from './spanTypes'
-import type { TraceRecording, TraceRecordingBase } from './traceRecordingTypes'
+import type {
+  RecordedSpanAndAnnotation,
+  TraceRecording,
+  TraceRecordingBase,
+} from './traceRecordingTypes'
 import type { RelationSchemasBase, TraceContext } from './types'
 
 export interface EmbeddedEntry {
@@ -104,16 +108,17 @@ function createEmbeddedEntry<
 export const defaultEmbedSpanSelector = <
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 >(
-  spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>,
+  spanAndAnnotation: SpanAndAnnotationForMatching<RelationSchemasT>,
 ) => {
   const { span } = spanAndAnnotation
+
   return isRenderEntry(span)
 }
 
 export function getSpanSummaryAttributes<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 >(
-  recordedItems: readonly SpanAndAnnotation<RelationSchemasT>[],
+  recordedItems: readonly RecordedSpanAndAnnotation<RelationSchemasT>[],
 ): SpanSummaryAttributes {
   // loop through recorded items, create a entry based on the name
   const spanAttributes: SpanSummaryAttributes = {}

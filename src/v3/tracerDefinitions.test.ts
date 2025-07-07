@@ -388,11 +388,11 @@ describe('Trace Definitions', () => {
           variants: { x: { timeout: 1_000 } },
           promoteSpanAttributes: [
             {
-              span: { name: 'foo', matchingIndex: -1 },
+              span: { name: 'foo', nthMatch: -1 },
               attributes: ['foo', 'only'],
             },
             {
-              span: { name: 'bar', matchingIndex: -1 },
+              span: { name: 'bar', nthMatch: -1 },
               attributes: ['bar', 'baz'],
             },
           ],
@@ -415,7 +415,7 @@ describe('Trace Definitions', () => {
         expect(report.attributes.other).toBeUndefined()
       })
 
-      it('should promote all span attributes to trace attributes when no matchingIndex is specified', () => {
+      it('should promote all span attributes to trace attributes when no nthMatch is specified', () => {
         const traceManager = new TraceManager({
           relationSchemas,
           reportFn: getReportFn(),

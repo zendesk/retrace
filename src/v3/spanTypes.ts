@@ -2,6 +2,7 @@ import type { ErrorInfo } from 'react'
 import type { BeaconConfig } from './hooksTypes'
 import type { ParentSpanMatcher } from './matchSpan'
 import type { SpanAndAnnotation } from './spanAnnotationTypes'
+import type { TICK_META, TickMeta } from './TickParentResolver'
 import type { TraceRecording } from './traceRecordingTypes'
 import type {
   DraftTraceContext,
@@ -84,9 +85,13 @@ export interface Attributes {
 }
 export type SpanStatus = 'ok' | 'error'
 
-export type GetParentSpanIdFn<
+export type GetParentSpanFn<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
-> = (context: GetParentSpanIdContext<RelationSchemasT>) => string | undefined
+> = (
+  context: GetParentSpanContext<RelationSchemasT>,
+) => Span<RelationSchemasT> | undefined
+
+export const PARENT_SPAN = Symbol('parentSpan')
 
 export interface SpanBase<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
@@ -137,14 +142,15 @@ export interface SpanBase<
   error?: Error
 
   /**
-   * Optional parent span ID, if known. Takes precedence over getParentSpanId.
+   * Optional parent span, if known. Takes precedence over getParentSpan.
+   * Non-enumerable (symbol).
    */
-  parentSpanId?: string
+  [PARENT_SPAN]?: Span<RelationSchemasT>
 
   /**
    * Resolve parentSpanId after the Trace is completed. Takes precedence over parentSpanMatcher.
    */
-  getParentSpanId?: GetParentSpanIdFn<RelationSchemasT>
+  getParentSpan?: GetParentSpanFn<RelationSchemasT>
 
   /**
    * The ID of the span that indicates the beginning of this span.
@@ -159,6 +165,13 @@ export interface SpanBase<
   tickId?: string
 
   /**
+   * Metadata about the tick in which the span was created (if functionality enabled).
+   * Not enumerable (symbol).
+   * This is used to resolve parent spans across ticks.
+   */
+  [TICK_META]?: TickMeta<RelationSchemasT>
+
+  /**
    * If true, this span will only be present for matching while the trace is being recorded,
    * but will not be included in the final trace recording.
    * This is useful for internal spans that are not relevant to the final trace.
@@ -169,6 +182,12 @@ export interface SpanBase<
 export interface WithParentSpanMatcher<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 > {
+  /**
+   * Optional parent span, if known. Takes precedence over getParentSpan.
+   * Non-enumerable.
+   */
+  parentSpan?: Span<RelationSchemasT>
+
   /**
    * A matcher that can be used to find the parent span of this span after the trace is completed.
    */
@@ -186,7 +205,7 @@ export interface ConvenienceSpanProperties<
   startTime?: Partial<Timestamp>
 }
 
-export interface GetParentSpanIdContext<
+export interface GetParentSpanContext<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 > {
   thisSpanAndAnnotation: SpanAndAnnotation<RelationSchemasT>
@@ -206,6 +225,7 @@ export interface ComponentRenderSpan<
   isIdle: boolean
   errorInfo?: ErrorInfo
   renderCount: number
+  attributes: NonNullable<BeaconConfig<RelationSchemasT>['attributes']>
 }
 
 export type InitiatorType =
@@ -295,6 +315,7 @@ export type AutoAddedSpanProperties =
   | 'startTime'
   | 'attributes'
   | 'duration'
+  | 'parentSpanId'
 
 export type ConvenienceSpan<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
