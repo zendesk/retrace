@@ -476,9 +476,9 @@ export class TraceManager<
                 (sp) =>
                   context.traceContext.recordedItems.get(sp.id) ?? {
                     span: sp,
-                    // this should never happen, but we provide a fallback annotation to satisfy types / in case of a bug:
+                    // we provide a fallback annotation
                     annotation: FALLBACK_ANNOTATION,
-                    tickMeta: undefined,
+                    tickMeta: context.thisSpanAndAnnotation.tickMeta,
                   },
               ) ?? []
             : // TODO: we could optimize this to not iterate over the entire array for every span by providing it in context

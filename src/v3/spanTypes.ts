@@ -145,6 +145,11 @@ export interface SpanBase<
    * Resolve parentSpanId after the Trace is completed. Takes precedence over parentSpanMatcher.
    */
   getParentSpanId?: GetParentSpanIdFn<RelationSchemasT>
+
+  /**
+   * The ID of the span that indicates the beginning of this span.
+   * This is used to prune redundant start-spans from the trace.
+   */
   startSpanId?: string
 
   /**
