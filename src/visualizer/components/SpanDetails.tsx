@@ -91,6 +91,13 @@ const SpanDetails: React.FC<SpanDetailsProps> = ({ span, onClose }) => {
         </Sheet.Header>
         <Sheet.Body>
           <DetailRow>
+            <Label>ID</Label>
+            <Value>
+              {span.span.parentSpanId ? `${span.span.parentSpanId} => ` : ''}
+              {span.span.id}
+            </Value>
+          </DetailRow>
+          <DetailRow>
             <Label>Start Time</Label>
             <Value>
               {span.annotation.operationRelativeStartTime.toFixed(2)}ms

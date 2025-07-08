@@ -55,12 +55,11 @@ export const DropTarget = ({ onDrop, children }: DropTargetProps) => {
       ></div>
       {children}
       <style>
-        {`.drop-target {
-             position: absolute;
+        {
+          /* css */ `.drop-target {
+             position: fixed;
              top: 0;
              left: 0;
-             right: 0;
-             bottom: 0;
              visibility: hidden;
              opacity: .5;
              z-index: 9999;
@@ -72,7 +71,8 @@ export const DropTarget = ({ onDrop, children }: DropTargetProps) => {
           border: 1px dashed;
           border-radius: 1rem;
         }
-        `}
+        `
+        }
       </style>
     </>
   )
