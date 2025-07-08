@@ -562,6 +562,8 @@ export class TraceManager<
       id: endSpanAttributes.id ?? this.utilities.generateId('span'),
       // a reference to the startSpan:
       startSpanId: startSpan.id,
+      // keep the parent span reference:
+      [PARENT_SPAN]: startSpan[PARENT_SPAN],
     })
 
     return this.#processSpan(endSpan)
