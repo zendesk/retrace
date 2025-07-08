@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useOnComponentUnmount } from '../ErrorBoundary'
 import type { BeaconConfig, UseBeacon } from './hooksTypes'
 import type { ProcessedSpan } from './spanAnnotationTypes'
-import type { ComponentRenderSpan } from './spanTypes'
+import { type ComponentRenderSpan, PARENT_SPAN } from './spanTypes'
 import type { TraceManager } from './TraceManager'
 import type { RelationSchemasBase, RelationsOnASpan } from './types'
 
@@ -56,6 +56,24 @@ export const generateUseBeacon =
     useEffect(() => {
       if (!renderStartRef.current) {
         return
+      }
+      const currentTrace = traceManager.currentTraceContext
+      if (
+        currentTrace &&
+        !currentTrace.recordedItems.has(renderStartRef.current.span.id)
+      ) {
+        // handle edge case where the component mounted before the trace was started
+        renderStartRef.current = traceManager.createAndProcessSpan({
+          ...renderStartRef.current.span,
+          parentSpan: renderStartRef.current.span[PARENT_SPAN],
+          // if startTime is before the trace start time, we set it to undefined
+          // to ensure the span is added to the trace
+          startTime:
+            renderStartRef.current.span.startTime.now <
+            currentTrace.input.startTime.now
+              ? undefined
+              : renderStartRef.current.span.startTime,
+        })
       }
       traceManager.endRenderSpan(renderStartRef.current.span)
       renderStartRef.current = undefined
