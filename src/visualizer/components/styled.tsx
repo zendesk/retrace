@@ -44,12 +44,13 @@ export const Container = styled.div`
   display: flex;
 `
 
-export const ScrollContainer = styled.div`
+export const ScrollContainer = styled.div<{ $isDetailsPanelOpen?: boolean }>`
   transition: all 0.2s ease-in-out;
   height: 100%;
   display: flex;
   flex-direction: column;
-  max-width: calc(100vw - 380px);
+  max-width: ${(props) =>
+    props.$isDetailsPanelOpen ? 'calc(100vw - 380px)' : '100vw'};
 `
 
 export const Header = styled.header`

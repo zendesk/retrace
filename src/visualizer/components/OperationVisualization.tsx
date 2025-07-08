@@ -239,6 +239,7 @@ const OperationVisualization: React.FC<OperationVisualizationProps> = ({
     <Container>
       <ScrollContainer
         ref={scrollContainerRef}
+        $isDetailsPanelOpen={selectedSpan !== null}
         onClick={selectedSpan ? handleContainerClick : undefined}
       >
         <Header>
