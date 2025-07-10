@@ -255,6 +255,13 @@ export interface TraceManagerConfig<
    * Useful for creating hierarchies from React components or hooks, or attributing and propagating errors.
    */
   enableTickTracking?: boolean
+
+  /**
+   * Sometimes a span is processed after the trace has started.
+   * This setting defines how much older than the trace the span can be, and still be accepted into the trace.
+   * Defaults to 100ms.
+   */
+  acceptSpansStartedBeforeTraceStartThreshold?: number
 }
 
 export interface TraceManagerUtilities<
@@ -276,6 +283,7 @@ export interface TraceManagerUtilities<
   ) => void
   getCurrentTrace: () => AllPossibleTraces<RelationSchemasT> | undefined
   onTraceConstructed: (trace: AllPossibleTraces<RelationSchemasT>) => void
+  acceptSpansStartedBeforeTraceStartThreshold: number
 }
 
 export interface TraceUtilities<

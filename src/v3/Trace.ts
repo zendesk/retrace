@@ -1962,7 +1962,14 @@ export class Trace<
       // )
       return undefined
     }
-    // TODO: also ignore events that started a long long time before the trace started
+    // also ignore events that started a long long time before the trace started
+    if (
+      span.startTime.now <
+      this.input.startTime.now -
+        this.traceUtilities.acceptSpansStartedBeforeTraceStartThreshold
+    ) {
+      return undefined
+    }
 
     if (isTerminalState(this.stateMachine.currentState)) {
       // nothing to do here
