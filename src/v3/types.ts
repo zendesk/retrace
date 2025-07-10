@@ -780,7 +780,7 @@ export interface TraceContext<
     | DraftTraceInput<RelationSchemasT[SelectedRelationNameT], VariantsT>
   // eslint-disable-next-line @typescript-eslint/consistent-indexed-object-style
   readonly recordedItemsByLabel: {
-    readonly [label: string]: readonly SpanAndAnnotation<RelationSchemasT>[]
+    readonly [label: string]: ReadonlySet<SpanAndAnnotation<RelationSchemasT>>
   }
   readonly recordedItems: ReadonlyMap<
     string,

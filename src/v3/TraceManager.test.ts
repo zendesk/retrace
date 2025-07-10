@@ -93,11 +93,7 @@ describe('TraceManager', () => {
     expect(reportFn).toHaveBeenCalled()
 
     const report = reportFn.mock.calls[0]![0]
-    expect(
-      report.entries.map(
-        (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,
-      ),
-    ).toMatchInlineSnapshot(`
+    expect(report.entries).toMatchInlineSnapshot(`
       events    | start       middle      end
       timeline  | |-<⋯ +50 ⋯>-|-<⋯ +50 ⋯>-|
       time (ms) | 0           50          100
@@ -157,11 +153,7 @@ describe('TraceManager', () => {
     expect(report.interruption).toBeUndefined()
     expect(report.computedSpans[computedSpanName]?.startOffset).toBe(50)
     expect(report.computedSpans[computedSpanName]?.duration).toBe(150)
-    expect(
-      report.entries.map(
-        (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,
-      ),
-    ).toMatchInlineSnapshot(`
+    expect(report.entries).toMatchInlineSnapshot(`
       events    | start       render-1(50)     render-2(50)     render-3(50)   end
       timeline  | |-<⋯ +50 ⋯>-[++++++++++++++]-[++++++++++++++]-[++++++++++++++|
       time (ms) | 0           50               100              150            200
@@ -217,11 +209,7 @@ describe('TraceManager', () => {
       feature: 2,
     })
 
-    expect(
-      report.entries.map(
-        (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,
-      ),
-    ).toMatchInlineSnapshot(`
+    expect(report.entries).toMatchInlineSnapshot(`
       events    | start       feature(50)              feature(50)             end
       timeline  | |-<⋯ +50 ⋯>-[+++++++++++++++++++++++][+++++++++++++++++++++++|
       time (ms) | 0           50                       100                     150
@@ -262,15 +250,15 @@ describe('TraceManager', () => {
     expect(reportFn).toHaveBeenCalled()
     const report = reportFn.mock.calls[0]![0]
 
-    expect(
-      report.entries.map(
-        (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,
-      ),
-    ).toMatchInlineSnapshot(`
-      events    | Component   Component(50)            Component(50)
-      timeline  | |-<⋯ +50 ⋯>-[+++++++++++++++++++++++][+++++++++++++++++++++++]
-      time (ms) | 0           50                       100
+    // render-start should get merged with the first render
+    expect(report.entries).toHaveLength(2)
+
+    expect(report.entries).toMatchInlineSnapshot(`
+      events    | Component(100)                                    Component(50)
+      timeline  | [++++++++++++++++++++++++++++++++++++++++++++++++][+++++++++++++++++++++++]
+      time (ms) | 0                                                 100
     `)
+
     expect(report.name).toBe('ticket.computedRenderBeaconSpans')
     expect(report.interruption).toBeUndefined()
     expect(report.status).toBe('ok')
@@ -323,11 +311,7 @@ describe('TraceManager', () => {
     expect(reportFn).toHaveBeenCalled()
 
     const report = reportFn.mock.calls[0]![0]
-    expect(
-      report.entries.map(
-        (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,
-      ),
-    ).toMatchInlineSnapshot(`
+    expect(report.entries).toMatchInlineSnapshot(`
       events    | start       middle      end
       timeline  | |-<⋯ +50 ⋯>-|-<⋯ +50 ⋯>-|
       time (ms) | 0           50          100

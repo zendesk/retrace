@@ -9,6 +9,27 @@ import type {
 } from './types'
 import type { UnionToIntersection } from './typeUtils'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const INACTIVE_CONTEXT: DraftTraceContext<any, any, any> = {
+  definition: {
+    computedSpanDefinitions: {},
+    computedValueDefinitions: {},
+    name: 'NO_TRACE_ACTIVE',
+    relationSchema: {},
+    relationSchemaName: 'NONE',
+    requiredSpans: [],
+    variants: { none: { timeout: 0 } },
+  },
+  input: {
+    id: 'NO_TRACE_ACTIVE',
+    relatedTo: {},
+    startTime: { now: 0, epoch: 0 },
+    variant: 'none',
+  },
+  recordedItems: new Map(),
+  recordedItemsByLabel: {},
+}
+
 export interface PublicSpanMatcherTags {
   /**
    * Only applicable for 'requiredSpans' list: it will opt-out of the default behavior,
@@ -68,11 +89,9 @@ export interface SpanMatcherFn<
 > extends SpanMatcherTags {
   (
     spanAndAnnotation: SpanAndAnnotationForMatching<RelationSchemasT>,
-    context: DraftTraceContext<
-      SelectedRelationNameT,
-      RelationSchemasT,
-      VariantsT
-    >,
+    context:
+      | DraftTraceContext<SelectedRelationNameT, RelationSchemasT, VariantsT>
+      | undefined,
   ): boolean
 
   /** source definition object for debugging (if converted from object) */
@@ -133,11 +152,15 @@ export interface ParentSpanMatcher<
 > {
   /**
    * Define the scope of the search for the parent span.
-   * 'current-tick' will only search for spans created in the current tick,
+   * 'span-created-tick' will only search for spans created in the current tick,
    * while 'entire-recording' will search through all recorded spans
    * in the trace that was running when the span was created.
+   *
+   * Note that search === 'entire-recording' only works
+   * when running the matcher when traceContext is available
+   * (i.e. before Trace is disposed - while it's active, and when first creating the recording)
    */
-  search: 'current-tick' | 'entire-recording'
+  search: 'span-created-tick' | 'span-ended-tick' | 'entire-recording'
   searchDirection: 'after-self' | 'before-self'
   match: SpanMatch<SelectedRelationNameT, RelationSchemasT, VariantsT>
 }
@@ -156,7 +179,7 @@ export function withName<
     SelectedRelationNameT,
     RelationSchemasT,
     VariantsT
-  > = ({ span }, { input: { relatedTo } }) => {
+  > = ({ span }, { input: { relatedTo } } = INACTIVE_CONTEXT) => {
     if (typeof value === 'string') return span.name === value
     if (value instanceof RegExp) return value.test(span.name)
     return value(span.name, relatedTo)
@@ -198,7 +221,7 @@ export function withPerformanceEntryName<
     SelectedRelationNameT,
     RelationSchemasT,
     VariantsT
-  > = ({ span }, { input: { relatedTo } }) => {
+  > = ({ span }, { input: { relatedTo } } = INACTIVE_CONTEXT) => {
     const entryName = span.performanceEntry?.name
     if (!entryName) return false
     if (typeof value === 'string') return entryName === value
@@ -285,7 +308,11 @@ export function withMatchingRelations<
     VariantsT
   > = (
     { span },
-    { input: { relatedTo: r }, definition: { relationSchema } },
+    {
+      input: { relatedTo: r },
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      definition: { relationSchema },
+    } = INACTIVE_CONTEXT,
   ) => {
     // DRAFT TODO: add test case when relatedTo is missing
     // if the relatedTo isn't set on the trace yet, we can't match against it, so we return early
@@ -636,7 +663,9 @@ export function findMatchingSpan<
 >(
   matcher: SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT>,
   recordedItemsArray: readonly RecordedItem[],
-  context: TraceContext<SelectedRelationNameT, RelationSchemasT, VariantsT>,
+  context:
+    | TraceContext<SelectedRelationNameT, RelationSchemasT, VariantsT>
+    | undefined,
   /** config argument can be used to override tags from matcher: */
   {
     lowestIndexToConsider = matcher.lowestIndexToConsider ?? 0,

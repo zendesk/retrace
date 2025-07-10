@@ -1,8 +1,10 @@
 import type { ErrorInfo } from 'react'
 import type { BeaconConfig } from './hooksTypes'
-import type { ParentSpanMatcher } from './matchSpan'
-import type { SpanAndAnnotation } from './spanAnnotationTypes'
-import type { TICK_META, TickMeta } from './TickParentResolver'
+import type {
+  ParentSpanMatcher,
+  SpanAndAnnotationForMatching,
+} from './matchSpan'
+import type { TICK_META, TICK_META_END, TickMeta } from './TickParentResolver'
 import type { TraceRecording } from './traceRecordingTypes'
 import type {
   DraftTraceContext,
@@ -153,23 +155,23 @@ export interface SpanBase<
   getParentSpan?: GetParentSpanFn<RelationSchemasT>
 
   /**
-   * The ID of the span that indicates the beginning of this span.
-   * This is used to prune redundant start-spans from the trace.
-   */
-  startSpanId?: string
-
-  /**
    * The ID of the tick in which the span was created.
    * This is used to group spans created in the same event loop tick.
    */
   tickId?: string
 
   /**
-   * Metadata about the tick in which the span was created (if functionality enabled).
+   * Metadata about the tick in which the span was created (if tick-tracking functionality enabled).
    * Not enumerable (symbol).
    * This is used to resolve parent spans across ticks.
    */
   [TICK_META]?: TickMeta<RelationSchemasT>
+  /**
+   * Metadata about the tick in which the span was ended (if tick-tracking functionality enabled).
+   * Not enumerable (symbol).
+   * This is used to resolve parent spans across ticks.
+   */
+  [TICK_META_END]?: TickMeta<RelationSchemasT>
 
   /**
    * If true, this span will only be present for matching while the trace is being recorded,
@@ -208,10 +210,10 @@ export interface ConvenienceSpanProperties<
 export interface GetParentSpanContext<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 > {
-  thisSpanAndAnnotation: SpanAndAnnotation<RelationSchemasT>
+  thisSpanAndAnnotation: SpanAndAnnotationForMatching<RelationSchemasT>
   // TODO: improve types here by requiring SelectedRelationNameT and VariantsT:
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  traceContext: DraftTraceContext<any, RelationSchemasT, any>
+  traceContext: DraftTraceContext<any, RelationSchemasT, any> | undefined
 }
 
 export interface ComponentRenderSpan<

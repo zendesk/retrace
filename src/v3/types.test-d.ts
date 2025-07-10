@@ -498,7 +498,7 @@ describe('type tests', () => {
     } = traceManager.processErrorSpan({
       error: new Error('Test error'),
       parentSpanMatcher: {
-        search: 'current-tick',
+        search: 'span-created-tick',
         searchDirection: 'before-self',
         match: {
           name: 'Component',

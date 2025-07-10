@@ -111,7 +111,7 @@ describe('TraceManager with Fixtures', () => {
             "firstRenderTillLoading": 134,
             "renderCount": 6,
             "startOffset": 482.69999998807907,
-            "sumOfRenderDurations": 695,
+            "sumOfRenderDurations": 347.5,
           },
           "OmniComposer": {
             "firstRenderTillContent": 343.80000001192093,
@@ -119,7 +119,7 @@ describe('TraceManager with Fixtures', () => {
             "firstRenderTillLoading": 0,
             "renderCount": 8,
             "startOffset": 689.1999999880791,
-            "sumOfRenderDurations": 693.400000050664,
+            "sumOfRenderDurations": 346.60000002384186,
           },
           "OmniLog": {
             "firstRenderTillContent": 1009.2999999970198,
@@ -127,7 +127,7 @@ describe('TraceManager with Fixtures', () => {
             "firstRenderTillLoading": 112.19999998807907,
             "renderCount": 7,
             "startOffset": 491.29999999701977,
-            "sumOfRenderDurations": 580.4000000357628,
+            "sumOfRenderDurations": 290.2000000178814,
           },
         },
         "computedSpans": {},
@@ -207,7 +207,7 @@ describe('TraceManager with Fixtures', () => {
             "firstRenderTillLoading": 138.59999999403954,
             "renderCount": 5,
             "startOffset": 459.1000000089407,
-            "sumOfRenderDurations": 566.1999999582767,
+            "sumOfRenderDurations": 283.0999999791384,
           },
           "OmniComposer": {
             "firstRenderTillContent": 211.99999998509884,
@@ -215,7 +215,7 @@ describe('TraceManager with Fixtures', () => {
             "firstRenderTillLoading": 0,
             "renderCount": 8,
             "startOffset": 640.4000000059605,
-            "sumOfRenderDurations": 516.9999999701977,
+            "sumOfRenderDurations": 258.3999999910593,
           },
           "OmniLog": {
             "firstRenderTillContent": 815.9000000059605,
@@ -223,7 +223,7 @@ describe('TraceManager with Fixtures', () => {
             "firstRenderTillLoading": 113.2000000178814,
             "renderCount": 9,
             "startOffset": 469.70000000298023,
-            "sumOfRenderDurations": 511.80000004172325,
+            "sumOfRenderDurations": 255.90000002086163,
           },
         },
         "computedSpans": {},

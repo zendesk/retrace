@@ -13,7 +13,7 @@ import type {
   RequiredSpanSeenEvent,
   StateTransitionEvent,
 } from './debugTypes'
-import { convertMatchersToFns, ensureMatcherFn } from './ensureMatcherFn'
+import { convertMatchersToFns } from './ensureMatcherFn'
 import { ensureTimestamp } from './ensureTimestamp'
 import {
   type CPUIdleLongTaskProcessor,
@@ -24,7 +24,6 @@ import {
 import { getSpanKey } from './getSpanKey'
 import {
   requiredSpanWithErrorStatus,
-  type SpanMatch,
   type SpanMatcherFn,
   withAllConditions,
 } from './matchSpan'
@@ -1220,18 +1219,11 @@ export class TraceStateMachine<
             this.sideEffectFns.addSpanToRecording(span)
           }
         }
-
-        // terminal state
-        this.clearDeadline()
       },
     },
 
     complete: {
       onEnterState: (transition: OnEnterComplete<RelationSchemasT>) => {
-        // terminal state
-
-        this.clearDeadline()
-
         const { completeSpanAndAnnotation, cpuIdleSpanAndAnnotation } =
           transition
 
@@ -1292,6 +1284,7 @@ export class TraceStateMachine<
 
       // Complete all event observables when reaching a terminal state
       if (isEnteringTerminalState(onEnterStateEvent)) {
+        this.clearDeadline()
         this.#context.sideEffectFns.onTerminalStateReached(onEnterStateEvent)
       }
 
@@ -1370,7 +1363,7 @@ export class Trace<
     >
   > = new Set()
   readonly recordedItemsByLabel: {
-    [label: string]: SpanAndAnnotation<RelationSchemasT>[]
+    [label: string]: Set<SpanAndAnnotation<RelationSchemasT>>
   }
 
   stateMachine: TraceStateMachine<
@@ -1640,7 +1633,7 @@ export class Trace<
     this.recordedItemsByLabel = Object.fromEntries(
       Object.keys(this.definition.labelMatching ?? {}).map((label) => [
         label,
-        [] as SpanAndAnnotation<RelationSchemasT>[],
+        new Set(),
       ]),
     )
 
@@ -1684,16 +1677,19 @@ export class Trace<
 
   sideEffectFns: TraceStateMachineSideEffectHandlers<RelationSchemasT> = {
     addSpanToRecording: (spanAndAnnotation) => {
-      if (!this.recordedItems.has(spanAndAnnotation.span.id)) {
-        this.recordedItems.set(spanAndAnnotation.span.id, spanAndAnnotation)
-        for (const label of spanAndAnnotation.annotation.labels) {
-          this.recordedItemsByLabel[label]?.push(spanAndAnnotation)
-        }
-        this.eventSubjects['add-span-to-recording'].next({
-          spanAndAnnotation,
-          traceContext: this,
-        })
+      if (this.recordedItems.has(spanAndAnnotation.span.id)) {
+        // since we depend on the order of items in the Map, we want to add the entry again
+        // last recording wins
+        this.recordedItems.delete(spanAndAnnotation.span.id)
       }
+      this.recordedItems.set(spanAndAnnotation.span.id, spanAndAnnotation)
+      for (const label of spanAndAnnotation.annotation.labels) {
+        this.recordedItemsByLabel[label]?.add(spanAndAnnotation)
+      }
+      this.eventSubjects['add-span-to-recording'].next({
+        spanAndAnnotation,
+        traceContext: this,
+      })
     },
     onTerminalStateReached: (transition) => {
       this.postProcessSpans()
@@ -1952,7 +1948,14 @@ export class Trace<
     }
   }
 
-  processSpan(span: Span<RelationSchemasT>): SpanAnnotationRecord | undefined {
+  processSpan<SpanT extends Span<RelationSchemasT>>(
+    span: SpanT,
+  ):
+    | {
+        spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>
+        annotationRecord: SpanAnnotationRecord
+      }
+    | undefined {
     const spanEndTime = span.startTime.now + span.duration
     // check if valid for this trace:
     if (spanEndTime < this.input.startTime.now) {
@@ -2007,7 +2010,19 @@ export class Trace<
             existingAnnotation.span,
             span,
           ) ?? span
+
+        if (!(PARENT_SPAN in existingAnnotation.span)) {
+          // keep parent span reference
+          existingAnnotation.span[PARENT_SPAN] = span[PARENT_SPAN]
+        }
       }
+      // update operationRelativeEndTime
+      spanAndAnnotation.annotation.operationRelativeEndTime =
+        spanAndAnnotation.span.startTime.now -
+        this.input.startTime.now +
+        spanAndAnnotation.span.duration
+      spanAndAnnotation.annotation.recordedInState =
+        this.stateMachine.currentState
     } else {
       const spanKey = getSpanKey(span)
       const occurrence = this.occurrenceCounters.get(spanKey) ?? 1
@@ -2039,16 +2054,19 @@ export class Trace<
 
     this.stateMachine.emit('onProcessSpan', spanAndAnnotation)
 
+    // the record is used for reporting the annotation externally (e.g. to the RUM agent)
     const annotationRecord: SpanAnnotationRecord = {}
+
     // Forward span to all still-running children (F-7), and merge result into annotation record
     for (const child of this.children) {
-      Object.assign(annotationRecord, child.processSpan(span))
+      Object.assign(annotationRecord, child.processSpan(span)?.annotationRecord)
     }
 
-    // the return value is used for reporting the annotation externally (e.g. to the RUM agent)
+    annotationRecord[this.definition.name] = spanAndAnnotation.annotation
+
     return {
-      ...annotationRecord,
-      [this.definition.name]: spanAndAnnotation.annotation,
+      annotationRecord,
+      spanAndAnnotation,
     }
   }
 
@@ -2065,60 +2083,6 @@ export class Trace<
     }
 
     return labels
-  }
-
-  /**
-   * Finds the first span matching the provided SpanMatch in the parent hierarchy
-   * of the given Span, starting with the span itself and traversing up
-   * through its parents.
-   */
-  findSpanInParentHierarchy = <
-    SpanT extends Partial<Span<RelationSchemasT>> & { id: string },
-  >(
-    span: SpanT,
-    spanMatch: SpanMatch<SelectedRelationNameT, RelationSchemasT, VariantsT>,
-  ): SpanAndAnnotation<RelationSchemasT> | undefined => {
-    // Convert SpanMatch to a matcher function if needed
-    const matcherFn = ensureMatcherFn<
-      SelectedRelationNameT,
-      RelationSchemasT,
-      VariantsT
-    >(spanMatch)
-
-    // Start with the current span
-    let currentSpanAndAnnotation = this.recordedItems.get(span.id)
-
-    while (currentSpanAndAnnotation) {
-      // Check if current span matches
-      if (matcherFn(currentSpanAndAnnotation, this)) {
-        return currentSpanAndAnnotation
-      }
-
-      // Move to parent span
-      let parentSpan = currentSpanAndAnnotation.span[PARENT_SPAN]
-
-      // If parentSpanId is not set but getParentSpanId is available, try to resolve it
-      if (!parentSpan && currentSpanAndAnnotation.span.getParentSpan) {
-        try {
-          parentSpan = currentSpanAndAnnotation.span.getParentSpan({
-            traceContext: this,
-            thisSpanAndAnnotation: currentSpanAndAnnotation,
-          })
-        } catch {
-          // If getParentSpanId fails, we'll just continue without resolving the parent
-        }
-      }
-
-      // If no parent span ID, we've reached the top of the hierarchy
-      if (!parentSpan) {
-        break
-      }
-
-      // Get the parent span
-      currentSpanAndAnnotation = this.recordedItems.get(parentSpan.id)
-    }
-
-    return undefined
   }
 }
 

@@ -17,7 +17,10 @@ export interface TickMeta<
   thisSpanInCurrentTickIndex: number
 }
 
+/** symbol for storing the tick meta for starting of the span */
 export const TICK_META = Symbol('tickMeta')
+/** symbol for storing the tick meta for closing of the span */
+export const TICK_META_END = Symbol('tickMetaEnd')
 
 export class TickParentResolver<
   const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
@@ -53,6 +56,7 @@ export class TickParentResolver<
 
   addSpanToCurrentTick(
     span: Span<RelationSchemasT>,
+    endingSpan = false,
   ): TickMeta<RelationSchemasT> {
     const spansInCurrentTick = this.#currentTickSpans
     const thisSpanInCurrentTickIndex = spansInCurrentTick.push(span) - 1
@@ -60,7 +64,7 @@ export class TickParentResolver<
     span.tickId = this.#tickId
     // store a non-enumerable reference to the tick meta on the span - helpful for parent resolution after the trace was finished
     // eslint-disable-next-line no-param-reassign
-    span[TICK_META] = {
+    span[endingSpan ? TICK_META_END : TICK_META] = {
       spansInCurrentTick,
       thisSpanInCurrentTickIndex,
     }

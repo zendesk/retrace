@@ -1,5 +1,6 @@
 import type { Observable } from 'rxjs'
 import { Subject } from 'rxjs'
+import { createParentSpanResolver } from './createParentSpanResolver'
 import type {
   AllPossibleAddSpanToRecordingEvents,
   AllPossibleDefinitionModifiedEvents,
@@ -13,12 +14,9 @@ import {
   ensureMatcherFn,
 } from './ensureMatcherFn'
 import { ensureTimestamp } from './ensureTimestamp'
-import { findMatchingSpan, fromDefinition, type SpanMatch } from './matchSpan'
-import type {
-  ProcessedSpan,
-  SpanAndAnnotation,
-  SpanAnnotationRecord,
-} from './spanAnnotationTypes'
+import { findSpanInParentHierarchy } from './findSpanInParentHierarchy'
+import { type SpanMatch } from './matchSpan'
+import type { ProcessedSpan } from './spanAnnotationTypes'
 import {
   type ComponentRenderSpan,
   type ConvenienceSpan,
@@ -31,7 +29,7 @@ import {
   type Span,
   type SpanUpdateFunction,
 } from './spanTypes'
-import { TICK_META, TickParentResolver } from './TickParentResolver'
+import { TickParentResolver } from './TickParentResolver'
 import type { AllPossibleTraces } from './Trace'
 import { Tracer } from './Tracer'
 import type {
@@ -45,6 +43,12 @@ import type {
   TraceManagerConfig,
   TraceManagerUtilities,
 } from './types'
+
+const START_TO_END_SPAN_TYPES = {
+  'component-render-start': 'component-render',
+  'hook-render-start': 'hook-render',
+  mark: 'measure',
+} as const
 
 /**
  * Class representing the centralized trace manager.
@@ -92,6 +96,7 @@ export class TraceManager<
       // by default noop for warnings
       reportWarningFn: () => {},
       enableTickTracking,
+      acceptSpansStartedBeforeTraceStartThreshold: 100,
       ...configInput,
       replaceCurrentTrace: (newTrace, reason) => {
         if (this.currentTrace) {
@@ -355,10 +360,11 @@ export class TraceManager<
     return new Tracer(completeTraceDefinition, this.utilities)
   }
 
-  #processSpan<SpanT extends Span<RelationSchemasT>>(
-    span: SpanT,
+  processSpan<SpanT extends Span<RelationSchemasT>>(
+    inputSpan: SpanT,
+    isEndingSpan = false,
   ): ProcessedSpan<RelationSchemasT, SpanT> {
-    if (span.id === undefined) {
+    if (inputSpan.id === undefined) {
       this.utilities.reportWarningFn(
         new Error(
           'Span ID for provided span was undefined, generating a new one.',
@@ -367,29 +373,30 @@ export class TraceManager<
       )
       // note: mutating span on purpose to preserve object identity
       // eslint-disable-next-line no-param-reassign
-      span.id = this.utilities.generateId('span')
+      inputSpan.id = this.utilities.generateId('span')
     }
-    this.tickParentResolver?.addSpanToCurrentTick(span)
+    this.tickParentResolver?.addSpanToCurrentTick(inputSpan, isEndingSpan)
     // eslint-disable-next-line prefer-destructuring
     const currentTrace = this.currentTrace
-    const annotations = currentTrace?.processSpan(span)
-    const thisSpanAndAnnotation = currentTrace?.recordedItems.get(span.id)
+    const maybeProcessed = currentTrace?.processSpan(inputSpan)
+
+    const { spanAndAnnotation: thisSpanAndAnnotation, annotationRecord } =
+      maybeProcessed ?? {}
+
+    // processing might have swapped (deduplicated) the instance of span
+    const span = (thisSpanAndAnnotation?.span as SpanT | undefined) ?? inputSpan
 
     const resolveParent = (): Span<RelationSchemasT> | undefined => {
-      if (currentTrace && thisSpanAndAnnotation) {
-        let parentSpan = span[PARENT_SPAN]
-        if (parentSpan === undefined && span.getParentSpan) {
-          parentSpan = span.getParentSpan({
-            traceContext: currentTrace,
-            thisSpanAndAnnotation,
-          })
-          // cache span if parent found, so we don't have to call getParentSpan again:
-          // eslint-disable-next-line no-param-reassign
-          span[PARENT_SPAN] = parentSpan
-        }
-        return parentSpan
+      let parentSpan = span[PARENT_SPAN]
+      if (parentSpan === undefined && span.getParentSpan) {
+        parentSpan = span.getParentSpan({
+          traceContext: currentTrace,
+          thisSpanAndAnnotation: thisSpanAndAnnotation ?? { span },
+        })
+        // cache span if parent found, so we don't have to call getParentSpan again:
+        span[PARENT_SPAN] = parentSpan
       }
-      return undefined
+      return parentSpan
     }
 
     const updateSpan: SpanUpdateFunction<RelationSchemasT, SpanT> = ({
@@ -413,7 +420,7 @@ export class TraceManager<
           continue
         }
         // for other properties, just assign the value to the new one:
-        // eslint-disable-next-line no-param-reassign
+
         span[key] = value as never
       }
       if (reprocess) {
@@ -422,25 +429,14 @@ export class TraceManager<
       }
     }
 
-    const findSpanInParentHierarchy = (
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      spanMatch: SpanMatch<keyof RelationSchemasT, RelationSchemasT, any>,
-    ): SpanAndAnnotation<RelationSchemasT> | undefined => {
-      if (!currentTrace) return undefined
-      return currentTrace.findSpanInParentHierarchy(span, spanMatch)
-    }
-
     return {
       span,
-      annotations,
+      annotations: annotationRecord,
       resolveParent,
       updateSpan,
-      findSpanInParentHierarchy,
+      findSpanInParentHierarchy: (spanMatch) =>
+        findSpanInParentHierarchy(span, spanMatch, currentTrace),
     }
-  }
-
-  processSpan(span: Span<RelationSchemasT>): SpanAnnotationRecord | undefined {
-    return this.#processSpan(span).annotations
   }
 
   ensureCompleteSpan<SpanT extends Span<RelationSchemasT>>({
@@ -449,104 +445,58 @@ export class TraceManager<
     ...partialSpan
   }: ConvenienceSpan<RelationSchemasT, SpanT>): SpanT {
     const id = partialSpan.id ?? this.utilities.generateId('span')
-    // eslint-disable-next-line prefer-destructuring
-    let getParentSpan = partialSpan.getParentSpan
-
-    // convert the convenience matcher to a getParentSpan function if needed::
-    if (parentSpanMatcher && !partialSpan.getParentSpan) {
-      // let's create a function that resolves the parent span ID based on the matcher:
-      getParentSpan = (context): Span<RelationSchemasT> | undefined => {
-        if (parentSpan) {
-          return parentSpan
-        }
-        // check if parent was set after the span was created:
-        // eslint-disable-next-line @typescript-eslint/no-use-before-define
-        if (span[PARENT_SPAN]) {
-          // eslint-disable-next-line @typescript-eslint/no-use-before-define
-          return span[PARENT_SPAN]
-        }
-        const spanAndAnnotations =
-          parentSpanMatcher.search === 'current-tick'
-            ? context.thisSpanAndAnnotation.span[
-                TICK_META
-              ]?.spansInCurrentTick.map(
-                (sp) =>
-                  context.traceContext.recordedItems.get(sp.id) ?? { span: sp },
-              ) ?? []
-            : [...context.traceContext.recordedItems.values()]
-
-        const parentSpanMatchFn =
-          typeof parentSpanMatcher.match === 'object'
-            ? fromDefinition(parentSpanMatcher.match)
-            : parentSpanMatcher.match
-
-        // memoize the matcher function to avoid re-creating it on every call
-        // eslint-disable-next-line no-param-reassign
-        parentSpanMatcher.match = parentSpanMatchFn
-
-        const thisSpanIndex =
-          parentSpanMatcher.search === 'current-tick'
-            ? context.thisSpanAndAnnotation.span[TICK_META]
-                ?.thisSpanInCurrentTickIndex ?? -1
-            : spanAndAnnotations.findIndex(
-                (spanAndAnnotation) => spanAndAnnotation.span.id === id,
-              )
-
-        if (thisSpanIndex === -1) {
-          // invalid
-          return undefined
-        }
-
-        const found = findMatchingSpan(
-          parentSpanMatchFn,
-          spanAndAnnotations,
-          context.traceContext,
-          {
-            ...(parentSpanMatcher.searchDirection === 'after-self' && {
-              nthMatch: 0,
-              lowestIndexToConsider: thisSpanIndex + 1,
-            }),
-            ...(parentSpanMatcher.searchDirection === 'before-self' && {
-              nthMatch: -1,
-              highestIndexToConsider: thisSpanIndex - 1,
-            }),
-          },
-        )
-
-        if (found) {
-          // eslint-disable-next-line @typescript-eslint/no-use-before-define
-          span[PARENT_SPAN] = found.span
-        }
-        return found?.span
-      }
-    }
 
     // ensure the span has an ID, and a startTime
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     const span = {
       ...partialSpan,
       id,
       startTime: ensureTimestamp(partialSpan.startTime),
       attributes: partialSpan.attributes ?? {},
       duration: partialSpan.duration ?? 0,
-      getParentSpan,
+      [PARENT_SPAN]: parentSpan,
+    } as SpanT
+
+    // convert the convenience matcher to a getParentSpan function if needed::
+    if (parentSpanMatcher && !partialSpan.getParentSpan) {
+      // let's create a function that resolves the parent span ID based on the matcher:
+      span.getParentSpan = createParentSpanResolver<RelationSchemasT, SpanT>(
+        span,
+        parentSpanMatcher,
+      )
     }
 
-    span[PARENT_SPAN] = parentSpan
-
-    return span as SpanT
+    return span
   }
 
   // helper functions to create and process spans that have a start event and an end event
   endSpan<SpanT extends Span<RelationSchemasT>>(
     startSpan: SpanT,
-    endSpanAttributes: Partial<ConvenienceSpan<RelationSchemasT, SpanT>> = {},
+    {
+      parentSpanMatcher,
+      getParentSpan,
+      parentSpan,
+      ...endSpanAttributes
+    }: Partial<Omit<ConvenienceSpan<RelationSchemasT, SpanT>, 'id'>> = {},
   ): ProcessedSpan<RelationSchemasT, SpanT> {
-    const endSpan = this.ensureCompleteSpan<SpanT>({
-      // all properties from startSpan:
-      ...startSpan,
+    // startTime cannot be updated, but if provided will extend the duration to encompass the time from start to end:
+    const duration =
+      typeof endSpanAttributes.startTime?.now === 'number' &&
+      typeof endSpanAttributes.duration === 'number'
+        ? endSpanAttributes.duration +
+          Math.max(0, endSpanAttributes.startTime.now - startSpan.startTime.now)
+        : endSpanAttributes.duration ??
+          performance.now() - startSpan.startTime.now
+
+    const originalGetParentSpan = startSpan.getParentSpan
+
+    Object.assign(startSpan, {
       type:
         endSpanAttributes.type ??
-        (startSpan.type === 'mark' ? 'measure' : startSpan.type),
+        START_TO_END_SPAN_TYPES[
+          startSpan.type as keyof typeof START_TO_END_SPAN_TYPES
+        ] ??
+        startSpan.type,
       // all overriding properties from endSpan:
       ...endSpanAttributes,
       // merge attributes:
@@ -554,19 +504,27 @@ export class TraceManager<
         ...startSpan.attributes,
         ...endSpanAttributes.attributes,
       },
-      // calculate duration if not provided:
-      duration:
-        endSpanAttributes.duration ??
-        performance.now() - startSpan.startTime.now,
-      // a new id, if not provided
-      id: endSpanAttributes.id ?? this.utilities.generateId('span'),
-      // a reference to the startSpan:
-      startSpanId: startSpan.id,
-      // keep the parent span reference:
-      [PARENT_SPAN]: startSpan[PARENT_SPAN],
+      duration,
+      // always keep id and startTime of the original span:
+      startTime: startSpan.startTime,
+      id: startSpan.id,
+      [PARENT_SPAN]: parentSpan ?? startSpan[PARENT_SPAN],
     })
 
-    return this.#processSpan(endSpan)
+    // convert the convenience matcher to a getParentSpan function if needed::
+    if (parentSpanMatcher && !getParentSpan) {
+      // let's create a function that resolves the parent span ID based on the matcher:
+      const parentSpanResolver = createParentSpanResolver<
+        RelationSchemasT,
+        SpanT
+      >(startSpan, parentSpanMatcher)
+      // try both parent span resolvers, endSpanResolver first, then originalGetParentSpan:
+      // eslint-disable-next-line no-param-reassign
+      startSpan.getParentSpan = (context) =>
+        parentSpanResolver(context) ?? originalGetParentSpan?.(context)
+    }
+
+    return this.processSpan(startSpan)
   }
 
   processErrorSpan(
@@ -584,7 +542,7 @@ export class TraceManager<
     partialSpan: ConvenienceSpan<RelationSchemasT, SpanT>,
   ): ProcessedSpan<RelationSchemasT, SpanT> {
     const span = this.ensureCompleteSpan<SpanT>(partialSpan)
-    return this.#processSpan(span)
+    return this.processSpan(span)
   }
 
   makePerformanceEntrySpan(
@@ -635,19 +593,11 @@ export class TraceManager<
    * of the given Span, starting with the span itself and traversing up
    * through its parents.
    */
-  findSpanInParentHierarchy<
-    SpanT extends Partial<Span<RelationSchemasT>> & { id: string },
-    SelectedRelationNameT extends keyof RelationSchemasT = keyof RelationSchemasT,
-    VariantsT extends string = string,
-  >(
-    span: SpanT,
-    spanMatch: SpanMatch<SelectedRelationNameT, RelationSchemasT, VariantsT>,
-  ): SpanAndAnnotation<RelationSchemasT> | undefined {
-    const { currentTrace } = this
-    if (!currentTrace) {
-      return undefined
-    }
-
-    return currentTrace.findSpanInParentHierarchy(span, spanMatch)
+  findSpanInParentHierarchy(
+    span: Span<RelationSchemasT>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    spanMatch: SpanMatch<keyof RelationSchemasT, RelationSchemasT, any>,
+  ): Span<RelationSchemasT> | undefined {
+    return findSpanInParentHierarchy(span, spanMatch, this.currentTrace)
   }
 }

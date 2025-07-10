@@ -17,6 +17,7 @@ import {
   type GetParentSpanContext,
   PARENT_SPAN,
   type PerformanceEntrySpan,
+  type Span,
 } from './spanTypes'
 import type { TicketIdRelationSchemasFixture } from './testUtility/fixtures/relationSchemas'
 import { TICK_META } from './TickParentResolver'
@@ -82,7 +83,7 @@ describe('creating spans', () => {
         name: 'test-span',
       })
 
-      const annotationsResult = traceManager.processSpan(span)
+      traceManager.processSpan(span)
 
       expect(span.tickId).toBeDefined()
       // first generated id goes to TickParentResolver, second to span
@@ -124,9 +125,8 @@ describe('creating spans', () => {
       })
 
       expect(endResult.span).toBeDefined()
-      expect(endResult.span.id).not.toBe(startSpan.id)
+      expect(endResult.span).toBe(startSpan)
       expect(endResult.span.name).toBe('operation-end')
-      expect(endResult.span.startSpanId).toBe(startSpan.id)
       expect(endResult.span.duration).toBe(100)
       expect(endResult.span.relatedTo).toEqual({ ticketId: '123' })
       expect(endResult.span.tickId).toBeDefined()
@@ -154,7 +154,7 @@ describe('creating spans', () => {
       expect(endResult.span.type).toBe('component-render')
       expect(endResult.span.duration).toBe(50)
       expect(endResult.span.isIdle).toBe(true)
-      expect(endResult.span.startSpanId).toBe(startResult.span.id)
+      expect(endResult.span).toBe(startResult.span)
     })
   })
 
@@ -312,7 +312,7 @@ describe('creating spans', () => {
       })
     })
 
-    it('should create getParentSpanId function from parentSpanMatcher for current-tick search', () => {
+    it('should create getParentSpanId function from parentSpanMatcher for span-created-tick search', () => {
       // Create spans with parent resolution in the same tick
       const parentSpan = traceManager.ensureCompleteSpan({
         type: 'mark',
@@ -326,7 +326,7 @@ describe('creating spans', () => {
         name: 'child-span',
         relatedTo: { ticketId: '123' },
         parentSpanMatcher: {
-          search: 'current-tick',
+          search: 'span-created-tick',
           searchDirection: 'before-self',
           match: { name: 'parent-span' },
         },
@@ -372,14 +372,14 @@ describe('creating spans', () => {
       expect(childSpan[PARENT_SPAN]).toBe(parentSpan)
     })
 
-    it('should create getParentSpanId function from parentSpanMatcher for current-tick search with after-self direction', () => {
+    it('should create getParentSpanId function from parentSpanMatcher for span-created-tick search with after-self direction', () => {
       // Process the child span
       const childSpan = traceManager.ensureCompleteSpan({
         type: 'mark',
         name: 'child-span',
         relatedTo: { ticketId: '123' },
         parentSpanMatcher: {
-          search: 'current-tick',
+          search: 'span-created-tick',
           searchDirection: 'after-self',
           match: { name: 'parent-span' },
         },
@@ -1314,8 +1314,8 @@ describe('creating spans', () => {
       })
 
       expect(found).toBeDefined()
-      expect(found?.span.id).toBe(result.span.id)
-      expect(found?.span.name).toBe('target-span')
+      expect(found?.id).toBe(result.span.id)
+      expect(found?.name).toBe('target-span')
     })
 
     it('should find parent span when child does not match but parent does', () => {
@@ -1351,8 +1351,8 @@ describe('creating spans', () => {
       })
 
       expect(found).toBeDefined()
-      expect(found?.span.id).toBe(parentResult.span.id)
-      expect(found?.span.name).toBe('parent')
+      expect(found?.id).toBe(parentResult.span.id)
+      expect(found?.name).toBe('parent')
     })
 
     it('should traverse multiple levels to find matching ancestor', () => {
@@ -1386,26 +1386,26 @@ describe('creating spans', () => {
       })
 
       expect(found).toBeDefined()
-      expect(found?.span.id).toBe(rootResult.span.id)
-      expect(found?.span.name).toBe('root')
+      expect(found?.id).toBe(rootResult.span.id)
+      expect(found?.name).toBe('root')
     })
 
-    it('should work with just an object containing id', () => {
-      const result = traceManager.createAndProcessSpan({
-        type: 'mark',
-        name: 'target-span',
-        relatedTo: { ticketId: '123' },
-      })
+    // it('should work with just an object containing id', () => {
+    //   const result = traceManager.createAndProcessSpan({
+    //     type: 'mark',
+    //     name: 'target-span',
+    //     relatedTo: { ticketId: '123' },
+    //   })
 
-      // Use just an object with id instead of full span
-      const found = traceManager.findSpanInParentHierarchy(
-        { id: result.span.id },
-        { name: 'target-span' },
-      )
+    //   // Use just an object with id instead of full span
+    //   const found = traceManager.findSpanInParentHierarchy(
+    //     { id: result.span.id },
+    //     { name: 'target-span' },
+    //   )
 
-      expect(found).toBeDefined()
-      expect(found?.span.id).toBe(result.span.id)
-    })
+    //   expect(found).toBeDefined()
+    //   expect(found?.id).toBe(result.span.id)
+    // })
 
     it('should return undefined when no match is found in hierarchy', () => {
       const parentResult = traceManager.createAndProcessSpan({
@@ -1441,17 +1441,16 @@ describe('creating spans', () => {
       // Now there's no current trace
       expect(traceManager.currentTraceContext).toBeUndefined()
 
-      const found = traceManager.findSpanInParentHierarchy(
-        { id: 'any-id' },
-        { name: 'any-name' },
-      )
+      const found = traceManager.findSpanInParentHierarchy(endSpan, {
+        name: 'any-name',
+      })
 
       expect(found).toBeUndefined()
     })
 
     it('should return undefined when span is not found in recorded items', () => {
       const found = traceManager.findSpanInParentHierarchy(
-        { id: 'non-existent-span-id' },
+        { id: 'non-existent-span-id' } as Span<TicketIdRelationSchemasFixture>,
         { name: 'any-name' },
       )
 
@@ -1481,8 +1480,8 @@ describe('creating spans', () => {
       })
 
       expect(found).toBeDefined()
-      expect(found?.span.id).toBe(parentResult.span.id)
-      expect(found?.span.type).toBe('measure')
+      expect(found?.id).toBe(parentResult.span.id)
+      expect(found?.type).toBe('measure')
     })
 
     it('should work with function-based matchers', () => {
@@ -1507,8 +1506,8 @@ describe('creating spans', () => {
       )
 
       expect(found).toBeDefined()
-      expect(found?.span.id).toBe(parentResult.span.id)
-      expect(found?.span.name).toBe('dynamic-parent')
+      expect(found?.id).toBe(parentResult.span.id)
+      expect(found?.name).toBe('dynamic-parent')
     })
 
     it('should work with spans that have getParentSpanId function', () => {
@@ -1532,7 +1531,7 @@ describe('creating spans', () => {
       })
 
       expect(found).toBeDefined()
-      expect(found?.span.id).toBe(parentResult.span.id)
+      expect(found?.id).toBe(parentResult.span.id)
     })
 
     it('should handle getParentSpanId that throws an error', () => {
@@ -1599,9 +1598,9 @@ describe('creating spans', () => {
       )
 
       expect(found).toBeDefined()
-      expect(found?.span.id).toBe(parentRenderResult.span.id)
+      expect(found?.id).toBe(parentRenderResult.span.id)
       expect(
-        (found?.span as ComponentRenderSpan<TicketIdRelationSchemasFixture>)
+        (found as ComponentRenderSpan<TicketIdRelationSchemasFixture>)
           .renderCount,
       ).toBe(1)
     })
@@ -1626,7 +1625,7 @@ describe('creating spans', () => {
       })
 
       expect(found).toBeDefined()
-      expect(found?.span.id).toBe(contextResult.span.id)
+      expect(found?.id).toBe(contextResult.span.id)
     })
   })
 })

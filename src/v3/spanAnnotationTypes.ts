@@ -64,6 +64,9 @@ export interface ProcessedSpan<
   SpanT extends Span<RelationSchemasT>,
 > {
   readonly span: SpanT
+  /**
+   * Only present if the span was processed by at least one active trace.
+   */
   readonly annotations: SpanAnnotationRecord | undefined
   readonly resolveParent: () => Span<RelationSchemasT> | undefined
   /**
@@ -82,5 +85,5 @@ export interface ProcessedSpan<
   readonly findSpanInParentHierarchy: (
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     spanMatch: SpanMatch<keyof RelationSchemasT, RelationSchemasT, any>,
-  ) => SpanAndAnnotation<RelationSchemasT> | undefined
+  ) => Span<RelationSchemasT> | undefined
 }

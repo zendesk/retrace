@@ -10,7 +10,6 @@ import {
   type ActiveTraceInput,
   type DraftTraceInput,
   PARENT_SPAN,
-  type Span,
 } from './spanTypes'
 import type { FinalTransition } from './Trace'
 import type {
@@ -202,7 +201,6 @@ function getComputedRenderBeaconSpans<
       firstContentStart: number | undefined
       renderCount: number
       sumOfDurations: number
-      lastRenderStartTime: number | undefined // Track the last render start time
       attributes: Record<string, unknown>
     }
   >()
@@ -254,8 +252,6 @@ function getComputedRenderBeaconSpans<
           entry.span.type === 'component-render' && renderedOutput === 'loading'
             ? start + duration
             : undefined,
-        lastRenderStartTime:
-          entry.span.type === 'component-render-start' ? start : undefined,
         attributes: entry.span.attributes ?? {},
       })
     } else {
@@ -272,18 +268,7 @@ function getComputedRenderBeaconSpans<
 
       if (entry.span.type === 'component-render') {
         spanTimes.renderCount += 1
-        // React's concurrent rendering might pause and discard a render,
-        // which would mean that an effect scheduled for that render does not execute because the render itself was not committed to the DOM.
-        // we want to extend the the render span backwards, to first time that rendering was scheduled as the start time of rendering
-        if (spanTimes.lastRenderStartTime !== undefined) {
-          spanTimes.sumOfDurations +=
-            start + duration - spanTimes.lastRenderStartTime
-          spanTimes.lastRenderStartTime = undefined
-        } else {
-          spanTimes.sumOfDurations += duration
-        }
-      } else if (entry.span.type === 'component-render-start') {
-        spanTimes.lastRenderStartTime = start
+        spanTimes.sumOfDurations += duration
       }
 
       if (
@@ -597,18 +582,8 @@ export function createTraceRecording<
   })
 
   const recordedItemsArray: SpanAndAnnotation<RelationSchemasT>[] = []
-  const startSpanIdToFullDurationSpanMap = new Map<
-    string,
-    Span<RelationSchemasT>
-  >()
 
   for (const item of recordedItems.values()) {
-    if (item.span.startSpanId) {
-      // if the item has a startSpan, it is the full span
-      // we'll want to add the startSpan to the list, and exclude it from the recorded items
-      // These startSpans are unnecessary, since the same information is present in the span that contains the duration
-      startSpanIdToFullDurationSpanMap.set(item.span.startSpanId, item.span)
-    }
     if (endOfOperationSpan) {
       // only keep items captured until the endOfOperationSpan or if not available, the lastRelevantSpan
       if (
@@ -619,18 +594,6 @@ export function createTraceRecording<
       }
     } else {
       recordedItemsArray.push(item)
-    }
-  }
-
-  // we need to re-parent any span that referred to a startSpanId that will be discarded
-  for (const item of recordedItemsArray) {
-    if (item.span[PARENT_SPAN]) {
-      const newParent = startSpanIdToFullDurationSpanMap.get(
-        item.span[PARENT_SPAN].id,
-      )
-      if (newParent) {
-        item.span[PARENT_SPAN] = newParent
-      }
     }
   }
 
@@ -682,21 +645,16 @@ export function createTraceRecording<
   const filteredRecordedItemsArray = recordedItemsArray.flatMap<
     RecordedSpanAndAnnotation<RelationSchemasT>
   >(
-    // remove the currentTick attributes from the array
-    ({ span: { getParentSpan: _, ...span }, annotation }) => {
-      // exclude internalUse and spanIdsToDiscard
-      const keep = !(
-        // prettier-ignore
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-        span.internalUse ||
-          startSpanIdToFullDurationSpanMap.has(span.id)
-      )
-      // remove getParentSpan function
+    // remove getParentSpan function
+    ({ span: { getParentSpan: _, ...span }, ...rest }) => {
+      // exclude internalUse
+      // const keep = !span.internalUse
+      const keep = true
 
       if (keep) {
         return [
           {
-            annotation,
+            ...rest,
             span: {
               ...span,
               // bake-in parentSpanId
