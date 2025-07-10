@@ -208,6 +208,7 @@ interface TraceStateMachineSideEffectHandlers<
   readonly onTerminalStateReached: (
     transition: FinalTransition<RelationSchemasT>,
   ) => void
+  readonly onError: (error: Error) => void
 }
 
 type EntryType<RelationSchemasT extends RelationSchemasBase<RelationSchemasT>> =
@@ -366,7 +367,7 @@ export class TraceStateMachine<
     let span: SpanAndAnnotation<RelationSchemasT> | undefined
     // eslint-disable-next-line no-cond-assign
     while ((span = this.#draftBuffer.shift())) {
-      const transition = this.emit('onProcessSpan', span)
+      const transition = this.emit('onProcessSpan', span, true)
       if (transition) return transition
     }
   }
@@ -892,6 +893,7 @@ export class TraceStateMachine<
           const transition = this.emit(
             'onProcessSpan',
             span,
+            true,
             // below cast is necessary due to circular type reference
           ) as Transition<RelationSchemasT> | undefined
           if (transition) {
@@ -1256,6 +1258,8 @@ export class TraceStateMachine<
       RelationSchemasT,
       VariantsT
     >[EventName],
+    /** if called recursively inside of an event handler, it must be set to true to avoid double handling of terminal state */
+    internal = false,
   ): OnEnterStatePayload<RelationSchemasT> | undefined {
     const currentStateHandlers = this.states[this.currentState] as Partial<
       MergedStateHandlerMethods<
@@ -1280,10 +1284,10 @@ export class TraceStateMachine<
       })
 
       const settledTransition =
-        this.emit('onEnterState', onEnterStateEvent) ?? onEnterStateEvent
+        this.emit('onEnterState', onEnterStateEvent, true) ?? onEnterStateEvent
 
       // Complete all event observables when reaching a terminal state
-      if (isEnteringTerminalState(onEnterStateEvent)) {
+      if (!internal && isEnteringTerminalState(onEnterStateEvent)) {
         this.clearDeadline()
         this.#context.sideEffectFns.onTerminalStateReached(onEnterStateEvent)
       }
@@ -1690,6 +1694,13 @@ export class Trace<
         spanAndAnnotation,
         traceContext: this,
       })
+    },
+    onError: (error) => {
+      this.traceUtilities.reportErrorFn(
+        error,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        this as Trace<any, RelationSchemasT, any>,
+      )
     },
     onTerminalStateReached: (transition) => {
       this.postProcessSpans()
