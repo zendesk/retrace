@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style */
 import type { SpanMatch } from './matchSpan'
 import type { Span, SpanUpdateFunction } from './spanTypes'
-import type { NonTerminalTraceStates } from './Trace'
+import type { TraceStates } from './Trace'
 import type { RelationSchemasBase } from './types'
 
 export interface SpanAnnotation {
@@ -26,7 +26,7 @@ export interface SpanAnnotation {
   /**
    * The state the event was recorded in.
    */
-  recordedInState: NonTerminalTraceStates
+  recordedInState: TraceStates
   /**
    * If true, this is the first required span after having met all the required span criteria of the operation.
    * e.g. if the operation requires 3 spans, this will be true for that 3rd span.
@@ -46,6 +46,12 @@ export interface SpanAnnotation {
    * Labels for the span based on label definitions from the Tracer. Empty if the span didn't match any of the label match definitions.
    */
   labels: string[]
+
+  /**
+   * If true, this span is a "ghost" span - it's only present because it is a parent of another span.
+   * It is not part of the trace.
+   */
+  isGhost?: boolean
 }
 
 export interface SpanAnnotationRecord {

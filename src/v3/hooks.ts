@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useOnComponentUnmount } from '../ErrorBoundary'
 import type { BeaconConfig, UseBeacon } from './hooksTypes'
 import type { ProcessedSpan } from './spanAnnotationTypes'
-import { type ComponentRenderSpan, PARENT_SPAN } from './spanTypes'
+import { type ComponentRenderSpan, PARENT_SPAN, type Span } from './spanTypes'
 import type { TraceManager } from './TraceManager'
 import type { RelationSchemasBase, RelationsOnASpan } from './types'
 
@@ -36,6 +36,11 @@ export const generateUseBeacon =
     const relatedTo =
       config.relatedTo as unknown as RelationsOnASpan<RelationSchemasT>
 
+    const parentSpanRef = useRef<Span<RelationSchemasT> | undefined>()
+    if (config.parentSpan) {
+      parentSpanRef.current = config.parentSpan
+    }
+
     const renderStartEntry = traceManager.startRenderSpan({
       ...config,
       kind: isHook ? 'hook' : 'component',
@@ -44,6 +49,7 @@ export const generateUseBeacon =
       status,
       renderCount: renderCountRef.current,
       isIdle,
+      parentSpan: parentSpanRef.current,
     })
 
     const renderStartRef = useRef<
@@ -57,6 +63,9 @@ export const generateUseBeacon =
       if (!renderStartRef.current) {
         return
       }
+      const maybeNewParent = renderStartRef.current.resolveParent()
+      parentSpanRef.current = maybeNewParent ?? parentSpanRef.current
+
       const currentTrace = traceManager.currentTraceContext
       if (
         currentTrace &&
@@ -65,7 +74,7 @@ export const generateUseBeacon =
         // handle edge case where the component mounted before the trace was started
         renderStartRef.current = traceManager.createAndProcessSpan({
           ...renderStartRef.current.span,
-          parentSpan: renderStartRef.current.span[PARENT_SPAN],
+          parentSpan: parentSpanRef.current,
           // if startTime is before the trace start time, we set it to undefined
           // to ensure the span is added to the trace
           startTime:

@@ -1764,6 +1764,26 @@ export class Trace<
           })
         spanAndAnnotation.span.getParentSpan = undefined
       }
+      const parent = spanAndAnnotation.span[PARENT_SPAN]
+
+      // create ghost spans if parent span doesn't exist in the recorded items
+      // since it would be added to the end of the Map, the loop should work recursively appending items to the iterator
+      if (parent && !this.recordedItems.has(parent.id)) {
+        const ghostSpan: SpanAndAnnotation<RelationSchemasT> = {
+          span: parent,
+          annotation: {
+            id: this.input.id,
+            labels: [],
+            recordedInState: this.stateMachine.currentState,
+            occurrence: 0,
+            operationRelativeStartTime:
+              parent.startTime.now - this.input.startTime.now,
+            operationRelativeEndTime:
+              parent.startTime.now - this.input.startTime.now + parent.duration,
+          },
+        }
+        this.recordedItems.set(ghostSpan.span.id, ghostSpan)
+      }
     }
   }
 
