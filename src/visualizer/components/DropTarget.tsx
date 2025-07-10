@@ -57,21 +57,23 @@ export const DropTarget = ({ onDrop, children }: DropTargetProps) => {
       <style>
         {
           /* css */ `.drop-target {
-             position: fixed;
-             top: 0;
-             left: 0;
-             visibility: hidden;
-             opacity: .5;
-             z-index: 9999;
-        }
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  visibility: hidden;
+  opacity: .5;
+  z-index: 9999;
+}
 
-        .drop-target.over {
-          visibility: initial;
-          background: lightblue;
-          border: 1px dashed;
-          border-radius: 1rem;
-        }
-        `
+.drop-target.over {
+  visibility: initial;
+  background: lightblue;
+  border: 1px dashed;
+  border-radius: 1rem;
+}
+`
         }
       </style>
     </>
