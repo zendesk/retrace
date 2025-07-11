@@ -1,6 +1,6 @@
 import { ensureMatcherFn } from './ensureMatcherFn'
 import type { SpanMatch } from './matchSpan'
-import { PARENT_SPAN, type Span } from './spanTypes'
+import type { Span } from './spanTypes'
 import type { DraftTraceContext, RelationSchemasBase } from './types'
 
 /**
@@ -8,7 +8,7 @@ import type { DraftTraceContext, RelationSchemasBase } from './types'
  * of the given Span, starting with the span itself and traversing up
  * through its parents.
  */
-export function findSpanInParentHierarchy<
+export function findAncestor<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 >(
   span: Span<RelationSchemasT>,
@@ -40,22 +40,15 @@ export function findSpanInParentHierarchy<
       return currentSpanAndAnnotation.span
     }
 
-    // Move to parent span
-    let parentSpan = currentSpanAndAnnotation.span[PARENT_SPAN]
+    const parentSpan = currentSpanAndAnnotation.span.getParentSpan(
+      {
+        traceContext,
+        thisSpanAndAnnotation: currentSpanAndAnnotation,
+      },
+      true,
+    )
 
-    // If parentSpanId is not set but getParentSpanId is available, try to resolve it
-    if (!parentSpan && currentSpanAndAnnotation.span.getParentSpan) {
-      try {
-        parentSpan = currentSpanAndAnnotation.span.getParentSpan({
-          traceContext,
-          thisSpanAndAnnotation: currentSpanAndAnnotation,
-        })
-      } catch {
-        // If getParentSpanId fails, we'll just continue without resolving the parent
-      }
-    }
-
-    // If no parent span ID, we've reached the top of the hierarchy
+    // If no parent span ID, we've reached the top of the known hierarchy
     if (!parentSpan) {
       break
     }

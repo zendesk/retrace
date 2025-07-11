@@ -3,6 +3,7 @@ import type { ProcessedSpan } from './spanAnnotationTypes'
 import type {
   Attributes,
   ComponentRenderSpan,
+  SpanBase,
   WithParentSpanMatcher,
 } from './spanTypes'
 import type { TraceManager } from './TraceManager'
@@ -35,19 +36,14 @@ export type BeaconConfig<
    */
   isIdle?: boolean
   /**
-   * An Error instance if the component encountered an error during rendering.
-   * Will set the span status to 'error'
-   */
-  error?: Error
-
-  /**
    * True if this is a hook being instrumented.
    */
   isHook?: boolean
 } & (keyof RequiredAttributesT extends never
   ? { attributes?: Attributes }
   : { attributes: MapRequiredAttributes<RequiredAttributesT> & Attributes }) &
-  WithParentSpanMatcher<RelationSchemasT>
+  WithParentSpanMatcher<RelationSchemasT> &
+  Pick<SpanBase<RelationSchemasT>, 'internalUse' | 'error'>
 
 export type UseBeacon<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,

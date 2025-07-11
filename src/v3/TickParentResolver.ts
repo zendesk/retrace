@@ -1,6 +1,12 @@
 import type { Span } from './spanTypes'
 import type { RelationSchemasBase, TraceManagerUtilities } from './types'
 
+export type TickListWithMeta<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> = Span<RelationSchemasT>[] & {
+  tickCompleted?: boolean
+}
+
 export interface TickMeta<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 > {
@@ -8,12 +14,7 @@ export interface TickMeta<
    * Array of all spans that were processed in the current event loop tick.
    * Empty if tick tracking is disabled
    */
-  spansInCurrentTick: Span<RelationSchemasT>[]
-  /**
-   * The index of the current span in the spansInCurrentTick array.
-   * Can be used to find preceeding or following spans that were processed in the same tick.
-   * Always -1 if tick tracking is disabled.
-   */
+  spansInCurrentTick: TickListWithMeta<RelationSchemasT>
   thisSpanInCurrentTickIndex: number
 }
 
@@ -32,7 +33,7 @@ export class TickParentResolver<
     this.#tickId = utilities.generateId('tick')
   }
 
-  #currentTickSpans: Span<RelationSchemasT>[] = []
+  #currentTickSpans: TickListWithMeta<RelationSchemasT> = []
   #isFlushScheduled = false
   #tickId: string
 
@@ -48,6 +49,8 @@ export class TickParentResolver<
   }
 
   #flushCurrentTickSpans = () => {
+    // we define an attribute to indicate that the tick is completed, and will not change
+    this.#currentTickSpans.tickCompleted = true
     // very important: the array instance is created fresh to preserve references to arrays in previous tick closures
     this.#currentTickSpans = []
     this.#tickId = this.#utilities.generateId('tick')

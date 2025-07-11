@@ -69,7 +69,7 @@ export function getComputedValues<
       // TODO: refactor findMatchingSpan to be a generator function
       // that returns multiple matches and use it here
       matches.forEach((doesSpanMatch, index) => {
-        if (doesSpanMatch(item, context)) {
+        if (!item.annotation.isGhost && doesSpanMatch(item, context)) {
           matchingEntriesByMatcher[index]!.push(item)
         }
       })
@@ -98,7 +98,9 @@ export function getComputedSpans<
     SelectedRelationNameT,
     RelationSchemasT
   >['computedSpans'] = {}
-  const recordedItemsArray = [...context.recordedItems.values()]
+  const recordedItemsArray = [...context.recordedItems.values()].filter(
+    (item) => !item.annotation.isGhost,
+  )
 
   for (const [name, computedSpanDefinition] of Object.entries(
     context.definition.computedSpanDefinitions,
@@ -210,8 +212,9 @@ function getComputedRenderBeaconSpans<
   // Group render spans by beacon and compute firstStart and lastEnd
   for (const entry of recordedItems) {
     if (
-      entry.span.type !== 'component-render' &&
-      entry.span.type !== 'component-render-start'
+      entry.annotation.isGhost ||
+      (entry.span.type !== 'component-render' &&
+        entry.span.type !== 'component-render-start')
     ) {
       continue
     }
@@ -457,6 +460,7 @@ export function propagateStatusAndAttributes<
     }
   }
 
+  // note: this currently happens in span post-processing:
   if (cfg.heritableSpanAttributes) {
     // 2. push selected attributes downward (pre-order)
     const inherited = new Map<string, Record<string, unknown>>() // id → merged bag
@@ -574,10 +578,11 @@ export function createTraceRecording<
       doesSpanMatch(spanAndAnnotation, context),
     ) ?? false
 
-  // selected attributes (like `team`) should propagate to every child (unless set by the child)
-  // and errors should bubble up to the parent (unless suppressed)
+  // errors should bubble up to the parent (unless suppressed)
   propagateStatusAndAttributes(recordedItems, childrenMap, {
-    heritableSpanAttributes: definition.heritableSpanAttributes,
+    // selected attributes (like `team`) should propagate to every child (unless set by the child)
+    // however this currently happens in span post-processing, not here:
+    // heritableSpanAttributes: definition.heritableSpanAttributes,
     shouldSuppressErrorStatusPropagation,
   })
 
@@ -615,6 +620,7 @@ export function createTraceRecording<
   let error: Error | undefined
   for (const spanAndAnnotation of recordedItemsArray) {
     if (
+      !spanAndAnnotation.annotation.isGhost &&
       spanAndAnnotation.span.status === 'error' &&
       !definition.suppressErrorStatusPropagationOnSpans?.some((doesSpanMatch) =>
         doesSpanMatch(spanAndAnnotation, context),
@@ -623,6 +629,7 @@ export function createTraceRecording<
       markTraceAsErrored = true
       // eslint-disable-next-line prefer-destructuring
       error = spanAndAnnotation.span.error
+      // first error found will be used, don't iterate further
       break
     }
   }
@@ -646,16 +653,14 @@ export function createTraceRecording<
     RecordedSpanAndAnnotation<RelationSchemasT>
   >(
     // remove getParentSpan function
-    ({ span: { getParentSpan: _, ...span }, ...rest }) => {
-      // exclude internalUse
-      // const keep = !span.internalUse
-      const keep = true
-
-      if (keep) {
+    ({ span, ...rest }) => {
+      // exclude internalUse spans from the final trace recording
+      if (!span.internalUse) {
         return [
           {
             ...rest,
             span: {
+              // remove any internal properties (symbols)
               ...span,
               // bake-in parentSpanId
               parentSpanId: span[PARENT_SPAN]?.id,

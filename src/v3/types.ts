@@ -251,7 +251,7 @@ export interface TraceManagerConfig<
    * Useful for grouping spans that were recorded in the same event loop tick.
    * If true, the tickId will be set on the span.
    * This enables finding the parent relative to the event-loop tick,
-   * when using the `getParentSpanId` function or the `parentSpanMatcher`.
+   * when using the `getParentSpan` function or the `parentSpanMatcher`.
    * Useful for creating hierarchies from React components or hooks, or attributing and propagating errors.
    */
   enableTickTracking?: boolean
@@ -262,6 +262,19 @@ export interface TraceManagerConfig<
    * Defaults to 100ms.
    */
   acceptSpansStartedBeforeTraceStartThreshold?: number
+
+  /**
+   * A list of span attributes that should be inherited by
+   * the children spans (propagated downwards).
+   * This is useful for ensuring that certain attributes are available on all children spans,
+   * for example, to ensure that `team` ownership information is available on descendant spans,
+   * even if they didn't explicitly define it.
+   * Note that a children span only inherits the attribute if it doesn't already have them defined.
+   *
+   * This inheritance occurs only after a trace is completed,
+   * or when manually requested, once the parent spans are resolved.
+   */
+  heritableSpanAttributes?: readonly string[]
 }
 
 export interface TraceManagerUtilities<
@@ -529,18 +542,6 @@ export interface TraceDefinition<
     RelationSchemasT,
     VariantsT
   >[]
-
-  /**
-   * A list of span attributes that should be inherited by
-   * the children spans (propagated downwards) in the trace recording.
-   * This is useful for ensuring that certain attributes are available on all spans,
-   * for example, to ensure that `team` ownership information is available on descendant spans,
-   * even if they didn't explicitly define it.
-   * Note that a children span only inherits the attribute if it doesn't already have them defined.
-   *
-   * This only applies to the output of the trace recording, it doesn't affect the spans themselves.
-   */
-  heritableSpanAttributes?: readonly string[]
 }
 
 /**

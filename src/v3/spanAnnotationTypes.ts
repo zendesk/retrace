@@ -74,7 +74,13 @@ export interface ProcessedSpan<
    * Only present if the span was processed by at least one active trace.
    */
   readonly annotations: SpanAnnotationRecord | undefined
-  readonly resolveParent: () => Span<RelationSchemasT> | undefined
+  /**
+   * Resolves the parent span of the current span, based on the parent span matcher.
+   * This will work even if the span wasn't processed by any active trace.
+   */
+  readonly resolveParent: (
+    recursiveAncestors?: boolean,
+  ) => Span<RelationSchemasT> | undefined
   /**
    * While not usually needed, you can use this function
    * to update some of the span's attributes AFTER it has been processed.
@@ -88,7 +94,14 @@ export interface ProcessedSpan<
    * to include that attribute, calling this function will trigger re-evaluation of the matchers.
    */
   readonly updateSpan: SpanUpdateFunction<RelationSchemasT, SpanT>
-  readonly findSpanInParentHierarchy: (
+  /**
+   * Finds an ancestor of the span that matches the given SpanMatch.
+   * This will traverse the parent hierarchy of the span,
+   * starting with the span itself and moving up through its parents,
+   * resolving them if necessary.
+   * If no matching ancestor is found, returns undefined.
+   */
+  readonly findAncestor: (
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     spanMatch: SpanMatch<keyof RelationSchemasT, RelationSchemasT, any>,
   ) => Span<RelationSchemasT> | undefined

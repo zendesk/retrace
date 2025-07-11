@@ -14,7 +14,7 @@ import {
   ensureMatcherFn,
 } from './ensureMatcherFn'
 import { ensureTimestamp } from './ensureTimestamp'
-import { findSpanInParentHierarchy } from './findSpanInParentHierarchy'
+import { findAncestor } from './findSpanInParentHierarchy'
 import { type SpanMatch } from './matchSpan'
 import type { ProcessedSpan } from './spanAnnotationTypes'
 import {
@@ -386,16 +386,16 @@ export class TraceManager<
     // processing might have swapped (deduplicated) the instance of span
     const span = (thisSpanAndAnnotation?.span as SpanT | undefined) ?? inputSpan
 
-    const resolveParent = (): Span<RelationSchemasT> | undefined => {
-      let parentSpan = span[PARENT_SPAN]
-      if (parentSpan === undefined && span.getParentSpan) {
-        parentSpan = span.getParentSpan({
+    const resolveParent = (
+      recursiveAncestors = false,
+    ): Span<RelationSchemasT> | undefined => {
+      const parentSpan = span.getParentSpan(
+        {
           traceContext: currentTrace,
           thisSpanAndAnnotation: thisSpanAndAnnotation ?? { span },
-        })
-        // cache span if parent found, so we don't have to call getParentSpan again:
-        span[PARENT_SPAN] = parentSpan
-      }
+        },
+        recursiveAncestors,
+      )
       return parentSpan
     }
 
@@ -434,8 +434,7 @@ export class TraceManager<
       annotations: annotationRecord,
       resolveParent,
       updateSpan,
-      findSpanInParentHierarchy: (spanMatch) =>
-        findSpanInParentHierarchy(span, spanMatch, currentTrace),
+      findAncestor: (spanMatch) => findAncestor(span, spanMatch, currentTrace),
     }
   }
 
@@ -457,14 +456,12 @@ export class TraceManager<
       [PARENT_SPAN]: parentSpan,
     } as SpanT
 
-    // convert the convenience matcher to a getParentSpan function if needed::
-    if (parentSpanMatcher && !partialSpan.getParentSpan) {
-      // let's create a function that resolves the parent span ID based on the matcher:
-      span.getParentSpan = createParentSpanResolver<RelationSchemasT, SpanT>(
-        span,
-        parentSpanMatcher,
-      )
-    }
+    // let's create a function that resolves the parent span based on the matcher:
+    span.getParentSpan = createParentSpanResolver<RelationSchemasT, SpanT>(
+      span,
+      parentSpanMatcher,
+      this.utilities.heritableSpanAttributes,
+    )
 
     return span
   }
@@ -474,7 +471,6 @@ export class TraceManager<
     startSpan: SpanT,
     {
       parentSpanMatcher,
-      getParentSpan,
       parentSpan,
       ...endSpanAttributes
     }: Partial<Omit<ConvenienceSpan<RelationSchemasT, SpanT>, 'id'>> = {},
@@ -511,17 +507,17 @@ export class TraceManager<
       [PARENT_SPAN]: parentSpan ?? startSpan[PARENT_SPAN],
     })
 
-    // convert the convenience matcher to a getParentSpan function if needed::
-    if (parentSpanMatcher && !getParentSpan) {
-      // let's create a function that resolves the parent span ID based on the matcher:
+    if (parentSpanMatcher) {
+      // let's re-create the function that resolves the parent span based on the matcher:
       const parentSpanResolver = createParentSpanResolver<
         RelationSchemasT,
         SpanT
-      >(startSpan, parentSpanMatcher)
+      >(startSpan, parentSpanMatcher, this.utilities.heritableSpanAttributes)
+
       // try both parent span resolvers, endSpanResolver first, then originalGetParentSpan:
       // eslint-disable-next-line no-param-reassign
-      startSpan.getParentSpan = (context) =>
-        parentSpanResolver(context) ?? originalGetParentSpan?.(context)
+      startSpan.getParentSpan = (...args) =>
+        parentSpanResolver(...args) ?? originalGetParentSpan?.(...args)
     }
 
     return this.processSpan(startSpan)
@@ -598,6 +594,6 @@ export class TraceManager<
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     spanMatch: SpanMatch<keyof RelationSchemasT, RelationSchemasT, any>,
   ): Span<RelationSchemasT> | undefined {
-    return findSpanInParentHierarchy(span, spanMatch, this.currentTrace)
+    return findAncestor(span, spanMatch, this.currentTrace)
   }
 }

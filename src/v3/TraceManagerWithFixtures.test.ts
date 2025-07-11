@@ -86,7 +86,7 @@ describe('TraceManager with Fixtures', () => {
     })
 
     for (const entry of fixtureEntries) {
-      traceManager.processSpan(entry.span)
+      traceManager.createAndProcessSpan(entry.span)
     }
 
     expect(reportFn).toHaveBeenCalled()
@@ -182,7 +182,7 @@ describe('TraceManager with Fixtures', () => {
     })
 
     for (const entry of fixtureEntries) {
-      traceManager.processSpan(entry.span)
+      traceManager.createAndProcessSpan(entry.span)
     }
 
     expect(reportFn).toHaveBeenCalled()

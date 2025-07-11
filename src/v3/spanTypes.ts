@@ -91,6 +91,11 @@ export type GetParentSpanFn<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 > = (
   context: GetParentSpanContext<RelationSchemasT>,
+  /**
+   * Whether to attempt to resolve parents recursively.
+   * Enabling this "bakes-in" the PARENT_SPAN reference onto the span
+   */
+  recursive?: boolean,
 ) => Span<RelationSchemasT> | undefined
 
 export const PARENT_SPAN = Symbol('parentSpan')
@@ -176,7 +181,7 @@ export interface SpanBase<
 
   /**
    * If true, this span will only be present for matching while the trace is being recorded,
-   * but will not be included in the final trace recording.
+   * but will not be included in the final trace recording, unless it is a parent of another span.
    * This is useful for internal spans that are not relevant to the final trace.
    */
   internalUse?: boolean

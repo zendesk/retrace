@@ -17,7 +17,7 @@ export type MinimalSpanAnnotation = Omit<
   Partial<SpanAnnotation>
 export type MinimalSpan = DistributiveOmit<
   RecordedSpan<any>,
-  'startTime' | 'attributes'
+  'startTime' | 'attributes' | 'getParentSpan'
 > & {
   startTime: Pick<Timestamp, 'now'> & Partial<Timestamp>
   attributes?: Attributes

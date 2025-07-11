@@ -1754,21 +1754,22 @@ export class Trace<
   private postProcessSpans() {
     // assigns parentSpan to spans that have it defined in getParentSpan
     for (const spanAndAnnotation of this.recordedItems.values()) {
-      if (
-        !spanAndAnnotation.span[PARENT_SPAN] &&
-        typeof spanAndAnnotation.span.getParentSpan === 'function'
-      ) {
-        spanAndAnnotation.span[PARENT_SPAN] =
-          spanAndAnnotation.span.getParentSpan({
-            thisSpanAndAnnotation: spanAndAnnotation,
-            traceContext: this,
-          })
-        spanAndAnnotation.span.getParentSpan = undefined
-      }
-      const parent = spanAndAnnotation.span[PARENT_SPAN]
+      const parent = spanAndAnnotation.span.getParentSpan(
+        {
+          thisSpanAndAnnotation: spanAndAnnotation,
+          traceContext: this,
+        },
+        // recursive:
+        true,
+      )
 
-      // create ghost spans if parent span doesn't exist in the recorded items
-      // since it would be added to the end of the Map, the loop should work recursively appending items to the iterator
+      if (parent?.internalUse) {
+        // if the span is a parent of any other span, it must be included in the recording:
+        parent.internalUse = false
+      }
+
+      // If the parent span doesn't exist in the recorded items, we backfill it by creating a "ghost" span.
+      // Because we're adding to the end of the Map, the loop should work recursively appending ancestors to the iterator
       if (parent && !this.recordedItems.has(parent.id)) {
         const ghostSpan: SpanAndAnnotation<RelationSchemasT> = {
           span: parent,
@@ -1781,6 +1782,7 @@ export class Trace<
               parent.startTime.now - this.input.startTime.now,
             operationRelativeEndTime:
               parent.startTime.now - this.input.startTime.now + parent.duration,
+            isGhost: true,
           },
         }
         this.recordedItems.set(ghostSpan.span.id, ghostSpan)
