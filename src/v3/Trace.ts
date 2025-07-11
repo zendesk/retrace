@@ -1287,9 +1287,9 @@ export class TraceStateMachine<
         this.emit('onEnterState', onEnterStateEvent, true) ?? onEnterStateEvent
 
       // Complete all event observables when reaching a terminal state
-      if (!internal && isEnteringTerminalState(onEnterStateEvent)) {
+      if (!internal && isEnteringTerminalState(settledTransition)) {
         this.clearDeadline()
-        this.#context.sideEffectFns.onTerminalStateReached(onEnterStateEvent)
+        this.#context.sideEffectFns.onTerminalStateReached(settledTransition)
       }
 
       return settledTransition
