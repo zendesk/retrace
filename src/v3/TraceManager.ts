@@ -98,21 +98,30 @@ export class TraceManager<
       enableTickTracking,
       acceptSpansStartedBeforeTraceStartThreshold: 100,
       ...configInput,
-      replaceCurrentTrace: (newTrace, reason) => {
+      replaceCurrentTrace: (getNewTrace, reason) => {
+        let newTrace: ReturnType<typeof getNewTrace>
         if (this.currentTrace) {
           if (reason === 'another-trace-started') {
+            newTrace = getNewTrace()
             this.currentTrace.interrupt({
-              reason: 'another-trace-started',
+              reason,
               anotherTrace: {
                 id: newTrace.input.id,
                 name: newTrace.definition.name,
               },
             })
-          } else {
-            this.currentTrace.interrupt({ reason })
+            this.currentTrace = newTrace
+            return newTrace
           }
+          // the new trace needs to be created AFTER the current trace is interrupted
+          // because the interrupt may unbuffer additional spans
+          this.currentTrace.interrupt({ reason })
+          newTrace = getNewTrace()
+        } else {
+          newTrace = getNewTrace()
         }
         this.currentTrace = newTrace
+        return newTrace
       },
       onTraceConstructed: (newTrace) => {
         // Subscribe to the new trace's events and forward them to our subjects
@@ -122,7 +131,8 @@ export class TraceManager<
           traceContext: newTrace,
         })
       },
-      onTraceEnd: (endedTrace) => {
+      onTraceEnd: (endedTrace, finalTransition) => {
+        // if (finalTransition?.interruption?.reason === 'definition-changed')
         if (endedTrace === this.currentTrace) {
           this.currentTrace = undefined
         }
@@ -360,6 +370,11 @@ export class TraceManager<
     return new Tracer(completeTraceDefinition, this.utilities)
   }
 
+  /**
+   * Internal use only.
+   * Use createAndProcessSpan to create a valid span, and process it immediately.
+   * @internal
+   */
   processSpan<SpanT extends Span<RelationSchemasT>>(
     inputSpan: SpanT,
     isEndingSpan = false,

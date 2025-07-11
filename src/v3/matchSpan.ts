@@ -120,6 +120,7 @@ export interface SpanMatchDefinition<
   type?: SpanType
   status?: SpanStatus
   attributes?: Attributes
+  id?: string
   matchingRelations?:
     | (keyof UnionToIntersection<RelationSchemasT[SelectedRelationNameT]>)[]
     | boolean
@@ -285,6 +286,22 @@ export function withAttributes<
     )
   }
   matcher.fromDefinition = { attributes: attrs }
+  return matcher
+}
+
+export function withId<
+  const SelectedRelationNameT extends keyof RelationSchemasT,
+  const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+  const VariantsT extends string,
+>(
+  value: string,
+): SpanMatcherFn<SelectedRelationNameT, RelationSchemasT, VariantsT> {
+  const matcher: SpanMatcherFn<
+    SelectedRelationNameT,
+    RelationSchemasT,
+    VariantsT
+  > = ({ span }) => span.id === value
+  matcher.fromDefinition = { id: value }
   return matcher
 }
 
@@ -580,6 +597,9 @@ export function fromDefinition<
   }
   if (definition.attributes) {
     matchers.push(withAttributes(definition.attributes))
+  }
+  if (definition.id) {
+    matchers.push(withId(definition.id))
   }
   if (definition.matchingRelations) {
     matchers.push(withMatchingRelations(definition.matchingRelations))

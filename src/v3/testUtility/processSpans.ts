@@ -14,7 +14,11 @@ export function processSpans<
     ProcessedSpan<RelationSchemasT, Span<RelationSchemasT>>
   >()
 
-  spans.forEach((span, i) => {
+  const sortedByEndTime = [...spans].sort((a, b) => {
+    return a.startTime.now + a.duration - (b.startTime.now + b.duration)
+  })
+
+  sortedByEndTime.forEach((span, i) => {
     const spanKey = `${span.type.replace(/-start$/, '')}|${span.name}`
     const existing = startSpansByKey.get(spanKey)
     if (existing) {

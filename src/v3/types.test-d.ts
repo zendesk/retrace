@@ -275,19 +275,19 @@ describe('type tests', () => {
     })
 
     // valid - excess relatedTo
-    traceManager.processSpan({
+    traceManager.createAndProcessSpan({
       ...mockSpanWithoutRelation,
       relatedTo: { ticketId: '123', customFieldId: '123', userId: '123' },
     })
 
     // valid
-    traceManager.processSpan({
+    traceManager.createAndProcessSpan({
       ...mockSpanWithoutRelation,
       relatedTo: { ticketId: '123' },
     })
 
     // valid - multiple relatedTo simultaneously
-    traceManager.processSpan({
+    traceManager.createAndProcessSpan({
       ...mockSpanWithoutRelation,
       relatedTo: {
         ticketId: '123',
@@ -296,7 +296,7 @@ describe('type tests', () => {
     })
 
     // invalid
-    traceManager.processSpan({
+    traceManager.createAndProcessSpan({
       ...mockSpanWithoutRelation,
       relatedTo: {
         // @ts-expect-error bad relatedTo
@@ -305,7 +305,7 @@ describe('type tests', () => {
     })
 
     // invalid
-    traceManager.processSpan({
+    traceManager.createAndProcessSpan({
       ...mockSpanWithoutRelation,
       relatedTo: {
         // @ts-expect-error bad relatedTo

@@ -6,7 +6,7 @@ import {
   expect,
   it,
   type Mock,
-  vitest as jest,
+  vitest,
 } from 'vitest'
 import * as matchSpan from './matchSpan'
 import {
@@ -33,7 +33,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
   let reportErrorFn: Mock<ReportErrorFn<TicketIdRelationSchemasFixture>>
   const DEFAULT_TIMEOUT_DURATION = 45_000
 
-  jest.useFakeTimers({
+  vitest.useFakeTimers({
     now: 0,
   })
 
@@ -49,7 +49,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       trace: 0,
       tick: 0,
     }
-    generateId = jest.fn((type) => {
+    generateId = vitest.fn((type) => {
       const seq = idPerType[type]++
       return type === 'span'
         ? `id-${seq}`
@@ -57,13 +57,13 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
         ? `trace-${seq}`
         : `tick-${seq}`
     })
-    reportFn = jest.fn()
-    reportErrorFn = jest.fn()
+    reportFn = vitest.fn()
+    reportErrorFn = vitest.fn()
   })
 
   afterEach(() => {
-    jest.clearAllMocks()
-    jest.clearAllTimers()
+    vitest.clearAllMocks()
+    vitest.clearAllTimers()
   })
 
   describe('Basic Child Adoption (F-1, F-2)', () => {
@@ -297,7 +297,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       // prettier-ignore
       const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
       Events: ${Render('parent-start', 0)}---${Render('child-1-start', 0)}---${Render('child-2-start', 0)}---${Render('child-1-end', 0)}---${Render('child-2-end', 0)}---${Render('parent-end', 0)}
-      Time:   ${0}                           ${25}                            ${50}                            ${75}                           ${100}                          ${125}
+      Time:   ${0}                           ${25}                           ${50}                           ${75}                         ${100}                        ${125}
       `
 
       processSpans(spans, traceManager)
@@ -2109,7 +2109,10 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
         relationSchemaName: 'ticket',
         requiredSpans: [{ name: 'parent-end' }],
         adoptAsChildren: ['ticket.child-operation'],
-        captureInteractive: true, // Parent uses interactive
+        // Parent uses interactive:
+        captureInteractive: {
+          heavyClusterThreshold: 100,
+        },
         variants: {
           default: { timeout: DEFAULT_TIMEOUT_DURATION },
         },
@@ -2120,7 +2123,8 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
         type: 'operation',
         relationSchemaName: 'ticket',
         requiredSpans: [{ name: 'child-end' }],
-        captureInteractive: true, // Child also has interactive, but should be ignored
+        // Child also defines interactive, but should be ignored
+        captureInteractive: {},
         variants: {
           default: { timeout: DEFAULT_TIMEOUT_DURATION },
         },
@@ -2135,13 +2139,14 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       childTracer.start({
         relatedTo: { ticketId: '1' },
         variant: 'default',
+        startTime: { now: 100 },
       })
 
       // Complete child and parent quickly (no interactive wait)
       // prettier-ignore
       const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
-        Events: ${Render('parent-start', 0)}---${Render('parent-end', 0)}--${LongTask(300)}--${Render('child-end', 0)}--${Check}
-        Time:   ${0}                           ${125}                      ${200}            ${220}                     ${5_000}
+        Events: ${Render('parent-start', 0)}---${Render('child-start', 0)}--${Render('parent-end', 0)}--${LongTask(300)}--${Render('child-end', 0)}--${Check}
+        Time:   ${0}                           ${100}                       ${125}                      ${200}            ${220}                     ${5_000}
       `
 
       processSpans(spans, traceManager)
@@ -2158,12 +2163,12 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       // Both should complete successfully
       expect(childReport?.status).toBe('ok')
       expect(childReport?.parentTraceId).toBe('trace-0')
-      expect(childReport?.duration).toBe(220) // child completes immediately
+      expect(childReport?.duration).toBe(120) // child completes immediately
       expect(childReport?.additionalDurations.startTillInteractive).toBe(null)
 
       expect(parentReport?.status).toBe('ok')
       expect(parentReport?.parentTraceId).toBeUndefined()
-      expect(parentReport?.duration).toBe(125)
+      expect(parentReport?.duration).toBe(220) // parent waits for child to complete
       expect(parentReport?.additionalDurations.startTillInteractive).toBe(500) // last long task starts at 200 + 300 duration
 
       expect(reportErrorFn).not.toHaveBeenCalled()
@@ -2406,8 +2411,8 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
         type: 'operation',
         relationSchemaName: 'ticket',
         requiredSpans: [{ name: 'parent-end' }],
+        debounceOnSpans: [{ name: 'parent-end' }],
         adoptAsChildren: ['ticket.child-operation'],
-        debounceOnSpans: [matchSpan.withName('parent-end')],
         debounceWindow: 200,
         variants: {
           default: { timeout: DEFAULT_TIMEOUT_DURATION },
@@ -2419,7 +2424,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
         type: 'operation',
         relationSchemaName: 'ticket',
         requiredSpans: [{ name: 'child-end' }],
-        debounceOnSpans: [matchSpan.withName('child-end')],
+        debounceOnSpans: [{ name: 'child-end' }],
         debounceWindow: 150,
         variants: {
           default: { timeout: DEFAULT_TIMEOUT_DURATION },
@@ -2441,7 +2446,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       // prettier-ignore
       const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
       Events: ${Render('parent-start', 0)}---${Render('child-start', 0)}---${Render('parent-end', 0)}---${Render('child-end', 0)}---${Render('parent-end', 0)}---${Render('child-end', 0)}---${Check}
-      Time:   ${0}                           ${25}                         ${50}                        ${100}                      ${220}                       ${240}                      ${600}
+      Time:   ${0}                           ${25}                         ${50}                        ${100}                      ${220}                       ${240}                      ${1_600}
       `
 
       processSpans(spans, traceManager)
@@ -2461,7 +2466,7 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       expect(childReport?.parentTraceId).toBe('trace-0')
 
       // Verify debouncing was applied (duration should reflect debounced end times)
-      expect(parentReport?.duration).toBe(220) // parent-start to parent-end
+      expect(parentReport?.duration).toBe(240) // parent-start to child-end
       expect(childReport?.duration).toBe(240) // child-start to child-end, accounting for debounce
       expect(reportErrorFn).not.toHaveBeenCalled()
     })
@@ -2565,10 +2570,10 @@ describe('TraceManager - Child Traces (Nested Proposal)', () => {
       // Create separate error/warning functions for the extended schema
       const extendedReportErrorFn: Mock<
         ReportErrorFn<TicketAndUserAndGlobalRelationSchemasFixture>
-      > = jest.fn()
+      > = vitest.fn()
       const extendedReportWarningFn: Mock<
         ReportErrorFn<TicketAndUserAndGlobalRelationSchemasFixture>
-      > = jest.fn()
+      > = vitest.fn()
 
       const traceManager = new TraceManager({
         relationSchemas: ticketAndUserAndGlobalRelationSchemasFixture,

@@ -963,12 +963,14 @@ describe('TraceManager with Capture Interactivity', () => {
         (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,
       ),
     ).toMatchInlineSnapshot(`
-        events    | start        end
-        timeline  | |-<⋯ +200 ⋯>-|
-        time (ms) | 0            200
-      `)
+      events    |
+      events    | start        task(110)                end
+      timeline  | |-<⋯ +150 ⋯>-[+++++++++++++++++++++++++++++++++++++++++++++++++++++]
+      timeline  | -<⋯ +200 ⋯>---------------------------|-<⋯ +60 ⋯>-------------------
+      time (ms) | 0            150                      200
+    `)
 
-    const lastLongTask = spans.at(-2)!
+    const lastLongTask = spans.at(-3)!
     const expectedResult = lastLongTask.startTime.now + lastLongTask.duration
 
     expect(report.name).toBe('ticket.operation')

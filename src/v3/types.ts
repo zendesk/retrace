@@ -8,7 +8,7 @@ import type {
   Span,
   SpanStatus,
 } from './spanTypes'
-import type { AllPossibleTraces, FinalTransition } from './Trace'
+import type { AllPossibleTraces, FinalTransition, Trace } from './Trace'
 import type { TraceRecording } from './traceRecordingTypes'
 import type {
   ArrayWithAtLeastOneElement,
@@ -282,11 +282,19 @@ export interface TraceManagerUtilities<
 > extends TraceManagerConfig<RelationSchemasT> {
   /**
    * interrupts the active trace (if any) and replaces it with a new one
+   * returns the new Trace
    */
-  replaceCurrentTrace: (
-    newTrace: AllPossibleTraces<RelationSchemasT>,
+  replaceCurrentTrace: <
+    const SelectedRelationNameT extends keyof RelationSchemasT,
+    const VariantsT extends string,
+  >(
+    getNewTrace: () => Trace<
+      SelectedRelationNameT,
+      RelationSchemasT,
+      VariantsT
+    >,
     reason: TraceReplaceInterruptionReason,
-  ) => void
+  ) => Trace<SelectedRelationNameT, RelationSchemasT, VariantsT>
   onTraceEnd: (
     trace: AllPossibleTraces<RelationSchemasT>,
     finalTransition: FinalTransition<RelationSchemasT>,
@@ -303,6 +311,13 @@ export interface TraceUtilities<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 > extends TraceManagerUtilities<RelationSchemasT> {
   performanceEntryDeduplicationStrategy?: SpanDeduplicationStrategy<RelationSchemasT>
+  parentTraceRef: AllPossibleTraces<RelationSchemasT> | undefined
+}
+
+export interface TraceChildUtilities<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> extends TraceUtilities<RelationSchemasT> {
+  parentTraceRef: AllPossibleTraces<RelationSchemasT>
 }
 
 export interface TraceDefinitionModifications<

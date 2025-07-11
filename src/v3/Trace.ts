@@ -1099,6 +1099,7 @@ export class TraceStateMachine<
           lastRelevantSpanAndAnnotation: this.lastRelevant,
           cpuIdleSpanAndAnnotation: undefined,
         }),
+
       onChildEnd: (event: ChildEndEvent<RelationSchemasT>) => {
         // Check if child was interrupted and handle accordingly
         if (event.terminalState === 'interrupted' && event.interruption) {
@@ -1277,14 +1278,20 @@ export class TraceStateMachine<
         transitionFromState,
       }
 
+      const settledTransition =
+        this.emit('onEnterState', onEnterStateEvent, true) ?? onEnterStateEvent
+
       // Emit state transition event
       this.#context.eventSubjects['state-transition'].next({
         traceContext: this.#context,
-        stateTransition: onEnterStateEvent,
+        stateTransition:
+          settledTransition === onEnterStateEvent
+            ? onEnterStateEvent
+            : {
+                ...settledTransition,
+                transitionFromState,
+              },
       })
-
-      const settledTransition =
-        this.emit('onEnterState', onEnterStateEvent, true) ?? onEnterStateEvent
 
       // Complete all event observables when reaching a terminal state
       if (!internal && isEnteringTerminalState(settledTransition)) {
@@ -1345,6 +1352,7 @@ export class Trace<
   ) {
     this.input = value
   }
+  wasReplaced = false
 
   input: DraftTraceInput<RelationSchemasT[SelectedRelationNameT], VariantsT>
   readonly traceUtilities: TraceUtilities<RelationSchemasT>
@@ -1382,8 +1390,15 @@ export class Trace<
 
   // Child trace management methods
   adoptChild(childTrace: AllPossibleTraces<RelationSchemasT>): void {
+    if (childTrace.wasReplaced) {
+      // If the child trace was replaced, we should not adopt it
+      return
+    }
     // Add child to the children set
     this.children.add(childTrace)
+    // update the child trace's parent reference
+    // eslint-disable-next-line no-param-reassign
+    childTrace.traceUtilities.parentTraceRef = this
   }
 
   onChildEnd(
@@ -1549,12 +1564,7 @@ export class Trace<
           }
         : data
 
-    this.traceUtilities = {
-      ...traceUtilities,
-      // every trace gets its own deduplication strategy instance:
-      performanceEntryDeduplicationStrategy:
-        traceUtilities.getPerformanceEntryDeduplicationStrategy?.(),
-    }
+    this.traceUtilities = traceUtilities
 
     this.sourceDefinition = definition
 
@@ -1659,7 +1669,7 @@ export class Trace<
       this.processedPerformanceEntries =
         data.importFrom.processedPerformanceEntries
 
-      // transplant children:
+      // adopt children happens after replaying items (to avoid children re-processing them):
       for (const child of data.importFrom.children) {
         this.adoptChild(child)
       }
@@ -1704,19 +1714,24 @@ export class Trace<
       )
     },
     onTerminalStateReached: (transition) => {
-      this.postProcessSpans()
-
       let traceRecording:
         | TraceRecording<SelectedRelationNameT, RelationSchemasT>
         | undefined
-      // we never report after definition-changed;
-      // it just means the Trace object has just been recreated
-      if (transition.interruption?.reason !== 'definition-changed') {
-        // this is an actual interruption:
-        // interrupt all children
-        for (const child of this.children) {
-          child.interrupt({ reason: 'parent-interrupted' })
+
+      const traceWillContinueUnderNewInstance =
+        transition.interruption?.reason === 'definition-changed'
+
+      if (!traceWillContinueUnderNewInstance) {
+        this.postProcessSpans()
+
+        if (transition.transitionToState === 'interrupted') {
+          // this is an actual interruption:
+          // interrupt all children
+          for (const child of this.children) {
+            child.interrupt({ reason: 'parent-interrupted' })
+          }
         }
+
         traceRecording = createTraceRecording(
           // we don't want to pass 'this' but select the relevant properties
           // to avoid circular references
@@ -1728,26 +1743,33 @@ export class Trace<
           },
           transition,
         )
+
+        // we only report if the reason is anything other than "definition-changed",
+        // which just means the Trace object has just been recreated
         this.traceUtilities.reportFn(traceRecording, this)
       }
 
       this.traceUtilities.onTraceEnd(this, transition, traceRecording)
 
-      // close all event subjects, no more events can be sent by this trace
-      for (const subject of Object.values(this.eventSubjects)) {
-        subject.complete()
-      }
-      // memory clean-up in case something retains the Trace instance
-      this.recordedItems = new Map()
-      this.occurrenceCounters = new Map()
-      this.processedPerformanceEntries = new WeakMap()
-      // @ts-expect-error memory cleanup force override the otherwise readonly property
-      this.recordedItemsByLabel = {}
+      // delay clean-up to next tick so that if this is a "definition-changed"
+      // we can import the trace into a new instance before the data is cleared
+      setTimeout(() => {
+        // close all event subjects, no more events can be sent by this trace
+        for (const subject of Object.values(this.eventSubjects)) {
+          subject.complete()
+        }
+        // memory clean-up in case something retains the Trace instance
+        this.recordedItems = new Map()
+        this.occurrenceCounters = new Map()
+        this.processedPerformanceEntries = new WeakMap()
+        // @ts-expect-error memory cleanup force override the otherwise readonly property
+        this.recordedItemsByLabel = {}
 
-      // Clear child references for garbage collection
-      this.children.clear()
-      this.terminalStateChildren.clear()
-      this.traceUtilities.performanceEntryDeduplicationStrategy?.reset()
+        // Clear child references for garbage collection
+        this.children.clear()
+        this.terminalStateChildren.clear()
+        this.traceUtilities.performanceEntryDeduplicationStrategy?.reset()
+      })
     },
   }
 
@@ -2086,15 +2108,20 @@ export class Trace<
     // make sure the labels are up-to-date
     spanAndAnnotation.annotation.labels = this.getSpanLabels(spanAndAnnotation)
 
-    this.stateMachine.emit('onProcessSpan', spanAndAnnotation)
-
     // the record is used for reporting the annotation externally (e.g. to the RUM agent)
     const annotationRecord: SpanAnnotationRecord = {}
 
-    // Forward span to all still-running children (F-7), and merge result into annotation record
+    // Forward span to all still-running children first, and merge result into annotation record
     for (const child of this.children) {
       Object.assign(annotationRecord, child.processSpan(span)?.annotationRecord)
     }
+
+    // Finally, process the span in the current trace.
+    // The reason it *must* be done in this order, is because processing the span on the child
+    // might have ended the child trace, which would emit an event on the parent,
+    // potentially changing the state of the parent trace.
+    // See test "should handle child adoption with debouncing" for an example where this might happen.
+    this.stateMachine.emit('onProcessSpan', spanAndAnnotation)
 
     annotationRecord[this.definition.name] = spanAndAnnotation.annotation
 
@@ -2102,6 +2129,33 @@ export class Trace<
       annotationRecord,
       spanAndAnnotation,
     }
+  }
+
+  /**
+   * Creates a new trace that adds additional required spans or debounce spans.
+   * Note: This recreates the Trace instance with the modified definition
+   * and replays all the recorded spans immediately.
+   */
+  recreateTraceWithDefinitionModifications(
+    definitionModifications: TraceDefinitionModifications<
+      SelectedRelationNameT,
+      RelationSchemasT,
+      VariantsT
+    >,
+  ): Trace<SelectedRelationNameT, RelationSchemasT, VariantsT> {
+    this.wasReplaced = true
+    // Create a new trace with the updated definition, importing state from the existing trace
+    // Replace the current trace with the new one
+    const newTrace = this.traceUtilities.replaceCurrentTrace(
+      () =>
+        new Trace<SelectedRelationNameT, RelationSchemasT, VariantsT>({
+          importFrom: this,
+          definitionModifications,
+        }),
+      'definition-changed',
+    )
+
+    return newTrace
   }
 
   private getSpanLabels(span: SpanAndAnnotation<RelationSchemasT>): string[] {
