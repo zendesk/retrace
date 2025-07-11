@@ -63,7 +63,7 @@ export const generateUseBeacon =
       if (!renderStartRef.current) {
         return
       }
-      const maybeNewParent = renderStartRef.current.resolveParent()
+      const maybeNewParent = renderStartRef.current.resolveParent(true)
       parentSpanRef.current = maybeNewParent ?? parentSpanRef.current
 
       const currentTrace = traceManager.currentTraceContext
