@@ -23,7 +23,7 @@ export function processSpans<
       startSpansByKey.delete(spanKey)
       return
     }
-    const processed = traceManager.processSpan(span)
+    const processed = traceManager.createAndProcessSpan(span)
     if (span.type.endsWith('-start')) {
       startSpansByKey.set(spanKey, processed)
     }

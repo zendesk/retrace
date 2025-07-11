@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useOnComponentUnmount } from '../ErrorBoundary'
 import type { BeaconConfig, UseBeacon } from './hooksTypes'
 import type { ProcessedSpan } from './spanAnnotationTypes'
-import { type ComponentRenderSpan, PARENT_SPAN, type Span } from './spanTypes'
+import { type ComponentRenderSpan, type Span } from './spanTypes'
 import type { TraceManager } from './TraceManager'
 import type { RelationSchemasBase, RelationsOnASpan } from './types'
 

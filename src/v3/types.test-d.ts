@@ -13,6 +13,7 @@ const mockSpanWithoutRelation = {
   type: 'mark',
   attributes: {},
   startTime: { now: 0, epoch: 0 },
+  getParentSpan: () => undefined,
 } as const
 
 describe('type tests', () => {

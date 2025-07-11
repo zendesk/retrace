@@ -1414,6 +1414,7 @@ export class Trace<
         duration: childRecording.duration,
         status: childRecording.status,
         relatedTo: { ...childRecording.relatedTo },
+        getParentSpan: () => undefined,
       })
     }
 

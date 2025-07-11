@@ -29,6 +29,7 @@ const mockEntryBase = {
   },
   duration: 100,
   status: 'ok',
+  getParentSpan: () => undefined,
 } as const satisfies SpanBase<TicketIdRelationSchemasFixture>
 
 const mockPerformanceEntry = {

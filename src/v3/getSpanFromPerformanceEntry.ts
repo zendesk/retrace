@@ -23,8 +23,8 @@ export function getSpanFromPerformanceEntry<
   inputEntry: PerformanceEntry,
   deriveRelationFromPerformanceEntry?: DeriveRelationsFromPerformanceEntryFn<RelationSchemasT>,
 ):
-  | Omit<PerformanceEntrySpan<RelationSchemasT>, 'id'>
-  | Omit<ResourceSpan<RelationSchemasT>, 'id'>
+  | Omit<PerformanceEntrySpan<RelationSchemasT>, 'id' | 'getParentSpan'>
+  | Omit<ResourceSpan<RelationSchemasT>, 'id' | 'getParentSpan'>
   | undefined {
   // react in dev mode generates hundreds of these marks, ignore them
   if (inputEntry.entryType === 'mark' && inputEntry.name.startsWith('--')) {
@@ -81,7 +81,10 @@ export function getSpanFromPerformanceEntry<
     now: inputEntry.startTime,
   }
 
-  const traceEntry: Omit<PerformanceEntrySpan<RelationSchemasT>, 'id'> = {
+  const traceEntry: Omit<
+    PerformanceEntrySpan<RelationSchemasT>,
+    'id' | 'getParentSpan'
+  > = {
     type,
     name,
     startTime: ensureTimestamp(timestamp),

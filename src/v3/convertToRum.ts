@@ -4,6 +4,7 @@ import type { SpanAndAnnotationForMatching, SpanMatcherFn } from './matchSpan'
 import type { SpanAndAnnotation } from './spanAnnotationTypes'
 import type { ComponentRenderSpan, Span } from './spanTypes'
 import type {
+  RecordedSpan,
   RecordedSpanAndAnnotation,
   TraceRecording,
   TraceRecordingBase,
@@ -53,7 +54,7 @@ export interface RumTraceRecording<
   spanAttributes: SpanSummaryAttributes
 
   longestSpan:
-    | (SpanAndAnnotation<RelationSchemasT> & { key: string })
+    | (RecordedSpanAndAnnotation<RelationSchemasT> & { key: string })
     | undefined
 
   // allow for additional attributes to be added by the consumer
@@ -62,7 +63,9 @@ export interface RumTraceRecording<
 
 export function isRenderEntry<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
->(span: Span<RelationSchemasT>): span is ComponentRenderSpan<RelationSchemasT> {
+>(
+  span: Span<RelationSchemasT> | RecordedSpan<RelationSchemasT>,
+): span is ComponentRenderSpan<RelationSchemasT> {
   return (
     span.type === 'component-render' ||
     span.type === 'component-render-start' ||
@@ -74,7 +77,9 @@ function updateEmbeddedEntry<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 >(
   embeddedEntry: EmbeddedEntry,
-  spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>,
+  spanAndAnnotation:
+    | SpanAndAnnotation<RelationSchemasT>
+    | RecordedSpanAndAnnotation<RelationSchemasT>,
 ): EmbeddedEntry {
   const { annotation, span } = spanAndAnnotation
   return {
@@ -92,7 +97,12 @@ function updateEmbeddedEntry<
 
 function createEmbeddedEntry<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
->({ span, annotation }: SpanAndAnnotation<RelationSchemasT>): EmbeddedEntry {
+>({
+  span,
+  annotation,
+}:
+  | SpanAndAnnotation<RelationSchemasT>
+  | RecordedSpanAndAnnotation<RelationSchemasT>): EmbeddedEntry {
   return {
     count: 1,
     totalDuration: span.duration,
@@ -140,9 +150,11 @@ export function getSpanSummaryAttributes<
 export function findLongestSpan<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 >(
-  spanAndAnnotations: readonly SpanAndAnnotation<RelationSchemasT>[],
-  filter?: (spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>) => boolean,
-): SpanAndAnnotation<RelationSchemasT> | undefined {
+  spanAndAnnotations: readonly RecordedSpanAndAnnotation<RelationSchemasT>[],
+  filter?: (
+    spanAndAnnotation: RecordedSpanAndAnnotation<RelationSchemasT>,
+  ) => boolean,
+): RecordedSpanAndAnnotation<RelationSchemasT> | undefined {
   const filteredSpans = filter
     ? spanAndAnnotations.filter(filter)
     : spanAndAnnotations
@@ -218,7 +230,7 @@ export function convertTraceToRUM<
     computedRenderBeaconSpans,
     ...otherTraceRecordingAttributes
   } = traceRecording
-  const embeddedEntries: SpanAndAnnotation<RelationSchemasT>[] = []
+  const embeddedEntries: RecordedSpanAndAnnotation<RelationSchemasT>[] = []
   const nonEmbeddedSpans = new Set<string>()
   const spanAttributes = getSpanSummaryAttributes(traceRecording.entries)
 

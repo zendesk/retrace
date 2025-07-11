@@ -144,15 +144,16 @@ export interface SpanBase<
   error?: Error
 
   /**
-   * Optional parent span, if known. Takes precedence over getParentSpan.
+   * Optional parent span, if known.
    * Non-enumerable (symbol).
    */
   [PARENT_SPAN]?: Span<RelationSchemasT>
 
   /**
-   * Resolve parentSpanId after the Trace is completed. Takes precedence over parentSpanMatcher.
+   * Resolve parentSpanId after the Trace is completed, or on demand.
+   * Set internally.
    */
-  getParentSpan?: GetParentSpanFn<RelationSchemasT>
+  getParentSpan: GetParentSpanFn<RelationSchemasT>
 
   /**
    * The ID of the tick in which the span was created.
@@ -317,7 +318,7 @@ export type AutoAddedSpanProperties =
   | 'startTime'
   | 'attributes'
   | 'duration'
-  | 'parentSpanId'
+  | 'getParentSpan'
 
 export type ConvenienceSpan<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,

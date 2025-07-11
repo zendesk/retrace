@@ -239,58 +239,6 @@ describe('creating spans', () => {
     })
   })
 
-  describe('parent span resolution with getParentSpanId', () => {
-    let activeTrace: string | undefined
-
-    beforeEach(() => {
-      // Create a tracer to enable trace recording
-      const tracer = traceManager.createTracer({
-        name: 'test-operation',
-        relationSchemaName: 'ticket',
-        requiredSpans: [{ name: 'end' }],
-        variants: {
-          default: { timeout: 10_000 },
-        },
-      })
-
-      // Start a trace to have an active context
-      activeTrace = tracer.start({
-        relatedTo: { ticketId: '123' },
-        variant: 'default',
-      })
-    })
-
-    it('should resolve parent span using getParentSpanId function', () => {
-      // Create a parent span first
-      const parentResult = traceManager.createAndProcessSpan({
-        type: 'mark',
-        name: 'parent-span',
-        relatedTo: { ticketId: '123' },
-      })
-
-      // Create a child span with getParentSpanId function
-      const childResult = traceManager.createAndProcessSpan({
-        type: 'mark',
-        name: 'child-span',
-        relatedTo: { ticketId: '123' },
-        getParentSpan: ({ thisSpanAndAnnotation }) => {
-          // Find the parent span by name
-          for (const span of thisSpanAndAnnotation.span[TICK_META]
-            ?.spansInCurrentTick ?? []) {
-            if (span.name === 'parent-span') {
-              return span
-            }
-          }
-          return undefined
-        },
-      })
-
-      const resolvedParent = childResult.resolveParent()
-      expect(resolvedParent?.id).toBe(parentResult.span.id)
-      expect(resolvedParent?.name).toBe('parent-span')
-    })
-  })
-
   describe('parent span resolution with parentSpanMatcher', () => {
     let activeTrace: string | undefined
 
@@ -312,7 +260,7 @@ describe('creating spans', () => {
       })
     })
 
-    it('should create getParentSpanId function from parentSpanMatcher for span-created-tick search', () => {
+    it('should create getParentSpan function from parentSpanMatcher for span-created-tick search', () => {
       // Create spans with parent resolution in the same tick
       const parentSpan = traceManager.ensureCompleteSpan({
         type: 'mark',
@@ -372,7 +320,7 @@ describe('creating spans', () => {
       expect(childSpan[PARENT_SPAN]).toBe(parentSpan)
     })
 
-    it('should create getParentSpanId function from parentSpanMatcher for span-created-tick search with after-self direction', () => {
+    it('should create getParentSpan function from parentSpanMatcher for span-created-tick search with after-self direction', () => {
       // Process the child span
       const childSpan = traceManager.ensureCompleteSpan({
         type: 'mark',
@@ -432,7 +380,7 @@ describe('creating spans', () => {
       expect(childSpan[PARENT_SPAN]).toBe(parentSpan)
     })
 
-    it('should create getParentSpanId function from parentSpanMatcher for entire-recording search', async () => {
+    it('should create getParentSpan function from parentSpanMatcher for entire-recording search', async () => {
       // Create parent span first
       const parentSpan = traceManager.ensureCompleteSpan({
         type: 'mark',
@@ -520,92 +468,6 @@ describe('creating spans', () => {
       expect(span1.tickId).not.toBe(span2.tickId)
       expect(span1.tickId).toBeDefined()
       expect(span2.tickId).toBeDefined()
-    })
-
-    it('should provide tick context in getParentSpanId calls', async () => {
-      let capturedContext:
-        | GetParentSpanContext<TicketIdRelationSchemasFixture>
-        | undefined
-
-      // Create a tracer to enable trace recording
-      const tracer = traceManager.createTracer({
-        name: 'tick-context-test',
-        relationSchemaName: 'ticket',
-        requiredSpans: [{ name: 'end' }],
-        variants: {
-          default: { timeout: 10_000 },
-        },
-      })
-
-      // Start a trace
-      const traceId = tracer.start({
-        relatedTo: { ticketId: '123' },
-        variant: 'default',
-      })
-
-      const span1 = traceManager.ensureCompleteSpan({
-        type: 'mark',
-        name: 'span1',
-        relatedTo: { ticketId: '123' },
-      })
-      traceManager.processSpan(span1)
-
-      const spanWithParentResolver = traceManager.ensureCompleteSpan({
-        type: 'mark',
-        name: 'child',
-        relatedTo: { ticketId: '123' },
-        getParentSpan: (context) => {
-          capturedContext = context
-          // Return the first span as parent
-          return context.thisSpanAndAnnotation.span[TICK_META]
-            ?.spansInCurrentTick[0]
-        },
-      })
-      traceManager.processSpan(spanWithParentResolver)
-
-      const span2 = traceManager.ensureCompleteSpan({
-        type: 'mark',
-        name: 'span2',
-        relatedTo: { ticketId: '123' },
-      })
-      traceManager.processSpan(span2)
-
-      // trigger next tick, so the endSpan is processed in a new tick
-      await waitOneTick()
-
-      // Add the required end span to complete the trace
-      const endSpan = traceManager.ensureCompleteSpan({
-        type: 'mark',
-        name: 'end',
-        relatedTo: { ticketId: '123' },
-      })
-      traceManager.processSpan(endSpan)
-
-      // The getParentSpanId should have been called with tick context
-      expect(capturedContext).toBeDefined()
-      expect(
-        capturedContext!.thisSpanAndAnnotation.span[TICK_META]
-          ?.spansInCurrentTick,
-      ).toHaveLength(3) // span1, spanWithParentResolver, span2
-      expect(
-        capturedContext!.thisSpanAndAnnotation.span[TICK_META]
-          ?.thisSpanInCurrentTickIndex,
-      ).toBe(1) // spanWithParentResolver was processed second
-      expect(
-        capturedContext!.thisSpanAndAnnotation.span[TICK_META]
-          ?.spansInCurrentTick[0],
-      ).toBe(span1)
-      expect(
-        capturedContext!.thisSpanAndAnnotation.span[TICK_META]
-          ?.spansInCurrentTick[1],
-      ).toBe(spanWithParentResolver)
-      expect(
-        capturedContext!.thisSpanAndAnnotation.span[TICK_META]
-          ?.spansInCurrentTick[2],
-      ).toBe(span2)
-
-      // Verify that the parent span was actually set
-      expect(spanWithParentResolver[PARENT_SPAN]).toBe(span1)
     })
   })
 
@@ -705,47 +567,10 @@ describe('creating spans', () => {
         name: 'test-span',
       })
 
-      const annotations = traceManagerNoTicks.processSpan(span)
+      const processed = traceManagerNoTicks.processSpan(span)
 
       expect(span.tickId).toBeUndefined()
       expect(span.id).toBeDefined()
-    })
-
-    it('should handle getParentSpanId that returns undefined', () => {
-      const result = traceManager.createAndProcessSpan({
-        type: 'mark',
-        name: 'child-span',
-        relatedTo: { ticketId: '123' },
-        getParentSpan: () => undefined,
-      })
-
-      expect(result.span[PARENT_SPAN]).toBeUndefined()
-      expect(result.resolveParent()).toBeUndefined()
-    })
-
-    it('should handle missing parent span in synchronous resolution', () => {
-      // Create a tracer for active context
-      const tracer = traceManager.createTracer({
-        name: 'test-operation',
-        relationSchemaName: 'ticket',
-        requiredSpans: [{ name: 'end' }],
-        variants: {
-          default: { timeout: 10_000 },
-        },
-      })
-
-      tracer.start({
-        relatedTo: { ticketId: '123' },
-        variant: 'default',
-      })
-
-      const childResult = traceManager.createAndProcessSpan({
-        type: 'mark',
-        name: 'child-span',
-        getParentSpan: () => undefined,
-      })
-
-      expect(childResult.resolveParent()).toBeUndefined() // parent not found in recorded items
     })
   })
 
@@ -1327,7 +1152,7 @@ describe('creating spans', () => {
         attributes: { level: 'root' },
       })
 
-      // Create parent with explicit parentSpanId
+      // Create parent with explicit parentSpan
       const parentResult = traceManager.createAndProcessSpan({
         type: 'mark',
         name: 'parent',
@@ -1336,7 +1161,7 @@ describe('creating spans', () => {
         attributes: { level: 'middle' },
       })
 
-      // Create child with explicit parentSpanId
+      // Create child with explicit parentSpan
       const childResult = traceManager.createAndProcessSpan({
         type: 'mark',
         name: 'child',
@@ -1390,23 +1215,6 @@ describe('creating spans', () => {
       expect(found?.name).toBe('root')
     })
 
-    // it('should work with just an object containing id', () => {
-    //   const result = traceManager.createAndProcessSpan({
-    //     type: 'mark',
-    //     name: 'target-span',
-    //     relatedTo: { ticketId: '123' },
-    //   })
-
-    //   // Use just an object with id instead of full span
-    //   const found = traceManager.findSpanInParentHierarchy(
-    //     { id: result.span.id },
-    //     { name: 'target-span' },
-    //   )
-
-    //   expect(found).toBeDefined()
-    //   expect(found?.id).toBe(result.span.id)
-    // })
-
     it('should return undefined when no match is found in hierarchy', () => {
       const parentResult = traceManager.createAndProcessSpan({
         type: 'mark',
@@ -1425,34 +1233,6 @@ describe('creating spans', () => {
       const found = traceManager.findSpanInParentHierarchy(childResult.span, {
         name: 'non-existent',
       })
-
-      expect(found).toBeUndefined()
-    })
-
-    it('should return undefined when no current trace is available', () => {
-      // Complete the trace first
-      const endSpan = traceManager.ensureCompleteSpan({
-        type: 'mark',
-        name: 'end',
-        relatedTo: { ticketId: '123' },
-      })
-      traceManager.processSpan(endSpan)
-
-      // Now there's no current trace
-      expect(traceManager.currentTraceContext).toBeUndefined()
-
-      const found = traceManager.findSpanInParentHierarchy(endSpan, {
-        name: 'any-name',
-      })
-
-      expect(found).toBeUndefined()
-    })
-
-    it('should return undefined when span is not found in recorded items', () => {
-      const found = traceManager.findSpanInParentHierarchy(
-        { id: 'non-existent-span-id' } as Span<TicketIdRelationSchemasFixture>,
-        { name: 'any-name' },
-      )
 
       expect(found).toBeUndefined()
     })
@@ -1508,48 +1288,6 @@ describe('creating spans', () => {
       expect(found).toBeDefined()
       expect(found?.id).toBe(parentResult.span.id)
       expect(found?.name).toBe('dynamic-parent')
-    })
-
-    it('should work with spans that have getParentSpanId function', () => {
-      // Create parent first
-      const parentResult = traceManager.createAndProcessSpan({
-        type: 'mark',
-        name: 'resolved-parent',
-        relatedTo: { ticketId: '123' },
-      })
-
-      // Create child with getParentSpanId function instead of explicit parentSpanId
-      const childResult = traceManager.createAndProcessSpan({
-        type: 'mark',
-        name: 'child-with-resolver',
-        relatedTo: { ticketId: '123' },
-        getParentSpan: () => parentResult.span,
-      })
-
-      const found = traceManager.findSpanInParentHierarchy(childResult.span, {
-        name: 'resolved-parent',
-      })
-
-      expect(found).toBeDefined()
-      expect(found?.id).toBe(parentResult.span.id)
-    })
-
-    it('should handle getParentSpanId that throws an error', () => {
-      const childResult = traceManager.createAndProcessSpan({
-        type: 'mark',
-        name: 'problematic-child',
-        relatedTo: { ticketId: '123' },
-        getParentSpan: () => {
-          throw new Error('Parent resolution failed')
-        },
-      })
-
-      // Should handle the error gracefully and return undefined since no parent can be found
-      const found = traceManager.findSpanInParentHierarchy(childResult.span, {
-        name: 'any-parent',
-      })
-
-      expect(found).toBeUndefined()
     })
 
     it('should stop traversal when parent span is not found in recorded items', () => {

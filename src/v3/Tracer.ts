@@ -291,6 +291,7 @@ export class Tracer<
         attributes: {},
         duration: 0,
         error,
+        getParentSpan: () => undefined,
       })
       trace.interrupt({ reason: 'aborted' })
       return

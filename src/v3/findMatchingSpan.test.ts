@@ -33,6 +33,7 @@ const createMockSpan = (
   },
   duration: 100,
   status: 'ok',
+  getParentSpan: () => undefined,
   ...overrides,
 })
 
