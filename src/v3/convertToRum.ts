@@ -2,8 +2,14 @@
 import { getSpanKey } from './getSpanKey'
 import type { SpanAndAnnotationForMatching, SpanMatcherFn } from './matchSpan'
 import type { SpanAndAnnotation } from './spanAnnotationTypes'
-import type { ComponentRenderSpan, Span } from './spanTypes'
 import type {
+  ChildOperationSpan,
+  ComponentRenderSpan,
+  PARENT_SPAN,
+  Span,
+} from './spanTypes'
+import type {
+  ComputedRenderSpan,
   RecordedSpan,
   RecordedSpanAndAnnotation,
   TraceRecording,
@@ -56,6 +62,8 @@ export interface RumTraceRecording<
   longestSpan:
     | (RecordedSpanAndAnnotation<RelationSchemasT> & { key: string })
     | undefined
+
+  childOperations: Record<string, ChildOperationData<RelationSchemasT>>
 
   // allow for additional attributes to be added by the consumer
   [key: string]: unknown
@@ -206,6 +214,43 @@ function recursivelyRoundValues<T extends object>(
   return result as T
 }
 
+function filterRenderSpanAttributes(
+  computedRenderBeaconSpans: { [spanName: string]: ComputedRenderSpan },
+  keepComputedRenderBeaconSpanAttributes: false | string[] | undefined,
+) {
+  let computedRenderBeaconSpansTransformed: typeof computedRenderBeaconSpans =
+    {}
+  if (keepComputedRenderBeaconSpanAttributes !== undefined) {
+    computedRenderBeaconSpansTransformed = Object.fromEntries(
+      Object.entries(computedRenderBeaconSpans).map(
+        ([key, { attributes, ...span }]) => {
+          if (keepComputedRenderBeaconSpanAttributes === false || !attributes) {
+            return [key, { ...span }]
+          }
+          const filteredAttributes: Record<string, unknown> = {}
+          for (const attr of keepComputedRenderBeaconSpanAttributes) {
+            if (attr in attributes) {
+              filteredAttributes[attr] = attributes[attr]
+            }
+          }
+          return [key, { ...span, attributes: filteredAttributes }]
+        },
+      ),
+    )
+  }
+  return computedRenderBeaconSpansTransformed
+}
+
+type ChildOperationData<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> = Omit<
+  ChildOperationSpan<RelationSchemasT>,
+  typeof PARENT_SPAN | 'getParentSpan' | 'entries'
+> & {
+  operationRelativeStartTime: number
+  operationRelativeEndTime: number
+}
+
 export function convertTraceToRUM<
   const SelectedRelationNameT extends keyof RelationSchemasT,
   const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
@@ -233,8 +278,27 @@ export function convertTraceToRUM<
   const embeddedEntries: RecordedSpanAndAnnotation<RelationSchemasT>[] = []
   const nonEmbeddedSpans = new Set<string>()
   const spanAttributes = getSpanSummaryAttributes(traceRecording.entries)
+  const childOperations: Record<
+    string,
+    ChildOperationData<RelationSchemasT>
+  > = {}
 
   for (const spanAndAnnotation of entries) {
+    if (spanAndAnnotation.span.type === 'operation') {
+      // note: if there were multiple child operations of the same name,
+      // we will only keep the last one, as they are keyed by name
+      childOperations[spanAndAnnotation.span.name] = {
+        ...spanAndAnnotation.span,
+        computedRenderBeaconSpans: filterRenderSpanAttributes(
+          spanAndAnnotation.span.computedRenderBeaconSpans,
+          keepComputedRenderBeaconSpanAttributes,
+        ),
+        operationRelativeStartTime:
+          spanAndAnnotation.annotation.operationRelativeStartTime,
+        operationRelativeEndTime:
+          spanAndAnnotation.annotation.operationRelativeEndTime,
+      }
+    }
     const isEmbedded = embedSpanSelector(spanAndAnnotation, context)
     if (isEmbedded) {
       embeddedEntries.push(spanAndAnnotation)
@@ -266,26 +330,10 @@ export function convertTraceToRUM<
     }
   }
 
-  let computedRenderBeaconSpansTransformed: typeof computedRenderBeaconSpans =
-    {}
-  if (keepComputedRenderBeaconSpanAttributes !== undefined) {
-    computedRenderBeaconSpansTransformed = Object.fromEntries(
-      Object.entries(computedRenderBeaconSpans).map(
-        ([key, { attributes, ...span }]) => {
-          if (keepComputedRenderBeaconSpanAttributes === false || !attributes) {
-            return [key, { ...span }]
-          }
-          const filteredAttributes: Record<string, unknown> = {}
-          for (const attr of keepComputedRenderBeaconSpanAttributes) {
-            if (attr in attributes) {
-              filteredAttributes[attr] = attributes[attr]
-            }
-          }
-          return [key, { ...span, attributes: filteredAttributes }]
-        },
-      ),
-    )
-  }
+  const computedRenderBeaconSpansTransformed = filterRenderSpanAttributes(
+    computedRenderBeaconSpans,
+    keepComputedRenderBeaconSpanAttributes,
+  )
 
   const longestSpanAndAnnotation = findLongestSpan(
     entries,
@@ -303,6 +351,7 @@ export function convertTraceToRUM<
       ...longestSpanAndAnnotation,
       key: getSpanKey(longestSpanAndAnnotation.span),
     },
+    childOperations,
   }
 
   // we want to decrease precision to improve readability of the output, and decrease the payload size

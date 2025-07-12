@@ -1404,7 +1404,7 @@ export class Trace<
   onChildEnd(
     childTrace: AllPossibleTraces<RelationSchemasT>,
     stateTransition: FinalTransition<RelationSchemasT>,
-    childRecording:
+    traceRecording:
       | TraceRecording<keyof RelationSchemasT, RelationSchemasT>
       | undefined,
   ): void {
@@ -1419,16 +1419,18 @@ export class Trace<
         : undefined
 
     if (
-      typeof childRecording?.duration === 'number' &&
-      childRecording.status !== 'interrupted'
+      typeof traceRecording?.duration === 'number' &&
+      traceRecording.status !== 'interrupted'
     ) {
-      // TODO: should this be sent to TraceManager, or just this Trace (parent)?
+      const { entries: _, ...childOperationSpan } = traceRecording
+      // TODO: should this child operation span be sent just this Trace (parent), or to TraceManager globally?
+      // if to globally, then maybe instead of here, we should just emit this as a span after any trace ends?
       this.processSpan({
-        ...childRecording,
+        ...childOperationSpan,
         // these below just to satisfy TS, they're already in ...childRecording:
-        duration: childRecording.duration,
-        status: childRecording.status,
-        relatedTo: { ...childRecording.relatedTo },
+        duration: traceRecording.duration,
+        status: traceRecording.status,
+        relatedTo: { ...traceRecording.relatedTo },
         getParentSpan: () => undefined,
       })
     }
