@@ -297,7 +297,6 @@ export interface ErrorLike {
   name?: string
   stack?: string
   cause?: unknown
-  [otherProps: string]: unknown
 }
 
 export interface ErrorSpan<
