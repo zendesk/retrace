@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as React from 'react'
 import {
   formatMatcher,
@@ -1315,16 +1315,21 @@ export default function TraceManagerDebugger<
   float = false,
   traceHistoryLimit = TRACE_HISTORY_LIMIT,
 }: TraceManagerDebuggerProps<RelationSchemasT>) {
-  const [traces, setTraces] = useState<
-    Map<string, TraceInfo<RelationSchemasT>>
-  >(new Map())
+  const [, setDummyRerenderState] = useState<number>(0)
+  const performActionAndRerender = useCallback(
+    (action: () => undefined) => {
+      action()
+      setDummyRerenderState((prev) => prev + 1)
+    },
+    [setDummyRerenderState],
+  )
   const [expandedTraceId, setExpandedTraceId] = useState<string | null>(null)
 
+  const tracesRef = useRef(new Map<string, TraceInfo<RelationSchemasT>>())
+
   const removeTrace = (traceId: string) => {
-    setTraces((prev) => {
-      const newTraces = new Map(prev)
-      newTraces.delete(traceId)
-      return newTraces
+    performActionAndRerender(() => {
+      tracesRef.current.delete(traceId)
     })
   }
 
@@ -1385,6 +1390,7 @@ export default function TraceManagerDebugger<
     const startSub = traceManager.when('trace-start').subscribe((event) => {
       const trace = event.traceContext as AllPossibleTraces<RelationSchemasT>
       const traceId = trace.input.id
+      const existingTrace = tracesRef.current.get(traceId)
       traceEntriesMap.set(traceId, [])
       const traceInfo: TraceInfo<RelationSchemasT> = {
         traceId,
@@ -1402,7 +1408,9 @@ export default function TraceManagerDebugger<
           const name = formatMatcher(matcher, index)
           return {
             name,
-            isMatched: false,
+            // retain previous match state if it exists
+            // this allows us to keep the match state when the trace has its definition changed and restarts
+            isMatched: existingTrace?.requiredSpans[index]?.isMatched ?? false,
             definition:
               (matcher.fromDefinition as Record<string, unknown>) ?? undefined,
           }
@@ -1426,21 +1434,19 @@ export default function TraceManagerDebugger<
         ),
       }
       schedule(() => {
-        setTraces((prev) => {
-          const newTraces = new Map(prev)
-          newTraces.set(traceId, traceInfo)
+        performActionAndRerender(() => {
+          tracesRef.current.set(traceId, traceInfo)
           // Keep only the most recent TRACE_HISTORY_LIMIT traces
-          if (newTraces.size > traceHistoryLimit) {
-            const entries = [...newTraces.entries()]
+          if (tracesRef.current.size > traceHistoryLimit) {
+            const entries = [...tracesRef.current.entries()]
             const oldestEntries = entries.slice(
               0,
-              newTraces.size - traceHistoryLimit,
+              tracesRef.current.size - traceHistoryLimit,
             )
             for (const [oldTraceId] of oldestEntries) {
-              newTraces.delete(oldTraceId)
+              tracesRef.current.delete(oldTraceId)
             }
           }
-          return newTraces
         })
       })
     })
@@ -1467,11 +1473,10 @@ export default function TraceManagerDebugger<
             : undefined,
         } as const
         schedule(() => {
-          setTraces((prev) => {
-            const existingTrace = prev.get(traceId)
-            if (!existingTrace) return prev
+          performActionAndRerender(() => {
+            const existingTrace = tracesRef.current.get(traceId)
+            if (!existingTrace) return
 
-            const newTraces = new Map(prev)
             const updatedTrace: TraceInfo<RelationSchemasT> = {
               ...existingTrace,
               ...partialNewTrace,
@@ -1505,8 +1510,7 @@ export default function TraceManagerDebugger<
                 transition as FinalTransition<RelationSchemasT>
             }
 
-            newTraces.set(traceId, updatedTrace)
-            return newTraces
+            tracesRef.current.set(traceId, updatedTrace)
           })
         })
       })
@@ -1517,11 +1521,10 @@ export default function TraceManagerDebugger<
         const trace = event.traceContext as AllPossibleTraces<RelationSchemasT>
         const traceId = trace.input.id
         schedule(() => {
-          setTraces((prev) => {
-            const existingTrace = prev.get(traceId)
-            if (!existingTrace) return prev
+          performActionAndRerender(() => {
+            const existingTrace = tracesRef.current.get(traceId)
+            if (!existingTrace) return
 
-            const newTraces = new Map(prev)
             const updatedRequiredSpans = [...existingTrace.requiredSpans]
             const matchedSpan = event.spanAndAnnotation
             trace.definition.requiredSpans.forEach((matcher, index) => {
@@ -1533,11 +1536,10 @@ export default function TraceManagerDebugger<
               }
             })
 
-            newTraces.set(traceId, {
+            tracesRef.current.set(traceId, {
               ...existingTrace,
               requiredSpans: updatedRequiredSpans,
             })
-            return newTraces
           })
         })
       })
@@ -1552,11 +1554,10 @@ export default function TraceManagerDebugger<
         const entries = traceEntriesMap.get(traceId)!
         entries.push(event.spanAndAnnotation)
         schedule(() => {
-          setTraces((prev) => {
-            const existingTrace = prev.get(traceId)
-            if (!existingTrace) return prev
+          performActionAndRerender(() => {
+            const existingTrace = tracesRef.current.get(traceId)
+            if (!existingTrace) return
 
-            const newTraces = new Map(prev)
             const liveDuration =
               entries.length > 0
                 ? Math.round(
@@ -1575,14 +1576,13 @@ export default function TraceManagerDebugger<
               (e) => e.span.status === 'error' && isSuppressedError(trace, e),
             )
 
-            newTraces.set(traceId, {
+            tracesRef.current.set(traceId, {
               ...existingTrace,
               liveDuration,
               totalSpanCount,
               hasErrorSpan,
               hasSuppressedErrorSpan,
             })
-            return newTraces
           })
         })
       })
@@ -1593,12 +1593,11 @@ export default function TraceManagerDebugger<
         ({ traceContext: trace, modifications: eventModifications }) => {
           const traceId = trace.input.id
           schedule(() => {
-            setTraces((prev) => {
-              const existingTrace = prev.get(traceId)
-              if (!existingTrace) return prev
+            performActionAndRerender(() => {
+              const existingTrace = tracesRef.current.get(traceId)
+              if (!existingTrace) return
 
-              const newTraces = new Map(prev)
-              newTraces.set(traceId, {
+              tracesRef.current.set(traceId, {
                 ...existingTrace,
                 traceContext: {
                   definition: trace.definition,
@@ -1611,7 +1610,6 @@ export default function TraceManagerDebugger<
                   eventModifications,
                 ],
               })
-              return newTraces
             })
           })
         },
@@ -1627,7 +1625,7 @@ export default function TraceManagerDebugger<
   }, [traceManager, traceHistoryLimit])
 
   // Convert Map to array and organize with parent-child relationships
-  const organizedTraces = organizeTraces([...traces.values()])
+  const organizedTraces = organizeTraces([...tracesRef.current.values()])
 
   // Determine which traces are currently running (not in terminal state)
   const runningTraces = organizedTraces.filter(
@@ -1692,7 +1690,9 @@ export default function TraceManagerDebugger<
                   <button
                     className="tmdb-button tmdb-clear-button"
                     onClick={() => {
-                      setTraces(new Map())
+                      performActionAndRerender(() => {
+                        tracesRef.current.clear()
+                      })
                       setExpandedTraceId(null)
                     }}
                   >
@@ -1706,7 +1706,7 @@ export default function TraceManagerDebugger<
                   trace={trace}
                   isExpanded={expandedTraceId === trace.traceId}
                   isCurrentTrace={runningTraces.includes(trace)}
-                  allTraces={traces}
+                  allTraces={tracesRef.current}
                   onToggleExpand={() =>
                     void setExpandedTraceId(
                       expandedTraceId === trace.traceId ? null : trace.traceId,
