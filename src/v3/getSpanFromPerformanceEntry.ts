@@ -7,18 +7,24 @@ import type {
   PerformanceEntrySpan,
   ResourceSpan,
 } from './spanTypes'
-import type { DeriveRelationsFromPerformanceEntryFn, Timestamp } from './types'
+import type {
+  DeriveRelationsFromPerformanceEntryFn,
+  RelationSchemasBase,
+  Timestamp,
+} from './types'
 
 /**
  * Maps Performance Entry to a Span
  * @returns The span.
  */
-export function getSpanFromPerformanceEntry<RelationSchemasT>(
+export function getSpanFromPerformanceEntry<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>(
   inputEntry: PerformanceEntry,
   deriveRelationFromPerformanceEntry?: DeriveRelationsFromPerformanceEntryFn<RelationSchemasT>,
 ):
-  | PerformanceEntrySpan<RelationSchemasT>
-  | ResourceSpan<RelationSchemasT>
+  | Omit<PerformanceEntrySpan<RelationSchemasT>, 'id' | 'getParentSpan'>
+  | Omit<ResourceSpan<RelationSchemasT>, 'id' | 'getParentSpan'>
   | undefined {
   // react in dev mode generates hundreds of these marks, ignore them
   if (inputEntry.entryType === 'mark' && inputEntry.name.startsWith('--')) {
@@ -75,7 +81,10 @@ export function getSpanFromPerformanceEntry<RelationSchemasT>(
     now: inputEntry.startTime,
   }
 
-  const traceEntry: PerformanceEntrySpan<RelationSchemasT> = {
+  const traceEntry: Omit<
+    PerformanceEntrySpan<RelationSchemasT>,
+    'id' | 'getParentSpan'
+  > = {
     type,
     name,
     startTime: ensureTimestamp(timestamp),

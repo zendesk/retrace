@@ -1,7 +1,6 @@
-/* eslint-disable no-magic-numbers */
-/* eslint-disable import/no-extraneous-dependencies */
-import React, { useEffect, useMemo, useState } from 'react'
-import { Axis, AxisLeft } from '@visx/axis'
+import * as React from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Axis } from '@visx/axis'
 import { Brush } from '@visx/brush'
 import type { BrushHandleRenderProps } from '@visx/brush/lib/BrushHandle'
 import type { Bounds } from '@visx/brush/lib/types'
@@ -16,8 +15,11 @@ import {
   DETAILS_PANEL_WIDTH,
   type FilterOption,
 } from '../constants'
-import type { MappedOperation } from '../mapOperationForVisualization'
-import type { MappedSpanAndAnnotation } from '../types'
+import { useSpanExpansion } from '../hooks/useSpanExpansion'
+import type {
+  HierarchicalOperation,
+  HierarchicalSpanAndAnnotation,
+} from '../types'
 import { FilterGroup } from './FilterGroup'
 import InteractiveSpan from './InteractiveSpan'
 import { LegendGroup } from './Legend'
@@ -44,7 +46,7 @@ const MINIMAP_HEIGHT = 25
 
 export interface OperationVisualizationProps {
   width: number
-  operation: MappedOperation
+  operation: HierarchicalOperation
   setDisplayOptions: React.Dispatch<
     React.SetStateAction<Record<FilterOption, boolean>>
   >
@@ -79,10 +81,46 @@ const OperationVisualization: React.FC<OperationVisualizationProps> = ({
   setDisplayOptions,
   margin = DEFAULT_MARGIN,
 }) => {
-  const { spanEvents, spanTypes, uniqueGroups, spansWithDuration } = operation
+  // Expansion state management using hook
+  const expansionState = useSpanExpansion({
+    initialExpandedSpans: operation.expandedSpanIds,
+    persistKey: `operation-${operation.name}`,
+  })
+
+  const {
+    // spanEvents,
+    spanTypes,
+    // uniqueGroups, // Now using visibleUniqueGroups for dynamic lane calculation
+  } = operation
+
+  // Get visible spans based on expansion state
+  const spans: HierarchicalSpanAndAnnotation[] = useMemo(
+    () => expansionState.getVisibleSpans(operation.spans),
+    [operation.spans, expansionState],
+  )
+
+  // Calculate unique groups from visible spans for dynamic lane calculation
+  const visibleUniqueGroups = useMemo(
+    () => [...new Set(spans.map((span) => span.groupName))],
+    [spans],
+  )
+
+  // Group spans by lane for easier processing
+  const spansByLane = useMemo(() => {
+    const laneMap = new Map<string, HierarchicalSpanAndAnnotation[]>()
+    spans.forEach((span) => {
+      if (!laneMap.has(span.groupName)) {
+        laneMap.set(span.groupName, [])
+      }
+      laneMap.get(span.groupName)!.push(span)
+    })
+    return laneMap
+  }, [spans])
 
   const [selectedSpan, setSelectedSpan] =
-    useState<MappedSpanAndAnnotation | null>(null)
+    useState<HierarchicalSpanAndAnnotation | null>(null)
+
+  // Add new state to control zoom domain
 
   // Track zoom domain with state that can be overridden by brush interactions
   const [zoomOverride, setZoomOverride] = useState<[number, number] | null>(
@@ -100,8 +138,9 @@ const OperationVisualization: React.FC<OperationVisualizationProps> = ({
     ? containerWidth - DETAILS_PANEL_WIDTH
     : containerWidth
 
-  // Render proportions
-  const height = uniqueGroups.length * GROUP_HEIGHT + margin.top + margin.bottom
+  // Render proportions - use visible groups for dynamic height calculation
+  const height =
+    visibleUniqueGroups.length * GROUP_HEIGHT + margin.top + margin.bottom
 
   const xMax = width - margin.left - margin.right
   const yMax = height - margin.bottom - margin.top
@@ -134,11 +173,11 @@ const OperationVisualization: React.FC<OperationVisualizationProps> = ({
   const yScale = useMemo(
     () =>
       scaleBand({
-        domain: uniqueGroups,
+        domain: visibleUniqueGroups,
         range: [0, yMax],
         padding: 0.2,
       }),
-    [uniqueGroups, yMax],
+    [visibleUniqueGroups, yMax],
   )
 
   const colorScale = scaleOrdinal({
@@ -153,12 +192,13 @@ const OperationVisualization: React.FC<OperationVisualizationProps> = ({
     tooltipData,
     hideTooltip,
     showTooltip,
-  } = useTooltip<MappedSpanAndAnnotation>()
-  const handleSpanClick = (span: MappedSpanAndAnnotation) => {
+  } = useTooltip<HierarchicalSpanAndAnnotation>()
+  const handleSpanClick = (span: HierarchicalSpanAndAnnotation) => {
+    // Just select the span - expansion is handled by lane headers
     setSelectedSpan(span)
   }
 
-  const getBarOpacity = (entry: MappedSpanAndAnnotation) => {
+  const getBarOpacity = (entry: HierarchicalSpanAndAnnotation) => {
     if (
       selectedSpan &&
       selectedSpan.span.name === entry.span.name &&
@@ -199,6 +239,7 @@ const OperationVisualization: React.FC<OperationVisualizationProps> = ({
     <Container>
       <ScrollContainer
         ref={scrollContainerRef}
+        $isDetailsPanelOpen={selectedSpan !== null}
         onClick={selectedSpan ? handleContainerClick : undefined}
       >
         <Header>
@@ -221,9 +262,9 @@ const OperationVisualization: React.FC<OperationVisualizationProps> = ({
                 yScale={yScale}
                 width={xMax}
                 height={yMax}
-                numTicksRows={uniqueGroups.length}
+                numTicksRows={visibleUniqueGroups.length}
               />
-              {spanEvents.map((entry, index) => (
+              {/* {spanEvents.map((entry, index) => (
                 <InteractiveSpan
                   key={`spanEvent-${index}`}
                   type="line"
@@ -237,10 +278,10 @@ const OperationVisualization: React.FC<OperationVisualizationProps> = ({
                   onClick={() => void handleSpanClick(entry)}
                   scrollContainerRef={scrollContainerRef}
                 />
-              ))}
+              ))} */}
 
-              {spansWithDuration.map((entry, i) => (
-                <React.Fragment key={`entry-${i}`}>
+              {spans.map((entry, i) => (
+                <React.Fragment key={`entry-${i}-${entry.span.id}`}>
                   <InteractiveSpan
                     type="bar"
                     data={entry}
@@ -252,6 +293,10 @@ const OperationVisualization: React.FC<OperationVisualizationProps> = ({
                     hideTooltip={hideTooltip}
                     onClick={() => void handleSpanClick(entry)}
                     scrollContainerRef={scrollContainerRef}
+                    depth={entry.depth}
+                    hasChildren={entry.children.length > 0}
+                    isExpanded={expansionState.isSpanExpanded(entry.span.id)}
+                    isVisible={true}
                   />
                   {(entry.annotation.markedComplete ||
                     entry.annotation.markedPageInteractive) && (
@@ -275,30 +320,98 @@ const OperationVisualization: React.FC<OperationVisualizationProps> = ({
                       hideTooltip={hideTooltip}
                       onClick={() => void handleSpanClick(entry)}
                       scrollContainerRef={scrollContainerRef}
+                      depth={entry.depth}
+                      hasChildren={entry.children.length > 0}
+                      isExpanded={expansionState.isSpanExpanded(entry.span.id)}
+                      isVisible={true}
                     />
                   )}
                 </React.Fragment>
               ))}
-              {/* Force white background for y axis labels */}
-              <rect
-                x={-margin.left}
-                y={-10}
-                width={margin.left}
-                height={yMax + 20}
-                fill="white"
-              />
-              <AxisLeft
-                scale={yScale}
-                numTicks={uniqueGroups.length}
-                tickLabelProps={{
-                  fill: '#888',
-                  fontSize: 10,
-                  textAnchor: 'end',
-                  dy: '0.33em',
-                  width: 100,
-                }}
-                tickFormat={(value) => value}
-              />
+              {/* Custom lane headers with expansion controls */}
+              {visibleUniqueGroups.map((groupName) => {
+                const laneSpans = spansByLane.get(groupName) ?? []
+                const parentSpans = laneSpans.filter(
+                  (span) => span.children.length > 0,
+                )
+                const hasExpandableContent = parentSpans.length > 0
+                const yPosition = yScale(groupName) ?? 0
+                const textStartX = hasExpandableContent
+                  ? -margin.left + 35
+                  : -margin.left + 15
+                const maxTextWidth = -textStartX
+
+                // Simple character-based estimation for truncation
+                // Using average character width of ~6px for 10px font
+                const avgCharWidth = 6
+                const maxChars = Math.floor(maxTextWidth / avgCharWidth)
+                const displayText =
+                  groupName.length > maxChars
+                    ? `${groupName.slice(0, maxChars - 3)}...`
+                    : groupName
+
+                return (
+                  <g key={`lane-header-${groupName}`}>
+                    {/* Background for lane header */}
+                    <rect
+                      x={-margin.left}
+                      y={yPosition}
+                      width={margin.left - 10}
+                      height={yScale.bandwidth()}
+                      fill="transparent"
+                    />
+
+                    {/* Expansion control for lanes with expandable spans */}
+                    {hasExpandableContent && (
+                      <g>
+                        <circle
+                          cx={-margin.left + 15}
+                          cy={yPosition + yScale.bandwidth() / 2}
+                          r={8}
+                          fill="#f0f0f0"
+                          stroke="#ccc"
+                          strokeWidth={1}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => {
+                            // Toggle expansion for all parent spans in this lane
+                            parentSpans.forEach((span) => {
+                              expansionState.toggleSpanExpansion(span.span.id)
+                            })
+                          }}
+                        />
+                        <text
+                          x={-margin.left + 15}
+                          y={yPosition + yScale.bandwidth() / 2}
+                          dy="0.33em"
+                          textAnchor="middle"
+                          fontSize={10}
+                          fill="#666"
+                          style={{ cursor: 'pointer', pointerEvents: 'none' }}
+                        >
+                          {parentSpans.every((span) =>
+                            expansionState.isSpanExpanded(span.span.id),
+                          )
+                            ? '−'
+                            : '+'}
+                        </text>
+                      </g>
+                    )}
+
+                    {/* Lane label */}
+                    <text
+                      x={textStartX}
+                      y={yPosition + yScale.bandwidth() / 2}
+                      dy="0.33em"
+                      textAnchor="start"
+                      fontSize={10}
+                      fill="#888"
+                    >
+                      <title>{groupName}</title>
+                      {displayText}
+                    </text>
+                  </g>
+                )
+              })}
               {/* <Axis scale={xScale} top={yMax} /> */}
             </Group>
           </svg>
@@ -356,7 +469,13 @@ const OperationVisualization: React.FC<OperationVisualizationProps> = ({
                 labelFormat={(label) => `${label.toUpperCase()}`}
               >
                 {(labels) => (
-                  <div style={{ display: 'flex', flexDirection: 'row' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'row',
+                      flexWrap: 'wrap',
+                    }}
+                  >
                     {labels.map((label, i) => (
                       <LegendItem key={`legend-${i}`} margin="0 5px">
                         <svg width={15} height={15}>

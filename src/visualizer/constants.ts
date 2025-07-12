@@ -37,8 +37,10 @@ export type SupportedSpanTypes =
   | 'computed-span'
 
 export const BAR_FILL_COLOR: Record<SupportedSpanTypes, string> = {
-  'component-render-start': '#ffffff', // invisible
+  'component-render-start': '#000000', // invisible
   'component-render': '#ff7f0e',
+  'hook-render-start': '#000000', // invisible
+  'hook-render': '#c0e0e0',
   measure: '#2ca02c',
   resource: '#1f77b4',
   'resource-ember': '#17becf',
@@ -49,9 +51,11 @@ export const BAR_FILL_COLOR: Record<SupportedSpanTypes, string> = {
   iframe: '#e377c2',
   element: '#7f7f7f',
   action: '#bcbd22',
+  operation: '#547621',
   'computed-span': '#17becf',
 
   'component-unmount': '#ff9896',
+  'hook-unmount': '#ff9896',
   error: '#ff9896',
   'first-input': '#aec7e8',
   'largest-contentful-paint': '#98df8a',

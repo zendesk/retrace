@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 import styled from 'styled-components'
 import { getColor } from '@zendeskgarden/react-theming'
 

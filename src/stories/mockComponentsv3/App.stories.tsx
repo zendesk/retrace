@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
-import React, { useEffect } from 'react'
-import type { Meta, StoryObj } from '@storybook/react'
+import { useEffect } from 'react'
+import * as React from 'react'
+import type { Meta, StoryObj } from '@storybook/react-webpack5'
 import { createConsoleTraceLogger } from '../../v3/ConsoleTraceLogger'
 import TraceManagerDebugger from '../../v3/TraceManagerDebugger'
 import { App } from './App'

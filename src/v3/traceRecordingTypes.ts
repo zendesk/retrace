@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style */
-import type { SpanAndAnnotation } from './spanAnnotationTypes'
-import type { Attributes } from './spanTypes'
+import type { SpanAnnotation } from './spanAnnotationTypes'
+import type { Attributes, ErrorLike, PARENT_SPAN, Span } from './spanTypes'
 import type {
+  InterruptionReasonPayload,
   MapSchemaToTypes,
+  RelationSchemasBase,
   Timestamp,
-  TraceInterruptionReason,
   TraceStatus,
   TraceType,
 } from './types'
@@ -28,13 +29,24 @@ export interface ComputedRenderSpan {
   renderCount: number
   /** the sum of all render durations */
   sumOfRenderDurations: number
+
+  attributes?: Attributes
 }
 
-export interface TraceRecordingBase<RelationSchemaT> {
+export interface TraceRecordingBase<
+  SelectedRelationNameT extends keyof RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> {
   /**
    * random generated unique value or provided by the user at start
    */
   id: string
+
+  /**
+   * if this is a child trace, this is the id of the parent trace
+   * if this is a root trace, this is undefined
+   */
+  parentTraceId?: string
 
   /**
    * name of the trace / operation
@@ -42,7 +54,9 @@ export interface TraceRecordingBase<RelationSchemaT> {
   name: string
 
   startTime: Timestamp
-  relatedTo: MapSchemaToTypes<RelationSchemaT> | undefined
+  relatedTo:
+    | MapSchemaToTypes<RelationSchemasT[SelectedRelationNameT]>
+    | undefined
 
   type: TraceType
 
@@ -56,7 +70,7 @@ export interface TraceRecordingBase<RelationSchemaT> {
   variant: string
 
   // STRICTER TYPE TODO: separate out trace recording into a union of trace recording and interrupted trace recording (fields that will be different: interruption reason,duration, and status)
-  interruptionReason?: TraceInterruptionReason
+  interruption?: InterruptionReasonPayload<RelationSchemasT>
   duration: number | null
 
   additionalDurations: {
@@ -83,11 +97,35 @@ export interface TraceRecordingBase<RelationSchemaT> {
   computedValues: {
     [valueName: string]: number | string | boolean
   }
+
+  /** The first unsupressed error that bubbled up to the trace, or undefined */
+  error?: ErrorLike
+}
+
+export type RecordedSpan<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+  SpansT extends Span<RelationSchemasT> = Span<RelationSchemasT>,
+> = SpansT extends SpansT
+  ? Readonly<Omit<SpansT, typeof PARENT_SPAN | 'getParentSpan'>> & {
+      /**
+       * The ID of the span that indicates the parent of this span.
+       * Resolved from [PARENT_SPAN].
+       * If [PARENT_SPAN] was not set, this will be undefined.
+       */
+      readonly parentSpanId?: string
+    }
+  : never
+
+export interface RecordedSpanAndAnnotation<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> {
+  readonly span: RecordedSpan<RelationSchemasT>
+  readonly annotation: SpanAnnotation
 }
 
 export interface TraceRecording<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
-> extends TraceRecordingBase<RelationSchemasT[SelectedRelationNameT]> {
-  entries: readonly SpanAndAnnotation<RelationSchemasT>[]
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+> extends TraceRecordingBase<SelectedRelationNameT, RelationSchemasT> {
+  entries: readonly RecordedSpanAndAnnotation<RelationSchemasT>[]
 }

@@ -1,16 +1,9 @@
 import './testUtility/asciiTimelineSerializer'
-import {
-  beforeEach,
-  describe,
-  expect,
-  it,
-  type Mock,
-  vitest as jest,
-} from 'vitest'
+import { beforeEach, describe, expect, it, type Mock, vitest } from 'vitest'
 import { Check, getSpansFromTimeline, Render } from './testUtility/makeTimeline'
 import { processSpans } from './testUtility/processSpans'
 import { TraceManager } from './TraceManager'
-import type { AnyPossibleReportFn } from './types'
+import type { AnyPossibleReportFn, GenerateIdFn } from './types'
 
 interface TestRelationSchema {
   test: {
@@ -22,14 +15,32 @@ describe('Tracer', () => {
   let reportFn: Mock<AnyPossibleReportFn<TestRelationSchema>>
   // TS doesn't like that reportFn is wrapped in Mock<> type
   const getReportFn = () => reportFn as AnyPossibleReportFn<TestRelationSchema>
-  let generateId: Mock
+  let generateId: Mock<GenerateIdFn>
   let reportErrorFn: Mock
 
+  let idPerType = {
+    span: 0,
+    trace: 0,
+    tick: 0,
+  }
+
   beforeEach(() => {
-    reportFn = jest.fn<AnyPossibleReportFn<TestRelationSchema>>()
-    generateId = jest.fn().mockReturnValue('trace-id')
-    reportErrorFn = jest.fn()
-    jest.useFakeTimers({ now: 0 })
+    idPerType = {
+      span: 0,
+      trace: 0,
+      tick: 0,
+    }
+    generateId = vitest.fn((type) => {
+      const seq = idPerType[type]++
+      return type === 'span'
+        ? `id-${seq}`
+        : type === 'trace'
+        ? `trace-${seq}`
+        : `tick-${seq}`
+    })
+    reportFn = vitest.fn<AnyPossibleReportFn<TestRelationSchema>>()
+    reportErrorFn = vitest.fn()
+    vitest.useFakeTimers({ now: 0 })
   })
 
   describe('variants', () => {
@@ -255,7 +266,7 @@ describe('Tracer', () => {
       })
 
       // @ts-expect-error internal prop
-      const trace = tracer.traceUtilities.getCurrentTrace()
+      const trace = tracer.rootTraceUtilities.getCurrentTrace()
       expect(
         trace?.stateMachine.successfullyMatchedRequiredSpanMatchers.size,
       ).toBe(0)
@@ -277,7 +288,7 @@ describe('Tracer', () => {
       })
 
       // @ts-expect-error internal prop
-      const traceRecreated = tracer.traceUtilities.getCurrentTrace()
+      const traceRecreated = tracer.rootTraceUtilities.getCurrentTrace()
       expect(traceRecreated).not.toBe(trace)
       expect(traceRecreated?.definition.requiredSpans).toHaveLength(3)
       expect(traceRecreated?.definition.interruptOnSpans).toHaveLength(3)
@@ -313,7 +324,7 @@ describe('Tracer', () => {
         'initial-required',
         'added-required',
       ])
-      expect(traceManager.currentTracerContext).toBeUndefined()
+      expect(traceManager.currentTraceContext).toBeUndefined()
     })
   })
 
@@ -343,10 +354,10 @@ describe('Tracer', () => {
           additionalRequiredSpans: [{ name: 'additional-end' }],
         },
       )
-      expect(traceId).toBe('trace-id')
+      expect(traceId).toBe('trace-0')
 
       // @ts-expect-error internals
-      const trace = tracer.traceUtilities.getCurrentTrace()
+      const trace = tracer.rootTraceUtilities.getCurrentTrace()
       expect(trace?.definition.requiredSpans).toHaveLength(2)
       expect(
         trace?.stateMachine.successfullyMatchedRequiredSpanMatchers.size,
@@ -356,8 +367,8 @@ describe('Tracer', () => {
       // prettier-ignore
       const { spans } = getSpansFromTimeline<TestRelationSchema>`
         Events: ${Render('start', 0)}-----${Render('middle', 0)}-----${Render('orig-end', 0)}----${Render('additional-end', 0)}
-        Time:   ${0}                      ${50}                      ${100}                      ${150}               
-        `
+        Time:   ${0}                      ${50}                      ${100}                      ${150}
+      `
 
       processSpans(spans, traceManager)
       expect(reportFn).toHaveBeenCalled()
@@ -379,7 +390,7 @@ describe('Tracer', () => {
       expect(report.name).toBe('ticket.basic-operation')
       expect(report.duration).toBe(150)
       expect(report.status).toBe('ok')
-      expect(report.interruptionReason).toBeUndefined()
+      expect(report.interruption).toBeUndefined()
     })
 
     it('adds requiredSpans when creating a trace, and then again after transitioning to active, and again after start', () => {
@@ -440,7 +451,7 @@ describe('Tracer', () => {
       })
 
       // @ts-expect-error internals
-      const trace = tracer.traceUtilities.getCurrentTrace()
+      const trace = tracer.rootTraceUtilities.getCurrentTrace()
 
       expect(trace?.definition.requiredSpans).toHaveLength(5)
       expect(
@@ -475,7 +486,7 @@ describe('Tracer', () => {
       expect(report.name).toBe('ticket.basic-operation')
       expect(report.duration).toBe(250)
       expect(report.status).toBe('ok')
-      expect(report.interruptionReason).toBeUndefined()
+      expect(report.interruption).toBeUndefined()
     })
   })
 })

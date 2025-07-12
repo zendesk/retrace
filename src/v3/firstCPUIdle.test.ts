@@ -47,6 +47,27 @@ describe('createCPUIdleProcessor', () => {
     expect(firstCPUIdle).toEqual({ firstCpuIdle: 200 })
   })
 
+  it('One heavy cluster-sized long task after FMP, FirstCPUIdle after long task', () => {
+    const { entries, fmpTime } = makeEntries([
+      Idle(200),
+      FMP,
+      Idle(200),
+      LongTask(400),
+      Idle(4_000),
+      Check,
+    ])
+    expect(entries).toMatchInlineSnapshot(`
+      events    | fmp                   task(400)                                                 check
+      timeline  | |---------------------[++++++++++++++++++++++++++++++++++++++++++]-<⋯ +4000 ⋯>--|
+      time (ms) | 200                   400                                                       4800
+    `)
+
+    const firstCPUIdle = getFirstCPUIdleEntry({ fmpTime, entries })
+
+    // the first CPU idle is after the long task, so it should be 800 (FMP at 200 + 200 idle + 400 long task)
+    expect(firstCPUIdle).toEqual({ firstCpuIdle: 800 })
+  })
+
   it('One light cluster after FMP, FirstCPUIdle at FMP', () => {
     const { entries, fmpTime } = makeEntries([
       Idle(200),

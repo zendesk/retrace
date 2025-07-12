@@ -6,11 +6,11 @@ import type {
 import {
   extractTimingOffsets,
   formatMatcher,
-  getComputedResults,
   getConfigSummary,
   isSuppressedError,
 } from './debugUtils'
 import type { SpanMatcherFn } from './matchSpan'
+import { createTraceRecording } from './recordingComputeUtils'
 import type { FinalTransition, OnEnterStatePayload } from './Trace'
 import { isTerminalState } from './Trace'
 import type { TraceManager } from './TraceManager'
@@ -52,7 +52,7 @@ export interface ConsoleTraceLoggerOptions {
   verbose?: boolean
   /**
    * Prefix added to all log messages.
-   * Defaults to '[Trace]'.
+   * Defaults to '[retrace]'.
    */
   prefix?: string
   /**
@@ -77,10 +77,9 @@ export interface ConsoleTraceLoggerOptions {
 const MAX_SERIALIZED_OBJECT_LENGTH = 500
 
 /**
- * Information about the currently active trace
+ * Information about an active or completed trace
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-interface TraceInfo<RelationSchemasT> {
+interface TraceInfo<_RelationSchemasT> {
   id: string
   name: string
   variant: string
@@ -88,6 +87,12 @@ interface TraceInfo<RelationSchemasT> {
   attributes?: Record<string, unknown>
   relatedTo?: Record<string, unknown>
   requiredSpans: { name: string; isMatched: boolean; matcher: Function }[]
+  parentTraceId?: string
+  liveDuration: number
+  totalSpanCount: number
+  hasErrorSpan: boolean
+  hasSuppressedErrorSpan: boolean
+  definitionModifications: unknown[]
 }
 
 /**
@@ -121,13 +126,13 @@ export function createConsoleTraceLogger<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 >(
   traceManager: TraceManager<RelationSchemasT>,
-  optionsInput: ConsoleTraceLoggerOptions = {}, // Rename to avoid conflict
+  optionsInput: ConsoleTraceLoggerOptions = {},
 ) {
   // Use a mutable options object internally
   let options: Required<ConsoleTraceLoggerOptions> = {
     logger: console, // Default to global console
     verbose: false,
-    prefix: '[Trace]',
+    prefix: '[retrace]',
     maxObjectStringLength: MAX_SERIALIZED_OBJECT_LENGTH,
     enableGrouping: true,
     enableColors: true,
@@ -140,18 +145,11 @@ export function createConsoleTraceLogger<
   let canGroup = isConsoleLike && options.enableGrouping
   let canColor = isConsoleLike && options.enableColors
 
-  // Keep track of active trace
-  let currentTraceInfo: TraceInfo<RelationSchemasT> | null = null
+  // Keep track of active traces (Map allows multiple concurrent traces)
+  const activeTraces = new Map<string, TraceInfo<RelationSchemasT>>()
 
   // Store subscriptions for cleanup
   const subscriptions: { unsubscribe: () => void }[] = []
-
-  // Track live info for active trace
-  let liveDuration = 0
-  let totalSpanCount = 0
-  let hasErrorSpan = false
-  let hasSuppressedErrorSpan = false
-  let definitionModifications: unknown[] = []
 
   // --- Helper Functions ---
 
@@ -178,6 +176,7 @@ export function createConsoleTraceLogger<
   const log = (
     message: string,
     level: 'log' | 'group' | 'groupCollapsed' | 'groupEnd' = 'log',
+    ...args: unknown[]
   ) => {
     const fullMessage = `${options.prefix} ${message}`
 
@@ -185,19 +184,19 @@ export function createConsoleTraceLogger<
       const consoleLogger = options.logger as ConsoleLike
       switch (level) {
         case 'group':
-          if (canGroup) consoleLogger.group(fullMessage)
-          else consoleLogger.log(fullMessage)
+          if (canGroup) consoleLogger.group(fullMessage, ...args)
+          else consoleLogger.log(fullMessage, ...args)
           break
         case 'groupCollapsed':
-          if (canGroup) consoleLogger.groupCollapsed(fullMessage)
-          else consoleLogger.log(fullMessage)
+          if (canGroup) consoleLogger.groupCollapsed(fullMessage, ...args)
+          else consoleLogger.log(fullMessage, ...args)
           break
         case 'groupEnd':
           if (canGroup) consoleLogger.groupEnd()
           // No equivalent log message needed for simple loggers
           break
         default: // 'log'
-          consoleLogger.log(fullMessage)
+          consoleLogger.log(fullMessage, ...args)
           break
       }
     } else {
@@ -220,12 +219,13 @@ export function createConsoleTraceLogger<
   }
 
   /** Get string representation of required spans count */
-  const getRequiredSpansCount = (): string => {
-    if (!currentTraceInfo) return '0/0'
-    const matched = currentTraceInfo.requiredSpans.filter(
+  const getRequiredSpansCount = (
+    traceInfo: TraceInfo<RelationSchemasT>,
+  ): string => {
+    const matched = traceInfo.requiredSpans.filter(
       (span) => span.isMatched,
     ).length
-    const total = currentTraceInfo.requiredSpans.length
+    const total = traceInfo.requiredSpans.length
     return `${matched}/${total}`
   }
 
@@ -243,41 +243,45 @@ export function createConsoleTraceLogger<
   /** Handle changes in attributes, relatedTo, or requiredSpans */
   const handleStateChanges = <K extends keyof RelationSchemasT>(
     trace: DraftTraceContext<K, RelationSchemasT, string>,
+    traceInfo: TraceInfo<RelationSchemasT>,
   ): void => {
-    if (!currentTraceInfo) return
-
     const currentAttributes = trace.input.attributes
-    if (objectsAreDifferent(currentAttributes, currentTraceInfo.attributes)) {
+    if (objectsAreDifferent(currentAttributes, traceInfo.attributes)) {
       log(
         `   Attributes changed: ${colorize(
           truncateObject(currentAttributes),
           GRAY,
         )}`,
       )
-      currentTraceInfo.attributes = currentAttributes
+      // eslint-disable-next-line no-param-reassign
+      traceInfo.attributes = currentAttributes
         ? { ...currentAttributes }
         : undefined
     }
 
     const currentRelatedTo = trace.input.relatedTo
-    if (objectsAreDifferent(currentRelatedTo, currentTraceInfo.relatedTo)) {
+    if (objectsAreDifferent(currentRelatedTo, traceInfo.relatedTo)) {
       log(
         `   Related to changed: ${colorize(
           truncateObject(currentRelatedTo),
           GRAY,
         )}`,
       )
-      currentTraceInfo.relatedTo = currentRelatedTo
+      // eslint-disable-next-line no-param-reassign
+      traceInfo.relatedTo = currentRelatedTo
         ? { ...currentRelatedTo }
         : undefined
     }
 
-    // Note: Required spans list itself doesn't change after trace start in current model
+    // Note: Required spans list doesn't change after trace start in current model
     // If variants could change requiredSpans, this would need updating.
   }
 
   /** Log timing information for a terminal state */
-  const logTimingInfo = (transition: OnEnterStatePayload<RelationSchemasT>) => {
+  const logTimingInfo = (
+    transition: OnEnterStatePayload<RelationSchemasT>,
+    traceInfo: TraceInfo<RelationSchemasT>,
+  ) => {
     const { lastRequiredSpanOffset, completeSpanOffset, cpuIdleSpanOffset } =
       extractTimingOffsets(transition)
 
@@ -301,7 +305,7 @@ export function createConsoleTraceLogger<
       log(`   CPU idle: ${formatRelativeTime(cpuIdleSpanOffset)}`)
     }
 
-    log(`   Required spans: ${getRequiredSpansCount()} spans matched`)
+    log(`   Required spans: ${getRequiredSpansCount(traceInfo)} spans matched`)
   }
 
   // Event handlers
@@ -322,7 +326,7 @@ export function createConsoleTraceLogger<
       createRequiredSpanEntry(matcher, index),
     )
 
-    currentTraceInfo = {
+    const traceInfo: TraceInfo<RelationSchemasT> = {
       id: traceId,
       name: traceName,
       variant: traceVariant,
@@ -334,37 +338,42 @@ export function createConsoleTraceLogger<
         ? { ...trace.input.relatedTo }
         : undefined,
       requiredSpans,
+      parentTraceId: trace.input.parentTraceId,
+      liveDuration: 0,
+      totalSpanCount: 0,
+      hasErrorSpan: false,
+      hasSuppressedErrorSpan: false,
+      definitionModifications: [],
     }
 
-    const startTimeStr = formatTimestamp(currentTraceInfo.startTime)
+    // Store the trace info
+    activeTraces.set(traceId, traceInfo)
+
+    const startTimeStr = formatTimestamp(traceInfo.startTime)
+    const isChild = !!traceInfo.parentTraceId
+    const tracePrefix = isChild ? '↳ Child trace started:' : '⏳ Trace started:'
+
     log(
       `${colorize(
-        '⏳ Trace started:',
+        tracePrefix,
         YELLOW,
-      )} ${traceName} (${traceVariant}) [${colorize(traceId, GRAY)}]`,
+      )} ${traceName} (${traceVariant}) [${colorize(traceId, GRAY)}]${
+        isChild ? ` parent: ${colorize(traceInfo.parentTraceId!, GRAY)}` : ''
+      }`,
       'groupCollapsed', // Start collapsed for tidiness
     )
     log(`   Started at: ${colorize(startTimeStr, GRAY)}`)
-    if (
-      currentTraceInfo.attributes &&
-      Object.keys(currentTraceInfo.attributes).length > 0
-    ) {
+    if (traceInfo.attributes && Object.keys(traceInfo.attributes).length > 0) {
       log(
         `   Attributes: ${colorize(
-          truncateObject(currentTraceInfo.attributes),
+          truncateObject(traceInfo.attributes),
           GRAY,
         )}`,
       )
     }
-    if (
-      currentTraceInfo.relatedTo &&
-      Object.keys(currentTraceInfo.relatedTo).length > 0
-    ) {
+    if (traceInfo.relatedTo && Object.keys(traceInfo.relatedTo).length > 0) {
       log(
-        `   Related to: ${colorize(
-          truncateObject(currentTraceInfo.relatedTo),
-          GRAY,
-        )}`,
+        `   Related to: ${colorize(truncateObject(traceInfo.relatedTo), GRAY)}`,
       )
     }
     log(`   Required spans: ${requiredSpans.length}`)
@@ -395,24 +404,29 @@ export function createConsoleTraceLogger<
   const handleStateTransition = (
     event: AllPossibleStateTransitionEvents<RelationSchemasT>,
   ) => {
-    if (!currentTraceInfo) return // Should not happen if trace started
-
     const { traceContext: trace, stateTransition: transition } = event
-    const traceName = currentTraceInfo.name
+    const traceId = trace.input.id
+    const traceInfo = activeTraces.get(traceId)
+
+    if (!traceInfo) return // Should not happen if trace started
+
+    const traceName = traceInfo.name
     const previousState = transition.transitionFromState
     const traceState = transition.transitionToState
 
     const groupLevel = options.verbose ? 'group' : 'groupCollapsed'
     // Add live duration, span count, and error indicator
     const liveInfo = [
-      liveDuration ? `(+${liveDuration}ms elapsed)` : '',
-      totalSpanCount ? `(Spans: ${totalSpanCount})` : '',
-      hasErrorSpan
+      traceInfo.liveDuration ? `(+${traceInfo.liveDuration}ms elapsed)` : '',
+      traceInfo.totalSpanCount ? `(Spans: ${traceInfo.totalSpanCount})` : '',
+      traceInfo.hasErrorSpan
         ? colorize('❗', RED)
-        : hasSuppressedErrorSpan
+        : traceInfo.hasSuppressedErrorSpan
         ? colorize('❗(suppressed)', RED)
         : '',
-      definitionModifications.length > 0 ? colorize('🔧', MAGENTA) : '',
+      traceInfo.definitionModifications.length > 0
+        ? colorize('🔧', MAGENTA)
+        : '',
     ]
       .filter(Boolean)
       .join(' ')
@@ -428,18 +442,42 @@ export function createConsoleTraceLogger<
     )
 
     // Log changes that occurred *during* this state
-    handleStateChanges(trace)
+    handleStateChanges(trace, traceInfo)
 
     if (isTerminalState(traceState)) {
+      // Create full trace recording to get comprehensive results
+      let traceRecording
+      try {
+        traceRecording = createTraceRecording(
+          trace,
+          transition as FinalTransition<RelationSchemasT>,
+        )
+      } catch (error) {
+        log(`   Failed to create trace recording: ${error}`)
+      }
+
       if (traceState === 'complete') {
-        log(`${colorize('✅ Trace', GREEN)} ${traceName} complete`)
-        logTimingInfo(transition)
-        // Log computed values and spans
-        try {
-          const { computedValues, computedSpans } = getComputedResults(
-            trace,
-            transition,
-          )
+        log(
+          colorize(
+            `${
+              traceRecording?.status === 'error' ? '❗' : '✅'
+            } Trace ${traceName} complete`,
+            traceRecording?.status === 'error' ? RED : GREEN,
+          ),
+        )
+
+        // Show error if present
+        if (traceRecording?.error) {
+          log(`   ${colorize('Error:', RED)} %o`, 'log', traceRecording.error)
+        }
+
+        logTimingInfo(transition, traceInfo)
+
+        // Log computed results from trace recording
+        if (traceRecording) {
+          const { computedValues, computedSpans, computedRenderBeaconSpans } =
+            traceRecording
+
           if (computedValues && Object.keys(computedValues).length > 0) {
             log(
               `   Computed Values: ${Object.entries(computedValues)
@@ -447,6 +485,7 @@ export function createConsoleTraceLogger<
                 .join(', ')}`,
             )
           }
+
           if (computedSpans && Object.keys(computedSpans).length > 0) {
             log(
               `   Computed Spans: ${Object.entries(computedSpans)
@@ -454,30 +493,61 @@ export function createConsoleTraceLogger<
                 .join(', ')}`,
             )
           }
-        } catch {
-          // ignore
+
+          if (
+            computedRenderBeaconSpans &&
+            Object.keys(computedRenderBeaconSpans).length > 0
+          ) {
+            log(`   Render Beacon Spans:`)
+            Object.entries(computedRenderBeaconSpans).forEach(
+              ([name, data]) => {
+                log(
+                  `     ${name}: ${
+                    data.renderCount
+                  } renders, ${data.firstRenderTillContent.toFixed(
+                    2,
+                  )}ms till content`,
+                )
+              },
+            )
+          }
         }
       } else {
         // interrupted
-        const reason = (
-          transition as Extract<
-            typeof transition,
-            { interruptionReason: unknown }
-          >
-        ).interruptionReason
+        const {
+          interruption: { reason: interruptionReason, ...interruptionMeta },
+        } = transition as Extract<typeof transition, { interruption: unknown }>
+
+        const statusIndicator =
+          traceRecording?.status === 'error'
+            ? colorize('❌❗', RED) // Double error indicator
+            : colorize('❌', RED)
+
         log(
-          `${colorize('❌ Trace', RED)} ${traceName} interrupted (${colorize(
-            reason,
+          `${statusIndicator} Trace ${traceName} interrupted (${colorize(
+            interruptionReason,
             RED,
-          )})`,
+          )}, %o)`,
+          'log',
+          interruptionMeta,
         )
-        logTimingInfo(transition)
-        // Log computed values and spans
-        try {
-          const { computedValues, computedSpans } = getComputedResults(
-            trace,
-            transition as FinalTransition<RelationSchemasT>,
+
+        // Show trace error if present
+        if (traceRecording?.error) {
+          log(
+            `   ${colorize('Trace Error:', RED)} %o`,
+            'log',
+            traceRecording.error,
           )
+        }
+
+        logTimingInfo(transition, traceInfo)
+
+        // Log computed results from trace recording (even for interrupted traces)
+        if (traceRecording) {
+          const { computedValues, computedSpans, computedRenderBeaconSpans } =
+            traceRecording
+
           if (computedValues && Object.keys(computedValues).length > 0) {
             log(
               `   Computed Values: ${Object.entries(computedValues)
@@ -485,6 +555,7 @@ export function createConsoleTraceLogger<
                 .join(', ')}`,
             )
           }
+
           if (computedSpans && Object.keys(computedSpans).length > 0) {
             log(
               `   Computed Spans: ${Object.entries(computedSpans)
@@ -492,16 +563,28 @@ export function createConsoleTraceLogger<
                 .join(', ')}`,
             )
           }
-        } catch {
-          // ignore
+
+          if (
+            computedRenderBeaconSpans &&
+            Object.keys(computedRenderBeaconSpans).length > 0
+          ) {
+            log(`   Render Beacon Spans:`)
+            Object.entries(computedRenderBeaconSpans).forEach(
+              ([name, data]) => {
+                log(
+                  `     ${name}: ${
+                    data.renderCount
+                  } renders, ${data.firstRenderTillContent.toFixed(
+                    2,
+                  )}ms till content`,
+                )
+              },
+            )
+          }
         }
       }
-      currentTraceInfo = null // Clear trace info on terminal state
-      liveDuration = 0
-      totalSpanCount = 0
-      hasErrorSpan = false
-      hasSuppressedErrorSpan = false
-      definitionModifications = []
+      // Remove trace from active map on terminal state
+      activeTraces.delete(traceId)
     }
 
     log('', 'groupEnd') // End the group for this transition
@@ -513,12 +596,18 @@ export function createConsoleTraceLogger<
   const handleRequiredSpanSeen = (
     event: AllPossibleRequiredSpanSeenEvents<RelationSchemasT>,
   ) => {
-    if (!currentTraceInfo) return
+    const {
+      traceContext: trace,
+      spanAndAnnotation: matchedSpan,
+      matcher,
+    } = event
+    const traceId = trace.input.id
+    const traceInfo = activeTraces.get(traceId)
 
-    const { spanAndAnnotation: matchedSpan, matcher } = event
+    if (!traceInfo) return
 
     // Find and update the matched span in our info
-    const requiredSpanEntry = currentTraceInfo.requiredSpans.find(
+    const requiredSpanEntry = traceInfo.requiredSpans.find(
       (s) => s.matcher === matcher,
     )
     if (requiredSpanEntry && !requiredSpanEntry.isMatched) {
@@ -532,7 +621,7 @@ export function createConsoleTraceLogger<
       `${colorize(
         '🔹 Matched required span:',
         MAGENTA,
-      )} ${name} (${getRequiredSpansCount()} spans matched)`,
+      )} ${name} (${getRequiredSpansCount(traceInfo)} spans matched)`,
       groupLevel,
     )
 
@@ -597,15 +686,14 @@ export function createConsoleTraceLogger<
   const addSpanSub = traceManager
     .when('add-span-to-recording')
     .subscribe((event) => {
-      if (!currentTraceInfo) return
-      // Calculate live info from traceContext
       const trace = event.traceContext
-      const entries = [
-        ...(trace.recordedItems.values
-          ? trace.recordedItems.values()
-          : trace.recordedItems),
-      ]
-      liveDuration =
+      const traceId = trace.input.id
+      const traceInfo = activeTraces.get(traceId)
+      if (!traceInfo) return
+
+      // Calculate live info from traceContext
+      const entries = [...trace.recordedItems.values()]
+      traceInfo.liveDuration =
         entries.length > 0
           ? Math.round(
               Math.max(
@@ -613,20 +701,23 @@ export function createConsoleTraceLogger<
               ) - trace.input.startTime.epoch,
             )
           : 0
-      totalSpanCount = entries.length
-      hasErrorSpan = entries.some(
+      traceInfo.totalSpanCount = entries.length
+      traceInfo.hasErrorSpan = entries.some(
         (e) => e.span.status === 'error' && !isSuppressedError(trace, e),
       )
-      hasSuppressedErrorSpan = entries.some(
+      traceInfo.hasSuppressedErrorSpan = entries.some(
         (e) => e.span.status === 'error' && isSuppressedError(trace, e),
       )
       // Log error if this span is error
       if (event.spanAndAnnotation.span.status === 'error') {
         const suppressed = isSuppressedError(trace, event.spanAndAnnotation)
+
         log(
           `${colorize('❗ Error span', RED)} '${
             event.spanAndAnnotation.span.name
-          }' seen${suppressed ? ' (suppressed)' : ''}`,
+          }' seen${suppressed ? ' (suppressed)' : ''} %o`,
+          'log',
+          event.spanAndAnnotation,
         )
       }
     })
@@ -636,7 +727,12 @@ export function createConsoleTraceLogger<
   const defModSub = traceManager
     .when('definition-modified')
     .subscribe((event) => {
-      definitionModifications.push(event.modifications)
+      const trace = event.traceContext
+      const traceId = trace.input.id
+      const traceInfo = activeTraces.get(traceId)
+      if (!traceInfo) return
+
+      traceInfo.definitionModifications.push(event.modifications)
       log(
         `${colorize('🔧 Definition modified', MAGENTA)}: ${Object.keys(
           event.modifications,
@@ -647,7 +743,7 @@ export function createConsoleTraceLogger<
 
   // Return API for the logger
   return {
-    getCurrentTrace: () => (currentTraceInfo ? { ...currentTraceInfo } : null),
+    getActiveTraces: () => new Map(activeTraces), // Return copy of active traces
 
     // Allow changing options
     setOptions: (newOptions: Partial<ConsoleTraceLoggerOptions>) => {
@@ -665,7 +761,7 @@ export function createConsoleTraceLogger<
     cleanup: () => {
       subscriptions.forEach((subscription) => void subscription.unsubscribe())
       subscriptions.length = 0 // Clear the array
-      currentTraceInfo = null
+      activeTraces.clear() // Clear all active traces
       // Optional: Log cleanup only if verbose or specifically configured?
       // log('ConsoleTraceLogger unsubscribed from all events')
     },

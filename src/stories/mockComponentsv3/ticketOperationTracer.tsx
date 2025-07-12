@@ -1,8 +1,10 @@
+import { CustomerSidebarOpenedOperation } from './customerSidebarTracer'
 import { traceManager } from './traceManager'
 
 export const ticketOperationTracer = traceManager.createTracer({
   name: `ticket-activation`,
   type: 'operation',
+  adoptAsChildren: [CustomerSidebarOpenedOperation],
   requiredSpans: [
     {
       name: 'TicketView',

@@ -5,6 +5,7 @@ import type {
   Span,
   SpanType,
 } from '../spanTypes'
+import type { RelationSchemasBase } from '../types'
 
 export interface ComponentRenderStub
   extends Partial<Omit<ComponentRenderSpan<any>, 'startTime' | 'duration'>> {
@@ -129,7 +130,9 @@ export function makeEntries(events: Stub[]): {
   return { entries, fmpTime }
 }
 
-export function getSpansFromTimeline<RelationSchemasT>(
+export function getSpansFromTimeline<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>(
   _: TemplateStringsArray,
   ...exprs: (Stub | number)[]
 ): { spans: Span<RelationSchemasT>[]; fmpTime: number | null } {
@@ -164,15 +167,16 @@ export function getSpansFromTimeline<RelationSchemasT>(
     if (stub.entryType === 'fmp') {
       fmpTime = currentTime
     }
+    const now =
+      'startTime' in stub ? stub.startTime ?? currentTime : currentTime
     spans.push({
       type: stub.entryType as SpanType,
       duration: 0,
       name: `${stub.entryType}`,
       ...stub,
       startTime: {
-        now: 'startTime' in stub ? stub.startTime ?? currentTime : currentTime,
-        epoch:
-          'startTime' in stub ? stub.startTime ?? currentTime : currentTime,
+        now,
+        epoch: now,
       },
       isIdle:
         'isIdle' in stub
@@ -196,6 +200,9 @@ export function getSpansFromTimeline<RelationSchemasT>(
           'startTime' in stub ? stub.startTime ?? currentTime : currentTime,
         toJSON: () => {},
       },
+      id: `span-${i}-${now}-${stub.entryType}-${
+        'duration' in stub ? stub.duration : 0
+      }`,
     } as Span<RelationSchemasT>)
   }
 

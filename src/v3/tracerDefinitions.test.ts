@@ -1,12 +1,5 @@
 import './testUtility/asciiTimelineSerializer'
-import {
-  beforeEach,
-  describe,
-  expect,
-  it,
-  type Mock,
-  vitest as jest,
-} from 'vitest'
+import { beforeEach, describe, expect, it, type Mock, vitest } from 'vitest'
 import * as match from './matchSpan'
 import {
   type TicketAndUserAndGlobalRelationSchemasFixture,
@@ -15,7 +8,7 @@ import {
 import { Check, getSpansFromTimeline, Render } from './testUtility/makeTimeline'
 import { processSpans } from './testUtility/processSpans'
 import { TraceManager } from './TraceManager'
-import type { AnyPossibleReportFn } from './types'
+import type { AnyPossibleReportFn, GenerateIdFn } from './types'
 
 describe('Trace Definitions', () => {
   let reportFn: Mock<
@@ -24,18 +17,36 @@ describe('Trace Definitions', () => {
   // TS doesn't like that reportFn is wrapped in Mock<> type
   const getReportFn = () =>
     reportFn as AnyPossibleReportFn<TicketAndUserAndGlobalRelationSchemasFixture>
-  let generateId: Mock
+  let generateId: Mock<GenerateIdFn>
   let reportErrorFn: Mock
   const DEFAULT_COLDBOOT_TIMEOUT_DURATION = 45_000
 
-  jest.useFakeTimers({
+  vitest.useFakeTimers({
     now: 0,
   })
 
+  let idPerType = {
+    span: 0,
+    trace: 0,
+    tick: 0,
+  }
+
   beforeEach(() => {
-    reportFn = jest.fn()
-    generateId = jest.fn().mockReturnValue('trace-id')
-    reportErrorFn = jest.fn()
+    idPerType = {
+      span: 0,
+      trace: 0,
+      tick: 0,
+    }
+    generateId = vitest.fn((type) => {
+      const seq = idPerType[type]++
+      return type === 'span'
+        ? `id-${seq}`
+        : type === 'trace'
+        ? `trace-${seq}`
+        : `tick-${seq}`
+    })
+    reportFn = vitest.fn()
+    reportErrorFn = vitest.fn()
   })
 
   describe('computedSpanDefinitions', () => {
@@ -70,7 +81,7 @@ describe('Trace Definitions', () => {
         variant: 'cold_boot',
       })
 
-      expect(traceId).toBe('trace-id')
+      expect(traceId).toBe('trace-0')
 
       // prettier-ignore
       const { spans } = getSpansFromTimeline<TicketAndUserAndGlobalRelationSchemasFixture>`
@@ -85,7 +96,7 @@ describe('Trace Definitions', () => {
       expect(report.name).toBe('ticket.computed-span-operation')
       expect(report.duration).toBe(200)
       expect(report.status).toBe('ok')
-      expect(report.interruptionReason).toBeUndefined()
+      expect(report.interruption).toBeUndefined()
       expect(report.computedSpans[computedSpanName]?.startOffset).toBe(50)
       expect(report.computedSpans[computedSpanName]?.duration).toBe(150)
     })
@@ -175,9 +186,9 @@ describe('Trace Definitions', () => {
 
       const report = reportFn.mock.calls[0]![0]
       expect(report.status).toBe('interrupted')
-      expect(report.interruptionReason).toBe(
-        'matched-on-required-span-with-error',
-      )
+      expect(report.interruption).toMatchObject({
+        reason: 'matched-on-required-span-with-error',
+      })
     })
 
     it('does not interrupt trace when required span error is explicitly ignored', () => {
@@ -219,7 +230,7 @@ describe('Trace Definitions', () => {
 
       const report = reportFn.mock.calls[0]![0]
       expect(report.status).toBe('error')
-      expect(report.interruptionReason).toBeUndefined()
+      expect(report.interruption).toBeUndefined()
     })
 
     it('interrupts trace when one of multiple required spans has an error', () => {
@@ -256,9 +267,9 @@ describe('Trace Definitions', () => {
 
       const report = reportFn.mock.calls[0]![0]
       expect(report.status).toBe('interrupted')
-      expect(report.interruptionReason).toBe(
-        'matched-on-required-span-with-error',
-      )
+      expect(report.interruption).toMatchObject({
+        reason: 'matched-on-required-span-with-error',
+      })
     })
   })
 
@@ -377,11 +388,11 @@ describe('Trace Definitions', () => {
           variants: { x: { timeout: 1_000 } },
           promoteSpanAttributes: [
             {
-              span: { name: 'foo', matchingIndex: -1 },
+              span: { name: 'foo', nthMatch: -1 },
               attributes: ['foo', 'only'],
             },
             {
-              span: { name: 'bar', matchingIndex: -1 },
+              span: { name: 'bar', nthMatch: -1 },
               attributes: ['bar', 'baz'],
             },
           ],
@@ -404,7 +415,7 @@ describe('Trace Definitions', () => {
         expect(report.attributes.other).toBeUndefined()
       })
 
-      it('should promote all span attributes to trace attributes when no matchingIndex is specified', () => {
+      it('should promote all span attributes to trace attributes when no nthMatch is specified', () => {
         const traceManager = new TraceManager({
           relationSchemas,
           reportFn: getReportFn(),

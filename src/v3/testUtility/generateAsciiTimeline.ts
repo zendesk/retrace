@@ -1,5 +1,8 @@
 /* eslint-disable no-continue */
 /* eslint-disable @typescript-eslint/prefer-for-of */
+
+import type { SpanBase } from '../spanTypes'
+
 export interface TimelineOptions {
   scale?: number // time units per character
   width?: number // maximum width of the timeline in characters
@@ -26,16 +29,46 @@ function generateGapMarker(duration: number): string {
   return `-<⋯ +${durationStr} ⋯>-`
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SpanLike = Pick<SpanBase<any>, 'startTime' | 'duration' | 'name' | 'type'>
+
+interface PerformanceEntryLike {
+  duration: number
+  entryType: string
+  name: string
+  startTime: number
+}
+
+const makePerformanceEntryLike = (
+  entry: PerformanceEntryLike | SpanLike | { span: SpanLike },
+): PerformanceEntryLike => {
+  if ('entryType' in entry) {
+    return entry
+  }
+  if ('span' in entry) {
+    // eslint-disable-next-line no-param-reassign
+    entry = entry.span
+  }
+  return {
+    duration: entry.duration,
+    entryType: entry.type,
+    name: entry.name,
+    startTime: entry.startTime.now,
+  }
+}
+
 export function generateAsciiTimeline(
-  entries: PerformanceEntry[],
+  spans: (PerformanceEntryLike | SpanLike)[],
   options: TimelineOptions = {},
 ): string {
   const maxWidth = options.width ?? DEFAULT_MAX_WIDTH
   const gapThreshold = options.gapThreshold ?? DEFAULT_GAP_THRESHOLD
 
-  if (entries.length === 0) {
+  if (spans.length === 0) {
     return ''
   }
+
+  const entries = spans.map(makePerformanceEntryLike)
 
   // Determine the time range
   const minTime =
@@ -221,11 +254,11 @@ export function generateAsciiTimeline(
   }
 
   // Assign events to rows based on event overlaps
-  const eventRows: PerformanceEntry[][] = []
+  const eventRows: PerformanceEntryLike[][] = []
 
   const isOverlap = (
-    row: PerformanceEntry[],
-    entry: PerformanceEntry,
+    row: PerformanceEntryLike[],
+    entry: PerformanceEntryLike,
   ): boolean => {
     for (const e of row) {
       if (

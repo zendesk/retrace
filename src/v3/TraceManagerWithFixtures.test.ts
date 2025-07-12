@@ -5,7 +5,8 @@ import {
   describe,
   expect,
   it,
-  vitest as jest,
+  type Mock,
+  vitest,
 } from 'vitest'
 import {
   ticketAndUserAndGlobalRelationSchemasFixture,
@@ -15,30 +16,50 @@ import { shouldCompleteAndHaveInteractiveTime } from './testUtility/fixtures/sho
 import { shouldNotEndWithInteractiveTimeout } from './testUtility/fixtures/shouldNotEndWithInteractiveTimeout'
 import { ticketActivatedDefinition } from './testUtility/fixtures/ticket.activated'
 import { TraceManager } from './TraceManager'
-import type { AnyPossibleReportFn } from './types'
+import type { AnyPossibleReportFn, GenerateIdFn } from './types'
 
 interface TicketIdRelation {
-  ticketId: string
+  ticketId: {
+    ticketId: StringConstructor
+  }
 }
 
 describe('TraceManager with Fixtures', () => {
   let reportFn: jest.Mock
-  let generateId: jest.Mock
+  let generateId: Mock<GenerateIdFn>
   let reportErrorFn: jest.Mock
 
-  jest.useFakeTimers({
+  vitest.useFakeTimers({
     now: 0,
   })
 
+  let idPerType = {
+    span: 0,
+    trace: 0,
+    tick: 0,
+  }
+
   beforeEach(() => {
-    reportFn = jest.fn<AnyPossibleReportFn<TicketIdRelation>>()
-    generateId = jest.fn().mockReturnValue('trace-id')
-    reportErrorFn = jest.fn()
+    idPerType = {
+      span: 0,
+      trace: 0,
+      tick: 0,
+    }
+    generateId = vitest.fn((type) => {
+      const seq = idPerType[type]++
+      return type === 'span'
+        ? `id-${seq}`
+        : type === 'trace'
+        ? `trace-${seq}`
+        : `tick-${seq}`
+    })
+    reportFn = vitest.fn<AnyPossibleReportFn<TicketIdRelation>>()
+    reportErrorFn = vitest.fn()
   })
 
   afterEach(() => {
-    jest.clearAllMocks()
-    jest.clearAllTimers()
+    vitest.clearAllMocks()
+    vitest.clearAllTimers()
   })
 
   it('should complete with interactive time without interruption', () => {
@@ -65,7 +86,7 @@ describe('TraceManager with Fixtures', () => {
     })
 
     for (const entry of fixtureEntries) {
-      traceManager.processSpan(entry.span)
+      traceManager.createAndProcessSpan(entry.span)
     }
 
     expect(reportFn).toHaveBeenCalled()
@@ -90,7 +111,7 @@ describe('TraceManager with Fixtures', () => {
             "firstRenderTillLoading": 134,
             "renderCount": 6,
             "startOffset": 482.69999998807907,
-            "sumOfRenderDurations": 695,
+            "sumOfRenderDurations": 347.5,
           },
           "OmniComposer": {
             "firstRenderTillContent": 343.80000001192093,
@@ -98,7 +119,7 @@ describe('TraceManager with Fixtures', () => {
             "firstRenderTillLoading": 0,
             "renderCount": 8,
             "startOffset": 689.1999999880791,
-            "sumOfRenderDurations": 693.400000050664,
+            "sumOfRenderDurations": 346.60000002384186,
           },
           "OmniLog": {
             "firstRenderTillContent": 1009.2999999970198,
@@ -106,15 +127,17 @@ describe('TraceManager with Fixtures', () => {
             "firstRenderTillLoading": 112.19999998807907,
             "renderCount": 7,
             "startOffset": 491.29999999701977,
-            "sumOfRenderDurations": 580.4000000357628,
+            "sumOfRenderDurations": 290.2000000178814,
           },
         },
         "computedSpans": {},
         "computedValues": {},
         "duration": 1504.4000000059605,
-        "id": "trace-id",
-        "interruptionReason": undefined,
+        "error": undefined,
+        "id": "trace-0",
+        "interruption": undefined,
         "name": "ticket.activated",
+        "parentTraceId": undefined,
         "relatedTo": {
           "ticketId": "74",
         },
@@ -128,7 +151,7 @@ describe('TraceManager with Fixtures', () => {
       }
     `)
     expect(report.duration).toBeCloseTo(1_504.4)
-    expect(report.interruptionReason).toBeUndefined()
+    expect(report.interruption).toBeUndefined()
     expect(report.additionalDurations.startTillInteractive).toBeCloseTo(1_504.4)
   })
 
@@ -159,7 +182,7 @@ describe('TraceManager with Fixtures', () => {
     })
 
     for (const entry of fixtureEntries) {
-      traceManager.processSpan(entry.span)
+      traceManager.createAndProcessSpan(entry.span)
     }
 
     expect(reportFn).toHaveBeenCalled()
@@ -184,7 +207,7 @@ describe('TraceManager with Fixtures', () => {
             "firstRenderTillLoading": 138.59999999403954,
             "renderCount": 5,
             "startOffset": 459.1000000089407,
-            "sumOfRenderDurations": 566.1999999582767,
+            "sumOfRenderDurations": 283.0999999791384,
           },
           "OmniComposer": {
             "firstRenderTillContent": 211.99999998509884,
@@ -192,7 +215,7 @@ describe('TraceManager with Fixtures', () => {
             "firstRenderTillLoading": 0,
             "renderCount": 8,
             "startOffset": 640.4000000059605,
-            "sumOfRenderDurations": 516.9999999701977,
+            "sumOfRenderDurations": 258.3999999910593,
           },
           "OmniLog": {
             "firstRenderTillContent": 815.9000000059605,
@@ -200,15 +223,17 @@ describe('TraceManager with Fixtures', () => {
             "firstRenderTillLoading": 113.2000000178814,
             "renderCount": 9,
             "startOffset": 469.70000000298023,
-            "sumOfRenderDurations": 511.80000004172325,
+            "sumOfRenderDurations": 255.90000002086163,
           },
         },
         "computedSpans": {},
         "computedValues": {},
         "duration": 1302.3999999910593,
-        "id": "trace-id",
-        "interruptionReason": undefined,
+        "error": undefined,
+        "id": "trace-0",
+        "interruption": undefined,
         "name": "ticket.activated",
+        "parentTraceId": undefined,
         "relatedTo": {
           "ticketId": "74",
         },
@@ -222,7 +247,7 @@ describe('TraceManager with Fixtures', () => {
       }
     `)
     expect(report.duration).toBeCloseTo(1_302.4)
-    expect(report.interruptionReason).toBeUndefined()
+    expect(report.interruption).toBeUndefined()
     expect(report.additionalDurations.startTillInteractive).toBeCloseTo(1_302.4)
   })
 })

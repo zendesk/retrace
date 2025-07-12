@@ -10,7 +10,7 @@ import type {
 // Types for debugging/monitoring events
 export interface AddSpanToRecordingEvent<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > {
   spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>
@@ -23,7 +23,7 @@ export interface AddSpanToRecordingEvent<
 
 export interface DefinitionModifiedEvent<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > {
   modifications: TraceDefinitionModifications<
@@ -40,7 +40,7 @@ export interface DefinitionModifiedEvent<
 
 export interface TraceStartEvent<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > {
   traceContext: DraftTraceContext<
@@ -51,7 +51,7 @@ export interface TraceStartEvent<
 }
 export interface StateTransitionEvent<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > {
   traceContext: DraftTraceContext<
@@ -63,7 +63,7 @@ export interface StateTransitionEvent<
 }
 export interface RequiredSpanSeenEvent<
   SelectedRelationNameT extends keyof RelationSchemasT,
-  RelationSchemasT,
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > {
   traceContext: DraftTraceContext<

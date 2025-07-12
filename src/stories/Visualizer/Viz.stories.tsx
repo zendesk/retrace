@@ -1,6 +1,5 @@
-import React from 'react'
-import type { Meta, StoryObj } from '@storybook/react'
-// eslint-disable-next-line import/no-extraneous-dependencies
+import * as React from 'react'
+import type { Meta, StoryObj } from '@storybook/react-webpack5'
 import { useScreenSize } from '@visx/responsive'
 import OperationVisualizer, {
   type OperationVisualizerProps,

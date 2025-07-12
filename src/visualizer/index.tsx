@@ -1,6 +1,6 @@
-/* eslint-disable import/no-extraneous-dependencies */
 import '@zendeskgarden/css-bedrock'
-import React, { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import * as React from 'react'
 import { DEFAULT_THEME, ThemeProvider } from '@zendeskgarden/react-theming'
 import { DropTarget } from './components/DropTarget'
 import FileUploadButton from './components/FileUploadButton'
@@ -14,7 +14,7 @@ import {
   MEASURES_TEXT,
   RESOURCES_TEXT,
 } from './constants'
-import { mapOperationForVisualization } from './mapOperationForVisualization'
+import { mapOperationForVisualizationHierarchical } from './mapOperationForVisualization'
 import type { RecordingInputFile } from './types'
 
 const STORAGE_KEY = {
@@ -119,7 +119,7 @@ const OperationVisualizer = ({ width, margin }: OperationVisualizerProps) => {
   const mappedFileContent = useMemo(() => {
     if (!fileContent) return null
 
-    return mapOperationForVisualization(fileContent, {
+    return mapOperationForVisualizationHierarchical(fileContent, {
       collapseRenders: displayOptions[COLLAPSE_RENDER_SPANS_TEXT],
       collapseAssets: displayOptions[COLLAPSE_ASSET_SPANS_TEXT],
       collapseEmberResources: displayOptions[COLLAPSE_EMBER_RESOURCE_SPANS],

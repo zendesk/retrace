@@ -5,41 +5,61 @@ import {
   describe,
   expect,
   it,
-  vitest as jest,
+  type Mock,
+  vitest,
 } from 'vitest'
 import * as matchSpan from './matchSpan'
 import { type TicketIdRelationSchemasFixture } from './testUtility/fixtures/relationSchemas'
 import { Check, getSpansFromTimeline, Render } from './testUtility/makeTimeline'
 import { processSpans } from './testUtility/processSpans'
 import { TraceManager } from './TraceManager'
-import type { AnyPossibleReportFn } from './types'
+import type { AnyPossibleReportFn, GenerateIdFn } from './types'
 
 describe('TraceManager', () => {
-  let reportFn: jest.Mock
-  let generateId: jest.Mock
-  let reportErrorFn: jest.Mock
-  let reportWarningFn: jest.Mock
+  let reportFn: Mock<AnyPossibleReportFn<TicketIdRelationSchemasFixture>>
+  let generateId: Mock<GenerateIdFn>
+  let reportErrorFn: Mock
+  let reportWarningFn: Mock
 
   const DEFAULT_COLDBOOT_TIMEOUT_DURATION = 45_000
-  jest.useFakeTimers({
+  vitest.useFakeTimers({
     now: 0,
   })
 
+  let idPerType = {
+    span: 0,
+    trace: 0,
+    tick: 0,
+  }
+
   beforeEach(() => {
-    reportFn = jest.fn<AnyPossibleReportFn<TicketIdRelationSchemasFixture>>()
-    generateId = jest.fn().mockReturnValue('trace-id')
-    reportErrorFn = jest.fn()
-    reportWarningFn = jest.fn()
+    idPerType = {
+      span: 0,
+      trace: 0,
+      tick: 0,
+    }
+    generateId = vitest.fn((type) => {
+      const seq = idPerType[type]++
+      return type === 'span'
+        ? `id-${seq}`
+        : type === 'trace'
+        ? `trace-${seq}`
+        : `tick-${seq}`
+    })
+    reportFn = vitest.fn<AnyPossibleReportFn<TicketIdRelationSchemasFixture>>()
+    reportErrorFn = vitest.fn()
+    reportWarningFn = vitest.fn()
   })
 
   afterEach(() => {
-    jest.clearAllMocks()
-    jest.clearAllTimers()
+    vitest.clearAllMocks()
+    vitest.clearAllTimers()
   })
 
   it('tracks trace after creating a draft and transitioning to active trace', () => {
     const traceManager = new TraceManager({
       relationSchemas: { ticket: { ticketId: String } },
+      // @ts-expect-error type mismatch
       reportFn,
       generateId,
       reportErrorFn,
@@ -57,7 +77,7 @@ describe('TraceManager', () => {
     const traceId = tracer.createDraft({
       variant: 'cold_boot',
     })
-    expect(traceId).toBe('trace-id')
+    expect(traceId).toBe('trace-0')
 
     // prettier-ignore
     const { spans } = getSpansFromTimeline<TicketIdRelationSchemasFixture>`
@@ -73,7 +93,7 @@ describe('TraceManager', () => {
 
     const report: Parameters<
       AnyPossibleReportFn<TicketIdRelationSchemasFixture>
-    >[0] = reportFn.mock.calls[0][0]
+    >[0] = reportFn.mock.calls[0]![0]
     expect(
       report.entries.map(
         (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,
@@ -86,12 +106,13 @@ describe('TraceManager', () => {
     expect(report.name).toBe('ticket.basic-operation')
     expect(report.duration).toBe(100)
     expect(report.status).toBe('ok')
-    expect(report.interruptionReason).toBeUndefined()
+    expect(report.interruption).toBeUndefined()
   })
 
   it('timeouts when the basic trace when an timeout duration from variant is reached', () => {
     const traceManager = new TraceManager({
       relationSchemas: { ticket: { ticketId: String } },
+      // @ts-expect-error type mismatch
       reportFn,
       generateId,
       reportErrorFn,
@@ -108,7 +129,7 @@ describe('TraceManager', () => {
       startTime: { now: 0, epoch: 0 },
       variant: 'cold_boot',
     })
-    expect(traceId).toBe('trace-id')
+    expect(traceId).toBe('trace-0')
 
     tracer.transitionDraftToActive({ relatedTo: { ticketId: '1' } })
 
@@ -123,7 +144,7 @@ describe('TraceManager', () => {
 
     const report: Parameters<
       AnyPossibleReportFn<TicketIdRelationSchemasFixture>
-    >[0] = reportFn.mock.calls[0][0]
+    >[0] = reportFn.mock.calls[0]![0]
 
     expect(
       report.entries.map(
@@ -134,13 +155,13 @@ describe('TraceManager', () => {
           timeline  | |
           time (ms) | 0
         `)
-    expect(report.interruptionReason).toBe('timeout')
+    expect(report.interruption).toMatchObject({ reason: 'timeout' })
     expect(report.duration).toBeNull()
 
     expect(report.name).toBe('ticket.timeout-operation')
     expect(report.status).toBe('interrupted')
 
-    expect(report.interruptionReason).toBe('timeout')
+    expect(report.interruption).toMatchObject({ reason: 'timeout' })
     expect(report.duration).toBeNull()
   })
 
@@ -148,6 +169,7 @@ describe('TraceManager', () => {
     it('after a trace is active: reports warning', () => {
       const traceManager = new TraceManager({
         relationSchemas: { ticket: { ticketId: String } },
+        // @ts-expect-error type mismatch
         reportFn,
         generateId,
         reportErrorFn,
@@ -188,6 +210,7 @@ describe('TraceManager', () => {
     it('after a trace is active and previouslyActivatedBehavior is "warn-and-continue": reports error and continues trace with new trace modification', () => {
       const traceManager = new TraceManager({
         relationSchemas: { ticket: { ticketId: String } },
+        // @ts-expect-error type mismatch
         reportFn,
         generateId,
         reportErrorFn,
@@ -245,6 +268,7 @@ describe('TraceManager', () => {
     it('after a trace is active and previouslyActivatedBehavior is "error-and-continue": reports error and continues trace with new trace modification', () => {
       const traceManager = new TraceManager({
         relationSchemas: { ticket: { ticketId: String } },
+        // @ts-expect-error type mismatch
         reportFn,
         generateId,
         reportErrorFn,
@@ -302,6 +326,7 @@ describe('TraceManager', () => {
     it('after a trace is active and previouslyActivatedBehavior is "error": reports error and continues trace with original trace definition', () => {
       const traceManager = new TraceManager({
         relationSchemas: { ticket: { ticketId: String } },
+        // @ts-expect-error type mismatch
         reportFn,
         generateId,
         reportErrorFn,
@@ -374,6 +399,7 @@ describe('TraceManager', () => {
     it('interrupts a basic trace when interruptOnSpans criteria is met in draft mode, trace stops immediately', () => {
       const traceManager = new TraceManager({
         relationSchemas: { ticket: { ticketId: String } },
+        // @ts-expect-error type mismatch
         reportFn,
         generateId,
         reportErrorFn,
@@ -404,19 +430,22 @@ describe('TraceManager', () => {
 
       const report: Parameters<
         AnyPossibleReportFn<TicketIdRelationSchemasFixture>
-      >[0] = reportFn.mock.calls[0][0]
+      >[0] = reportFn.mock.calls[0]![0]
 
       // this trace was interrupted before transitioning from draft to active, so the only available entries are up to the interrupt
       expect(report.entries).toHaveLength(2)
       expect(report.name).toBe('ticket.interrupt-on-basic-operation')
       expect(report.duration).toBeNull()
-      expect(report.interruptionReason).toBe('matched-on-interrupt')
+      expect(report.interruption).toMatchObject({
+        reason: 'matched-on-interrupt',
+      })
       expect(report.status).toBe('interrupted')
     })
 
     it('interrupts a draft trace when interrupt() is called with error', () => {
       const traceManager = new TraceManager({
         relationSchemas: { ticket: { ticketId: String } },
+        // @ts-expect-error type mismatch
         reportFn,
         generateId,
         reportErrorFn,
@@ -446,17 +475,18 @@ describe('TraceManager', () => {
       tracer.interrupt({ error })
 
       expect(reportFn).toHaveBeenCalled()
-      const report = reportFn.mock.calls[0][0]
+      const report = reportFn.mock.calls[0]![0]
       expect(report.entries.length).toBe(3) // start, middle, and error mark
       expect(report.status).toBe('interrupted')
-      expect(report.interruptionReason).toBe('aborted')
+      expect(report.interruption).toMatchObject({ reason: 'aborted' })
       // Last entry should be the error mark
-      expect(report.entries[report.entries.length - 1].span.error).toBe(error)
+      expect(report.entries[report.entries.length - 1]!.span.error).toBe(error)
     })
 
     it('interrupts a draft trace when interrupt() is called without error', () => {
       const traceManager = new TraceManager({
         relationSchemas: { ticket: { ticketId: String } },
+        // @ts-expect-error type mismatch
         reportFn,
         generateId,
         reportErrorFn,
@@ -485,15 +515,16 @@ describe('TraceManager', () => {
       tracer.interrupt()
 
       expect(reportFn).toHaveBeenCalled()
-      const report = reportFn.mock.calls[0][0]
+      const report = reportFn.mock.calls[0]![0]
       expect(report.status).toBe('interrupted')
       expect(report.entries.length).toBe(0)
-      expect(report.interruptionReason).toBe('draft-cancelled')
+      expect(report.interruption).toMatchObject({ reason: 'draft-cancelled' })
     })
 
     it('interrupts an active trace when interrupt() is called with error', () => {
       const traceManager = new TraceManager({
         relationSchemas: { ticket: { ticketId: String } },
+        // @ts-expect-error type mismatch
         reportFn,
         generateId,
         reportErrorFn,
@@ -524,17 +555,18 @@ describe('TraceManager', () => {
       tracer.interrupt({ error })
 
       expect(reportFn).toHaveBeenCalled()
-      const report = reportFn.mock.calls[0][0]
+      const report = reportFn.mock.calls[0]![0]
       expect(report.entries.length).toBe(3) // start, middle, and error mark
       expect(report.status).toBe('interrupted')
-      expect(report.interruptionReason).toBe('aborted')
+      expect(report.interruption).toMatchObject({ reason: 'aborted' })
       // Last entry should be the error mark
-      expect(report.entries[report.entries.length - 1].span.error).toBe(error)
+      expect(report.entries[report.entries.length - 1]?.span.error).toBe(error)
     })
 
     it('interrupts an active trace when interrupt() is called without error', () => {
       const traceManager = new TraceManager({
         relationSchemas: { ticket: { ticketId: String } },
+        // @ts-expect-error type mismatch
         reportFn,
         generateId,
         reportErrorFn,
@@ -564,15 +596,16 @@ describe('TraceManager', () => {
       tracer.interrupt()
 
       expect(reportFn).toHaveBeenCalled()
-      const report = reportFn.mock.calls[0][0]
+      const report = reportFn.mock.calls[0]![0]
       expect(report.status).toBe('interrupted')
       expect(report.entries.length).toBe(2) // start, middle
-      expect(report.interruptionReason).toBe('aborted')
+      expect(report.interruption).toMatchObject({ reason: 'aborted' })
     })
 
     it('reports warning when interrupting a non-existent trace', () => {
       const traceManager = new TraceManager({
         relationSchemas: { ticket: { ticketId: String } },
+        // @ts-expect-error type mismatch
         reportFn,
         generateId,
         reportErrorFn,

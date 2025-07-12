@@ -1,5 +1,4 @@
-/* eslint-disable import/no-extraneous-dependencies */
-import React from 'react'
+import * as React from 'react'
 import styled from 'styled-components'
 import { Sheet } from '@zendeskgarden/react-chrome'
 import { getColor } from '@zendeskgarden/react-theming'
@@ -91,6 +90,13 @@ const SpanDetails: React.FC<SpanDetailsProps> = ({ span, onClose }) => {
           <Sheet.Description>Type: {span.type}</Sheet.Description>
         </Sheet.Header>
         <Sheet.Body>
+          <DetailRow>
+            <Label>ID</Label>
+            <Value>
+              {span.span.parentSpanId ? `${span.span.parentSpanId} => ` : ''}
+              {span.span.id}
+            </Value>
+          </DetailRow>
           <DetailRow>
             <Label>Start Time</Label>
             <Value>

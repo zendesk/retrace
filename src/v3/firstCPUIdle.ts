@@ -41,8 +41,13 @@ export interface CPUIdleProcessorOptions {
   heavyClusterThreshold?: number
 }
 
-const isLongTask = (entry: PerformanceEntryLike) =>
-  entry.entryType === 'longtask' || entry.entryType === 'long-animation-frame'
+export interface CPUIdleProcessorInit {
+  lastLongTaskEndTime?: number
+}
+
+export const isLongTask = (entry?: PerformanceEntryLike) =>
+  entry &&
+  (entry.entryType === 'longtask' || entry.entryType === 'long-animation-frame')
 
 export function createCPUIdleProcessor<T extends number | PerformanceEntryLike>(
   fmpOrEntry: T,
@@ -51,6 +56,7 @@ export function createCPUIdleProcessor<T extends number | PerformanceEntryLike>(
     heavyClusterThreshold = DEFAULT_HEAVY_CLUSTER_THRESHOLD,
     getQuietWindowDuration,
   }: CPUIdleProcessorOptions = {},
+  { lastLongTaskEndTime }: CPUIdleProcessorInit = {},
 ): CPUIdleLongTaskProcessor<T> {
   const fmp =
     typeof fmpOrEntry === 'number'
@@ -62,8 +68,8 @@ export function createCPUIdleProcessor<T extends number | PerformanceEntryLike>(
     typeof fmpOrEntry === 'number' ? null : fmpOrEntry
   let longTaskClusterDurationTotal = 0 // Total duration of the current long task cluster
 
-  // TODO: potentially assume that FMP point is as if inside of a heavy cluster already, this could be done by setting this value to fmp
-  let endTimeStampOfLastLongTask: number | null = null // End timestamp of the last long task
+  // assume that FMP point is as if inside of a heavy cluster already, this could be done by setting this value to fmp
+  let endTimeOfLastLongTask: number | null = lastLongTaskEndTime ?? null // End timestamp of the last long task
   let lastLongTask: PerformanceEntryLike | null = null
 
   const returnType = typeof fmpOrEntry === 'number' ? 'number' : 'object'
@@ -100,7 +106,7 @@ export function createCPUIdleProcessor<T extends number | PerformanceEntryLike>(
       quietWindowDuration,
     )
 
-    if (endTimeStampOfLastLongTask === null) {
+    if (endTimeOfLastLongTask === null) {
       // Check if a quiet window has passed without seeing any long tasks
       if ('firstCpuIdle' in quietWindowCheck) {
         return quietWindowCheck
@@ -109,27 +115,36 @@ export function createCPUIdleProcessor<T extends number | PerformanceEntryLike>(
       // If this is the first long task
       if (isEntryLongTask) {
         // Update the end timestamp of the last long task and initialize the cluster
-        endTimeStampOfLastLongTask = entryEndTime
+        endTimeOfLastLongTask = entryEndTime
         lastLongTask = entry
-        // if this longtask overlaps FMP, then push the first CPU idle timestamp to the end of it
+        // if this longtask overlaps (strides) FMP, then push the first CPU idle timestamp to the end of it
         if (entry.startTime - fmp < 0) {
           longTaskClusterDurationTotal =
             entry.duration - Math.abs(entry.startTime - fmp)
 
-          if (endTimeStampOfLastLongTask > fmp) {
+          if (endTimeOfLastLongTask > fmp) {
             // Move to the end of the cluster:
-            possibleFirstCPUIdleTimestamp = endTimeStampOfLastLongTask
+            possibleFirstCPUIdleTimestamp = endTimeOfLastLongTask
             possibleFirstCPUIdleEntry = entry
           }
         } else {
           longTaskClusterDurationTotal = entry.duration
+
+          // Check if this single task is a heavy cluster
+          if (
+            longTaskClusterDurationTotal >= heavyClusterThreshold &&
+            endTimeOfLastLongTask > fmp
+          ) {
+            possibleFirstCPUIdleTimestamp = endTimeOfLastLongTask
+            possibleFirstCPUIdleEntry = entry
+          }
         }
       }
       return quietWindowCheck
     }
 
     // Calculate time since the last long task
-    const gapSincePreviousTask = entry.startTime - endTimeStampOfLastLongTask
+    const gapSincePreviousTask = entry.startTime - endTimeOfLastLongTask
 
     if (
       isEntryLongTask &&
@@ -137,20 +152,20 @@ export function createCPUIdleProcessor<T extends number | PerformanceEntryLike>(
       gapSincePreviousTask > 0
     ) {
       // Continue to expand the existing cluster
-      // If less than 1 second since the last long task
+      // If less than $clusterPadding since the last long task
       // Include the time passed since the last long task in the cluster duration
       longTaskClusterDurationTotal += gapSincePreviousTask + entry.duration
-      endTimeStampOfLastLongTask = entryEndTime // Update the end timestamp of the last long task
+      endTimeOfLastLongTask = entryEndTime // Update the end timestamp of the last long task
       lastLongTask = entry
 
       // If the cluster duration exceeds 250ms, update the first CPU idle timestamp
       if (
         longTaskClusterDurationTotal >= heavyClusterThreshold &&
-        endTimeStampOfLastLongTask > fmp
+        endTimeOfLastLongTask > fmp
       ) {
         // Met criteria for Heavy Cluster
         // Move to the end of the cluster
-        possibleFirstCPUIdleTimestamp = endTimeStampOfLastLongTask
+        possibleFirstCPUIdleTimestamp = endTimeOfLastLongTask
         possibleFirstCPUIdleEntry = lastLongTask
       }
     } else {
@@ -165,7 +180,7 @@ export function createCPUIdleProcessor<T extends number | PerformanceEntryLike>(
       if (isEntryLongTask) {
         // Start a new cluster
         longTaskClusterDurationTotal = entry.duration // Reset the cluster duration with the current task
-        endTimeStampOfLastLongTask = entryEndTime // Update the end timestamp of the last long task
+        endTimeOfLastLongTask = entryEndTime // Update the end timestamp of the last long task
         lastLongTask = entry
         // possibleFirstCPUIdleTimestamp remains unchanged,
         // because we don't know if it's a light or heavy cluster yet

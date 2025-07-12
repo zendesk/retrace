@@ -1,5 +1,4 @@
-/* eslint-disable import/no-extraneous-dependencies */
-import React from 'react'
+import * as React from 'react'
 import { Table } from '@zendeskgarden/react-tables'
 
 interface TicketProps {

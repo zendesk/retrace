@@ -1,9 +1,10 @@
-import React, {
+import {
   type DragEventHandler,
   type ReactElement,
   useEffect,
   useState,
 } from 'react'
+import * as React from 'react'
 
 export interface DropTargetProps {
   onDrop: DragEventHandler
@@ -54,24 +55,26 @@ export const DropTarget = ({ onDrop, children }: DropTargetProps) => {
       ></div>
       {children}
       <style>
-        {`.drop-target {
-             position: absolute;
-             top: 0;
-             left: 0;
-             right: 0;
-             bottom: 0;
-             visibility: hidden;
-             opacity: .5;
-             z-index: 9999;
+        {
+          /* css */ `.drop-target {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  visibility: hidden;
+  opacity: .5;
+  z-index: 9999;
+}
+
+.drop-target.over {
+  visibility: initial;
+  background: lightblue;
+  border: 1px dashed;
+  border-radius: 1rem;
+}
+`
         }
-        
-        .drop-target.over {
-          visibility: initial;
-          background: lightblue;
-          border: 1px dashed;
-          border-radius: 1rem;
-        }
-        `}
       </style>
     </>
   )

@@ -1,7 +1,4 @@
-/* eslint-disable no-magic-numbers */
-/* eslint-disable import/no-extraneous-dependencies */
-
-import React from 'react'
+import * as React from 'react'
 import styled, { useTheme } from 'styled-components'
 import { Annotation, Label } from '@visx/annotation'
 import { localPoint } from '@visx/event'
@@ -14,7 +11,7 @@ import type { WithTooltipProvidedProps } from '@visx/tooltip/lib/enhancers/withT
 import type { ScaleBand, ScaleLinear } from '@visx/vendor/d3-scale'
 import { getColor } from '@zendeskgarden/react-theming'
 import { BAR_FILL_COLOR } from '../constants'
-import type { MappedSpanAndAnnotation } from '../types'
+import type { HierarchicalSpanAndAnnotation } from '../types'
 
 const interactiveStyles = `
   cursor: pointer;
@@ -71,11 +68,16 @@ interface SharedAnnotationProps {
   titleColor?: string
   title?: string
   annotateAt?: 'top'
-  data: MappedSpanAndAnnotation
+  data: HierarchicalSpanAndAnnotation
   showTooltip: (
-    data: Partial<WithTooltipProvidedProps<MappedSpanAndAnnotation>>,
+    data: Partial<WithTooltipProvidedProps<HierarchicalSpanAndAnnotation>>,
   ) => void
   hideTooltip: () => void
+  depth?: number
+  hasChildren?: boolean
+  isExpanded?: boolean
+  onToggleExpansion?: (spanId: string) => void
+  isVisible?: boolean
 }
 
 interface InteractiveLineSpanProps
@@ -109,6 +111,12 @@ const InteractiveSpan: React.FC<InteractiveSpanProps> = (props) => {
     titleColor: color,
     title,
     annotateAt,
+    depth = 0,
+    hasChildren = false,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    isExpanded = false,
+    onToggleExpansion,
+    isVisible = true,
     ...restProps
   } = props
   let tooltipTimeout: number
@@ -139,7 +147,18 @@ const InteractiveSpan: React.FC<InteractiveSpanProps> = (props) => {
 
   const handleClick = (event: React.MouseEvent) => {
     event.stopPropagation() // Prevent click from bubbling to container
-    onClick()
+
+    // If this span has children and we have expansion handler, toggle expansion
+    if (hasChildren && onToggleExpansion) {
+      onToggleExpansion(data.span.id)
+    } else {
+      onClick()
+    }
+  }
+
+  // Don't render if not visible
+  if (!isVisible) {
+    return null
   }
   let element: React.ReactNode
   if (restProps.type === 'line') {
@@ -171,14 +190,20 @@ const InteractiveSpan: React.FC<InteractiveSpanProps> = (props) => {
       xScale(data.annotation.operationRelativeStartTime)
     const isTiny = scaledWidth < MIN_SPAN_WIDTH
     const width = isTiny ? MIN_SPAN_WIDTH : scaledWidth
-    const fill =
+    const baseFill =
       data.span.status === 'error'
         ? getColor({ theme, variable: 'background.dangerEmphasis' })
         : BAR_FILL_COLOR[data.type]
 
+    // Slightly reduce opacity for child spans to show hierarchy
+    const opacity = Math.max(0.4, 1 - depth * 0.15)
+
     const height = isTiny ? yScale.bandwidth() / 2 : yScale.bandwidth()
+    const depthOffset = depth * 2 // Slight vertical offset for child spans
     const y =
-      (yScale(data.groupName) ?? 0) + (isTiny ? yScale.bandwidth() / 4 : 0)
+      (yScale(data.groupName) ?? 0) +
+      (isTiny ? yScale.bandwidth() / 4 : 0) +
+      depthOffset
 
     element = (
       <>
@@ -186,11 +211,14 @@ const InteractiveSpan: React.FC<InteractiveSpanProps> = (props) => {
           <StyledBar
             {...restProps}
             data-status={data.span.status}
+            data-depth={depth}
+            data-has-children={hasChildren}
             x={xScale(data.annotation.operationRelativeStartTime)}
             y={y}
             width={width}
             height={height}
-            fill={fill}
+            fill={baseFill}
+            fillOpacity={opacity}
             rx={2}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
@@ -204,7 +232,7 @@ const InteractiveSpan: React.FC<InteractiveSpanProps> = (props) => {
                 xScale(data.annotation.operationRelativeEndTime)) /
               2
             }
-            y={yScale(data.groupName)! + yScale.bandwidth() / 2}
+            y={yScale(data.groupName)! + yScale.bandwidth() / 2 + depthOffset}
             dy=".33em"
             fontSize={12}
             textAnchor="middle"

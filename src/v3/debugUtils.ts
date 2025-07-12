@@ -2,7 +2,7 @@ import {
   DEFAULT_DEBOUNCE_DURATION,
   DEFAULT_INTERACTIVE_TIMEOUT_DURATION,
 } from './constants'
-import type { SpanMatchDefinitionCombinator, SpanMatcherFn } from './matchSpan'
+import type { SpanMatch, SpanMatcherFn } from './matchSpan'
 import { createTraceRecording } from './recordingComputeUtils'
 import type { SpanAndAnnotation } from './spanAnnotationTypes'
 import type { FinalTransition, OnEnterStatePayload } from './Trace'
@@ -14,7 +14,9 @@ import type {
 } from './types'
 
 // Helper to check if error is suppressed
-export function isSuppressedError<RelationSchemasT>(
+export function isSuppressedError<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>(
   trace: DraftTraceContext<keyof RelationSchemasT, RelationSchemasT, string>,
   spanAndAnnotation: SpanAndAnnotation<RelationSchemasT>,
 ) {
@@ -58,24 +60,28 @@ export function getConfigSummary<
 }
 
 // Helper to get computed values/spans for completed/interrupted traces
-export function getComputedResults<RelationSchemasT>(
+export function getComputedResults<
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   traceContext: TraceContext<any, RelationSchemasT, any>,
   finalTransition: FinalTransition<RelationSchemasT>,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Partial<TraceRecording<any, RelationSchemasT>> {
+): TraceRecording<any, RelationSchemasT> | undefined {
   try {
     const recording = createTraceRecording(traceContext, finalTransition)
     return recording
   } catch {
-    return {}
+    return undefined
   }
 }
 
 /**
  * Extract timing offsets from a transition object
  */
-export const extractTimingOffsets = <RelationSchemasT>(
+export const extractTimingOffsets = <
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>(
   transition: OnEnterStatePayload<RelationSchemasT>,
 ) => {
   let lastRequiredSpanOffset: number | undefined
@@ -120,13 +126,13 @@ export function getMatcherLabelFromCombinator<
   SelectedRelationNameT extends keyof RelationSchemasT,
   VariantsT extends string,
 >(
-  def: SpanMatchDefinitionCombinator<
-    SelectedRelationNameT,
-    RelationSchemasT,
-    VariantsT
-  >,
+  def: SpanMatch<SelectedRelationNameT, RelationSchemasT, VariantsT>,
   index?: number,
 ): string {
+  if ('fromDefinition' in def && def.fromDefinition) {
+    return getMatcherLabelFromCombinator(def.fromDefinition, index)
+  }
+
   const parts: string[] = []
 
   // Example: Prioritize 'label' if it exists
@@ -214,9 +220,9 @@ export function getMatcherLabelFromCombinator<
     parts.push('<customMatcherFn>')
   }
 
-  // matchingIndex
-  if ('matchingIndex' in def && typeof def.matchingIndex === 'number') {
-    parts.push(`matchingIndex=${def.matchingIndex}`)
+  // nthMatch
+  if ('nthMatch' in def && typeof def.nthMatch === 'number') {
+    parts.push(`nthMatch=${def.nthMatch}`)
   }
 
   if (parts.length > 0) {
@@ -227,10 +233,7 @@ export function getMatcherLabelFromCombinator<
   try {
     const defString = JSON.stringify(def)
     // Limit length to avoid overly long strings
-    return defString.length > 100
-      ? // eslint-disable-next-line no-magic-numbers
-        `${defString.slice(0, 97)}...`
-      : defString
+    return defString.length > 100 ? `${defString.slice(0, 97)}...` : defString
   } catch {
     // Fallback if stringify fails
     return `<matcher#${index ?? '?'}>`
