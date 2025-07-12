@@ -52,17 +52,14 @@ export const generateUseBeacon =
       parentSpan: parentSpanRef.current,
     })
 
-    const renderStartRef = useRef<
-      | ProcessedSpan<RelationSchemasT, ComponentRenderSpan<RelationSchemasT>>
-      | undefined
-    >()
+    const renderStartRef =
+      useRef<
+        ProcessedSpan<RelationSchemasT, ComponentRenderSpan<RelationSchemasT>>
+      >(renderStartEntry)
     renderStartRef.current = renderStartEntry
 
     // Beacon effect for tracking 'component-render'. This will fire after every render as it does not have any dependencies:
     useEffect(() => {
-      if (!renderStartRef.current) {
-        return
-      }
       const maybeNewParent = renderStartRef.current.resolveParent(true)
       parentSpanRef.current = maybeNewParent ?? parentSpanRef.current
 
@@ -85,7 +82,6 @@ export const generateUseBeacon =
         })
       }
       traceManager.endRenderSpan(renderStartRef.current.span)
-      renderStartRef.current = undefined
     })
 
     // Beacon effect for tracking 'component-unmount' entries

@@ -542,7 +542,7 @@ export class TraceManager<
     partialSpan: ErrorSpanInput<RelationSchemasT>,
   ): ProcessedSpan<RelationSchemasT, ErrorSpan<RelationSchemasT>> {
     return this.createAndProcessSpan({
-      name: partialSpan.error.name,
+      name: partialSpan.error.name ?? 'Error',
       status: 'error',
       type: 'error',
       ...partialSpan,

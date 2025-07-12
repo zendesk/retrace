@@ -146,7 +146,7 @@ export interface SpanBase<
   /**
    * if status is error, optionally provide the Error object with additional metadata
    */
-  error?: Error
+  error?: ErrorLike
 
   /**
    * Optional parent span, if known.
@@ -287,16 +287,24 @@ export interface ChildOperationSpan<
     Omit<
       TraceRecording<keyof RelationSchemasT, RelationSchemasT>,
       // these come from the SpanBase type:
-      'duration' | 'status' | 'relatedTo'
+      'duration' | 'status' | 'relatedTo' | 'entries'
     > {
   type: 'operation'
+}
+
+export interface ErrorLike {
+  message: string
+  name?: string
+  stack?: string
+  cause?: unknown
+  [otherProps: string]: unknown
 }
 
 export interface ErrorSpan<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
 > extends SpanBase<RelationSchemasT> {
   type: 'error'
-  error: Error
+  error: ErrorLike
   status: 'error'
 }
 

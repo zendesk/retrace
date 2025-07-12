@@ -9,6 +9,7 @@ import type { SpanAndAnnotation } from './spanAnnotationTypes'
 import {
   type ActiveTraceInput,
   type DraftTraceInput,
+  type ErrorLike,
   PARENT_SPAN,
 } from './spanTypes'
 import type { FinalTransition } from './Trace'
@@ -518,7 +519,7 @@ export function propagateStatusAndAttributes<
       continue
     }
 
-    let childError: boolean | Error = false
+    let childError: boolean | ErrorLike = false
     const kids = children.get(id)
     if (kids) {
       for (const childId of kids) {
@@ -617,7 +618,7 @@ export function createTraceRecording<
       : {}
 
   let markTraceAsErrored = false
-  let error: Error | undefined
+  let error: ErrorLike | undefined
   for (const spanAndAnnotation of recordedItemsArray) {
     if (
       !spanAndAnnotation.annotation.isGhost &&

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style */
 import type { SpanAnnotation } from './spanAnnotationTypes'
-import type { Attributes, PARENT_SPAN, Span } from './spanTypes'
+import type { Attributes, ErrorLike, PARENT_SPAN, Span } from './spanTypes'
 import type {
   InterruptionReasonPayload,
   MapSchemaToTypes,
@@ -99,7 +99,7 @@ export interface TraceRecordingBase<
   }
 
   /** The first unsupressed error that bubbled up to the trace, or undefined */
-  error?: Error
+  error?: ErrorLike
 }
 
 export type RecordedSpan<
