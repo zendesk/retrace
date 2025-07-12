@@ -591,8 +591,9 @@ export function createTraceRecording<
 
   for (const item of recordedItems.values()) {
     if (endOfOperationSpan) {
-      // only keep items captured until the endOfOperationSpan or if not available, the lastRelevantSpan
       if (
+        // and spans captured until the endOfOperationSpan,
+        // or if not available, the lastRelevantSpan
         item.annotation.operationRelativeEndTime <=
         endOfOperationSpan.annotation.operationRelativeEndTime
       ) {
@@ -656,7 +657,8 @@ export function createTraceRecording<
     // remove getParentSpan function
     ({ span, ...rest }) => {
       // exclude internalUse spans from the final trace recording
-      if (!span.internalUse) {
+      // unless they are errored
+      if (!span.internalUse || span.status === 'error') {
         return [
           {
             ...rest,
