@@ -526,6 +526,8 @@ export class TraceStateMachine<
             if (doesSpanMatch(spanAndAnnotation, this.#context)) {
               // still record the span that interrupted the trace
               this.sideEffectFns.addSpanToRecording(spanAndAnnotation)
+              // relevant because it caused the interruption
+              this.lastRelevant = spanAndAnnotation
               return {
                 transitionToState: 'interrupted',
                 interruption: {
@@ -709,6 +711,33 @@ export class TraceStateMachine<
             transitionToState: 'interrupted',
             interruption: { reason: 'timeout' },
             lastRelevantSpanAndAnnotation: this.lastRelevant,
+          }
+        }
+
+        // does span satisfy any of the "interruptOnSpans" definitions
+        if (this.#context.definition.interruptOnSpans) {
+          for (const doesSpanMatch of this.#context.definition
+            .interruptOnSpans) {
+            if (doesSpanMatch(spanAndAnnotation, this.#context)) {
+              // still record the span that interrupted the trace
+              this.sideEffectFns.addSpanToRecording(spanAndAnnotation)
+              // relevant because it caused the interruption
+              // this might be a little controversial since we don't know
+              // if we would have seen a required span after
+              // after all we're already debouncing...
+              // but for simplicity the assumption is that if we see a span that matches the interruptOnSpans,
+              // the trace should still be considered as interrupted
+              this.lastRelevant = spanAndAnnotation
+              return {
+                transitionToState: 'interrupted',
+                interruption: {
+                  reason: doesSpanMatch.requiredSpan
+                    ? 'matched-on-required-span-with-error'
+                    : 'matched-on-interrupt',
+                },
+                lastRelevantSpanAndAnnotation: this.lastRelevant,
+              }
+            }
           }
         }
 
