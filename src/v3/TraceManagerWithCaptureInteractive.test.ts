@@ -5,6 +5,7 @@ import {
   describe,
   expect,
   it,
+  type Mock,
   vitest as jest,
 } from 'vitest'
 import { DEFAULT_INTERACTIVE_TIMEOUT_DURATION } from './constants'
@@ -32,9 +33,9 @@ const cpuIdleProcessorOptions = {
 }
 
 describe('TraceManager with Capture Interactivity', () => {
-  let reportFn: jest.Mock
-  let generateId: jest.Mock
-  let reportErrorFn: jest.Mock
+  let reportFn: Mock
+  let generateId: Mock
+  let reportErrorFn: Mock
   const DEFAULT_COLDBOOT_TIMEOUT_DURATION = 45_000
 
   jest.useFakeTimers({
@@ -89,7 +90,7 @@ describe('TraceManager with Capture Interactivity', () => {
 
     const report: Parameters<
       AnyPossibleReportFn<TicketIdRelationSchemasFixture>
-    >[0] = reportFn.mock.calls[0][0]
+    >[0] = reportFn.mock.calls[0]?.[0] ?? []
     expect(
       report.entries.map(
         (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,
@@ -146,7 +147,7 @@ describe('TraceManager with Capture Interactivity', () => {
 
     const report: Parameters<
       AnyPossibleReportFn<TicketIdRelationSchemasFixture>
-    >[0] = reportFn.mock.calls[0][0]
+    >[0] = reportFn.mock.calls[0]?.[0] ?? []
     expect(
       report.entries.map(
         (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,
@@ -203,7 +204,7 @@ describe('TraceManager with Capture Interactivity', () => {
 
     const report: Parameters<
       AnyPossibleReportFn<TicketIdRelationSchemasFixture>
-    >[0] = reportFn.mock.calls[0][0]
+    >[0] = reportFn.mock.calls[0]?.[0] ?? []
     expect(
       report.entries.map(
         (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,
@@ -260,7 +261,7 @@ describe('TraceManager with Capture Interactivity', () => {
 
     const report: Parameters<
       AnyPossibleReportFn<TicketIdRelationSchemasFixture>
-    >[0] = reportFn.mock.calls[0][0]
+    >[0] = reportFn.mock.calls[0]?.[0] ?? []
     expect(
       report.entries.map(
         (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,
@@ -319,7 +320,7 @@ describe('TraceManager with Capture Interactivity', () => {
 
     const report: Parameters<
       AnyPossibleReportFn<TicketIdRelationSchemasFixture>
-    >[0] = reportFn.mock.calls[0][0]
+    >[0] = reportFn.mock.calls[0]?.[0] ?? []
     expect(
       report.entries.map(
         (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,
@@ -381,7 +382,7 @@ describe('TraceManager with Capture Interactivity', () => {
     expect(reportFn).toHaveBeenCalled()
     const report: Parameters<
       AnyPossibleReportFn<TicketIdRelationSchemasFixture>
-    >[0] = reportFn.mock.calls[0][0]
+    >[0] = reportFn.mock.calls[0]?.[0] ?? []
 
     expect(
       report.entries.map(
@@ -445,7 +446,7 @@ describe('TraceManager with Capture Interactivity', () => {
     expect(reportFn).toHaveBeenCalled()
     const report: Parameters<
       AnyPossibleReportFn<TicketIdRelationSchemasFixture>
-    >[0] = reportFn.mock.calls[0][0]
+    >[0] = reportFn.mock.calls[0]?.[0] ?? []
 
     expect(
       report.entries.map(
@@ -502,7 +503,7 @@ describe('TraceManager with Capture Interactivity', () => {
 
     const report: Parameters<
       AnyPossibleReportFn<TicketIdRelationSchemasFixture>
-    >[0] = reportFn.mock.calls[0][0]
+    >[0] = reportFn.mock.calls[0]?.[0] ?? []
     expect(
       report.entries.map(
         (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,
@@ -557,7 +558,7 @@ describe('TraceManager with Capture Interactivity', () => {
 
     const report: Parameters<
       AnyPossibleReportFn<TicketIdRelationSchemasFixture>
-    >[0] = reportFn.mock.calls[0][0]
+    >[0] = reportFn.mock.calls[0]?.[0] ?? []
     expect(
       report.entries.map(
         (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,
@@ -612,7 +613,7 @@ describe('TraceManager with Capture Interactivity', () => {
 
     const report: Parameters<
       AnyPossibleReportFn<TicketIdRelationSchemasFixture>
-    >[0] = reportFn.mock.calls[0][0]
+    >[0] = reportFn.mock.calls[0]?.[0] ?? []
     expect(
       report.entries.map(
         (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,
@@ -669,7 +670,7 @@ describe('TraceManager with Capture Interactivity', () => {
 
     const report: Parameters<
       AnyPossibleReportFn<TicketIdRelationSchemasFixture>
-    >[0] = reportFn.mock.calls[0][0]
+    >[0] = reportFn.mock.calls[0]?.[0] ?? []
     expect(
       report.entries.map(
         (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,
@@ -727,7 +728,7 @@ describe('TraceManager with Capture Interactivity', () => {
 
     const report: Parameters<
       AnyPossibleReportFn<TicketIdRelationSchemasFixture>
-    >[0] = reportFn.mock.calls[0][0]
+    >[0] = reportFn.mock.calls[0]?.[0] ?? []
     expect(
       report.entries.map(
         (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,
@@ -783,7 +784,7 @@ describe('TraceManager with Capture Interactivity', () => {
 
     const report: Parameters<
       AnyPossibleReportFn<TicketIdRelationSchemasFixture>
-    >[0] = reportFn.mock.calls[0][0]
+    >[0] = reportFn.mock.calls[0]?.[0] ?? []
     expect(
       report.entries.map(
         (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,
@@ -842,7 +843,7 @@ describe('TraceManager with Capture Interactivity', () => {
 
     const report: Parameters<
       AnyPossibleReportFn<TicketIdRelationSchemasFixture>
-    >[0] = reportFn.mock.calls[0][0]
+    >[0] = reportFn.mock.calls[0]?.[0] ?? []
     expect(
       report.entries.map(
         (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,
@@ -898,7 +899,7 @@ describe('TraceManager with Capture Interactivity', () => {
 
     const report: Parameters<
       AnyPossibleReportFn<TicketIdRelationSchemasFixture>
-    >[0] = reportFn.mock.calls[0][0]
+    >[0] = reportFn.mock.calls[0]?.[0] ?? []
     expect(
       report.entries.map(
         (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,
@@ -957,7 +958,7 @@ describe('TraceManager with Capture Interactivity', () => {
 
     const report: Parameters<
       AnyPossibleReportFn<TicketIdRelationSchemasFixture>
-    >[0] = reportFn.mock.calls[0][0]
+    >[0] = reportFn.mock.calls[0]?.[0] ?? []
     expect(
       report.entries.map(
         (spanAndAnnotation) => spanAndAnnotation.span.performanceEntry,

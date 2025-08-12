@@ -4,6 +4,7 @@ import {
   describe,
   expect,
   it,
+  type Mock,
   vitest as jest,
 } from 'vitest'
 import {
@@ -15,7 +16,7 @@ import {
 } from './debounce'
 
 describe('debounce', () => {
-  let mockFn: jest.Mock
+  let mockFn: Mock
   let optionsRef: DebounceOptionsRef<readonly [string]>
   let debouncedFn: DebouncedFn<readonly [string]>
 

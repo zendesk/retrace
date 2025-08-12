@@ -25,9 +25,9 @@ interface TicketIdRelation {
 }
 
 describe('TraceManager with Fixtures', () => {
-  let reportFn: jest.Mock
+  let reportFn: Mock
   let generateId: Mock<GenerateIdFn>
-  let reportErrorFn: jest.Mock
+  let reportErrorFn: Mock
 
   vitest.useFakeTimers({
     now: 0,
@@ -94,7 +94,7 @@ describe('TraceManager with Fixtures', () => {
       entries,
       ...report
     }: Parameters<AnyPossibleReportFn<TicketIdRelationSchemasFixture>>[0] =
-      reportFn.mock.calls[0][0]
+      reportFn.mock.calls[0]?.[0] ?? []
 
     expect(report).toMatchInlineSnapshot(`
       {
@@ -190,7 +190,7 @@ describe('TraceManager with Fixtures', () => {
       entries,
       ...report
     }: Parameters<AnyPossibleReportFn<TicketIdRelationSchemasFixture>>[0] =
-      reportFn.mock.calls[0][0]
+      reportFn.mock.calls[0]?.[0] ?? []
 
     expect(report).toMatchInlineSnapshot(`
       {

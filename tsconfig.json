@@ -1,0 +1,40 @@
+{
+  "compilerOptions": {
+    "jsx": "react",
+    "target": "es2023",
+    "verbatimModuleSyntax": true,
+    "strict": true,
+    "module": "esnext",
+    "esModuleInterop": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "sourceMap": true,
+    "declaration": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true
+    // "types": ["vitest/globals"]
+  },
+  "ts-node": {
+    "compilerOptions": {
+      "module": "commonjs"
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": [
+    "node_modules/",
+    "build/",
+    "cjs/",
+    "coverage/",
+    "dist/",
+    "dts/",
+    "esm/",
+    "lib/",
+    "mjs/",
+    "umd/"
+  ]
+}
