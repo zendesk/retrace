@@ -186,10 +186,14 @@ export function findLongestSpan<
 
 type RoundFunction = (x: number) => number
 
-function recursivelyRoundValues<T extends object>(
+export function recursivelyRoundValues<T extends object>(
   obj: T,
   roundFunc: RoundFunction = (x) => Math.round(x),
 ): T {
+  if (obj == null) {
+    return obj
+  }
+
   const result: Record<string, unknown> = {}
 
   for (const [key, value] of Object.entries(obj as object)) {
@@ -201,6 +205,9 @@ function recursivelyRoundValues<T extends object>(
           ? roundFunc(item)
           : // Keep strings intact - don't process them
           typeof item === 'string'
+          ? item
+          : // Handle null/undefined in arrays
+          item == null
           ? item
           : recursivelyRoundValues(item, roundFunc),
       )
