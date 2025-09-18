@@ -194,23 +194,30 @@ export function recursivelyRoundValues<T extends object>(
     return obj
   }
 
+  // Handle arrays specially to preserve array structure
+  if (Array.isArray(obj)) {
+    return obj.map((item: unknown) =>
+      typeof item === 'number'
+        ? roundFunc(item)
+        : typeof item === 'string'
+        ? item
+        : typeof item === 'boolean'
+        ? item
+        : item == null
+        ? item
+        : typeof item === 'object'
+        ? recursivelyRoundValues(item as T, roundFunc)
+        : item,
+    ) as T
+  }
+
   const result: Record<string, unknown> = {}
 
   for (const [key, value] of Object.entries(obj as object)) {
     if (typeof value === 'number') {
       result[key] = roundFunc(value)
     } else if (Array.isArray(value)) {
-      result[key] = value.map((item: number | T) =>
-        typeof item === 'number'
-          ? roundFunc(item)
-          : // Keep strings intact - don't process them
-          typeof item === 'string'
-          ? item
-          : // Handle null/undefined in arrays
-          item == null
-          ? item
-          : recursivelyRoundValues(item, roundFunc),
-      )
+      result[key] = recursivelyRoundValues(value, roundFunc)
     } else if (value && typeof value === 'object') {
       result[key] = recursivelyRoundValues(value, roundFunc)
     } else {
