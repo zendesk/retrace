@@ -2,12 +2,13 @@ diff --git a/lib/esm/ModuleChunkLoadingRuntimeModule.js b/lib/esm/ModuleChunkLoa
 index 4a846a7e4ef1c454379b1983c37ac25baa93766e..a16aa2c88ec07de810198e73abdbf21fd32f8980 100644
 --- a/lib/esm/ModuleChunkLoadingRuntimeModule.js
 +++ b/lib/esm/ModuleChunkLoadingRuntimeModule.js
-@@ -193,7 +193,7 @@ class ModuleChunkLoadingRuntimeModule extends RuntimeModule {
+@@ -224,8 +224,8 @@ class ModuleChunkLoadingRuntimeModule extends RuntimeModule {
+ 													? "if(true) { // all chunks have JS"
  													: `if(${hasJsMatcher("chunkId")}) {`,
  												Template.indent([
  													"// setup Promise in chunk cache",
--													`var promise = ${importFunctionName}(${JSON.stringify(
-+													`var promise = ${importFunctionName}(/* webpackInclude: /\\.js$/ */ ${JSON.stringify(
- 														rootOutputDir
- 													)} + ${
- 														RuntimeGlobals.getChunkScriptFilename
+-													`var promise = ${importFunctionName}(${
++													`var promise = ${importFunctionName}(/* webpackInclude: /\\.js$/ */ ${
+ 														compilation.outputOptions.publicPath === "auto"
+ 															? JSON.stringify(rootOutputDir)
+ 															: RuntimeGlobals.publicPath
