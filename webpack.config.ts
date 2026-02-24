@@ -122,6 +122,7 @@ export default ({
                 transpileOnly: true,
                 compilerOptions: {
                   module: 'esnext',
+                  moduleResolution: 'node',
                   target: 'es2020',
                   esModuleInterop: false,
                   sourceMap: true,

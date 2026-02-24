@@ -658,7 +658,7 @@ export class ActionLog<CustomMetadata extends Record<string, unknown>> {
         this.minimumExpectedSimultaneousBeacons,
       flushReason:
         typeof flushReason === 'symbol'
-          ? flushReason.description ?? 'manual'
+          ? (flushReason.description ?? 'manual')
           : flushReason,
     }
 

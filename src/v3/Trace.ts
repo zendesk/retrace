@@ -221,10 +221,10 @@ interface StateMachineContext<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > extends DraftTraceContext<
-    SelectedRelationNameT,
-    RelationSchemasT,
-    VariantsT
-  > {
+  SelectedRelationNameT,
+  RelationSchemasT,
+  VariantsT
+> {
   sideEffectFns: TraceStateMachineSideEffectHandlers<RelationSchemasT>
   children: ReadonlySet<AllPossibleTraces<RelationSchemasT>>
   terminalStateChildren: ReadonlySet<AllPossibleTraces<RelationSchemasT>>
@@ -313,9 +313,9 @@ export class TraceStateMachine<
       deadlineEpoch > this.#timeoutDeadline
         ? 'global'
         : deadlineType === 'next-quiet-window' &&
-          deadlineEpoch > this.#interactiveDeadline
-        ? 'interactive'
-        : deadlineType
+            deadlineEpoch > this.#interactiveDeadline
+          ? 'interactive'
+          : deadlineType
 
     const rightNowEpoch = Date.now()
     const timeToDeadlinePlusBuffer =
@@ -325,9 +325,12 @@ export class TraceStateMachine<
       clearTimeout(this.nextDeadlineRef)
     }
 
-    this.nextDeadlineRef = setTimeout(() => {
-      this.emit('onDeadline', closestDeadline)
-    }, Math.max(timeToDeadlinePlusBuffer, 0))
+    this.nextDeadlineRef = setTimeout(
+      () => {
+        this.emit('onDeadline', closestDeadline)
+      },
+      Math.max(timeToDeadlinePlusBuffer, 0),
+    )
   }
 
   setGlobalDeadline(deadline: number) {
@@ -338,9 +341,12 @@ export class TraceStateMachine<
 
     if (!this.nextDeadlineRef) {
       // this should never happen
-      this.nextDeadlineRef = setTimeout(() => {
-        this.emit('onDeadline', 'global')
-      }, Math.max(timeToDeadlinePlusBuffer, 0))
+      this.nextDeadlineRef = setTimeout(
+        () => {
+          this.emit('onDeadline', 'global')
+        },
+        Math.max(timeToDeadlinePlusBuffer, 0),
+      )
     }
   }
 
@@ -444,7 +450,7 @@ export class TraceStateMachine<
           transitionToState: 'interrupted',
           interruption: reasonPayload,
           lastRelevantSpanAndAnnotation: undefined,
-        } as const),
+        }) as const,
 
       onDeadline: (deadlineType: DeadlineType) => {
         if (deadlineType === 'global') {
@@ -1338,8 +1344,7 @@ export class Trace<
   const SelectedRelationNameT extends keyof RelationSchemasT,
   const RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   const VariantsT extends string,
-> implements TraceContext<SelectedRelationNameT, RelationSchemasT, VariantsT>
-{
+> implements TraceContext<SelectedRelationNameT, RelationSchemasT, VariantsT> {
   readonly sourceDefinition: CompleteTraceDefinition<
     SelectedRelationNameT,
     RelationSchemasT,

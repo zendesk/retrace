@@ -61,8 +61,7 @@ export interface WithShouldResetOnDependencyChangeFn {
   shouldResetOnDependencyChangeFn?: ShouldResetOnDependencyChange
 }
 
-export interface WithMeasurementBeaconState
-  extends WithShouldResetOnDependencyChangeFn {
+export interface WithMeasurementBeaconState extends WithShouldResetOnDependencyChangeFn {
   /**
    * Time different rendering stages by changing the value of this property.
    * Use one of the DEFAULT_STAGES or any string value for custom stages.
@@ -87,8 +86,8 @@ export interface WithMeasurementBeaconState
 export interface StaticActionLogOptions<
   Placements extends string,
   CustomMetadata extends Record<string, unknown>,
-> extends WithReportFn<CustomMetadata>,
-    WithOnInternalError<CustomMetadata> {
+>
+  extends WithReportFn<CustomMetadata>, WithOnInternalError<CustomMetadata> {
   /** the number of milliseconds we will wait before another render, or sending the report */
   debounceMs?: number
   /** stop timing after this amount of milliseconds passes from the start of the render */
@@ -139,11 +138,12 @@ export interface WithMetadata<Metadata extends Record<string, unknown>> {
   metadata?: Metadata
 }
 
-export interface ReportArguments<CustomMetadata extends Record<string, unknown>>
-  extends Pick<
-    StaticActionLogOptions<string, CustomMetadata>,
-    'finalStages' | 'loadingStages' | 'immediateSendReportStages'
-  > {
+export interface ReportArguments<
+  CustomMetadata extends Record<string, unknown>,
+> extends Pick<
+  StaticActionLogOptions<string, CustomMetadata>,
+  'finalStages' | 'loadingStages' | 'immediateSendReportStages'
+> {
   readonly actions: readonly ActionWithStateMetadata[]
   readonly timingId?: string
   readonly isFirstLoad?: boolean
@@ -159,7 +159,9 @@ export interface ReportArguments<CustomMetadata extends Record<string, unknown>>
 
 export interface DynamicActionLogOptions<
   CustomMetadata extends Record<string, unknown>,
-> extends WithTimingId,
+>
+  extends
+    WithTimingId,
     WithShouldResetOnDependencyChangeFn,
     WithReportFn<CustomMetadata>,
     WithOnInternalError<CustomMetadata> {}
@@ -197,27 +199,35 @@ export interface WithGarbageCollectMs {
 export interface UseActionLogCacheOptions<
   CustomMetadata extends Record<string, unknown>,
   Placements extends string = string,
-> extends StaticActionLogOptions<Placements, CustomMetadata>,
+>
+  extends
+    StaticActionLogOptions<Placements, CustomMetadata>,
     WithGarbageCollectMs {}
 
 export interface UseActionLogOptions<
   CustomMetadata extends Record<string, unknown>,
   Placements extends string = string,
-> extends WithTimingId,
+>
+  extends
+    WithTimingId,
     StaticActionLogOptions<Placements, CustomMetadata>,
     Partial<WithGarbageCollectMs>,
     WithActionLogCache<CustomMetadata> {}
 
 export interface UseTimingMeasurementHookConfiguration<
   CustomMetadata extends Record<string, unknown>,
-> extends DynamicActionLogOptions<CustomMetadata>,
+>
+  extends
+    DynamicActionLogOptions<CustomMetadata>,
     WithBeaconConfig,
     WithMeasurementBeaconState,
     WithActionLog<CustomMetadata> {}
 
 export interface UseTimingHookConfiguration<
   CustomMetadata extends Record<string, unknown>,
-> extends DynamicActionLogOptions<CustomMetadata>,
+>
+  extends
+    DynamicActionLogOptions<CustomMetadata>,
     WithBeaconConfig,
     WithMeasurementBeaconState,
     WithMetadata<CustomMetadata>,
@@ -229,7 +239,9 @@ export interface WithIdSuffix {
 
 export interface UseTimingBeaconHookOptions<
   CustomMetadata extends Record<string, unknown>,
-> extends Omit<DynamicActionLogOptions<CustomMetadata>, 'id'>,
+>
+  extends
+    Omit<DynamicActionLogOptions<CustomMetadata>, 'id'>,
     WithMeasurementBeaconState,
     WithBeaconConfig,
     WithMetadata<CustomMetadata>,
@@ -238,9 +250,9 @@ export interface UseTimingBeaconHookOptions<
 export interface GeneratedUseTimingBeaconHookConfiguration<
   CustomMetadata extends Record<string, unknown>,
 > extends Omit<
-    UseTimingBeaconHookOptions<CustomMetadata>,
-    'placement' | 'type'
-  > {}
+  UseTimingBeaconHookOptions<CustomMetadata>,
+  'placement' | 'type'
+> {}
 
 export type GeneratedUseTimingBeaconHook = <
   CustomMetadata extends Record<string, unknown>,
@@ -253,7 +265,9 @@ export interface GenerateUseTimingHooksConfiguration<
   Name extends string,
   Placements extends string,
   CustomMetadata extends Record<string, unknown>,
-> extends Partial<UseActionLogOptions<CustomMetadata, Placements>>,
+>
+  extends
+    Partial<UseActionLogOptions<CustomMetadata, Placements>>,
     WithIdPrefix {
   name: Name
 }
@@ -265,14 +279,18 @@ export interface WithIdPrefix {
 export interface GetPrefixedUseTimingHooksConfiguration<
   Placements extends string,
   Metadata extends Record<string, unknown>,
-> extends Omit<UseActionLogOptions<Metadata, Placements>, 'id'>,
+>
+  extends
+    Omit<UseActionLogOptions<Metadata, Placements>, 'id'>,
     WithIdPrefix,
     WithBeaconConfig<Placements> {}
 
 export interface GetExternalApiConfiguration<
   Placements extends string,
   Metadata extends Record<string, unknown>,
-> extends WithActionLogCache<Metadata>,
+>
+  extends
+    WithActionLogCache<Metadata>,
     WithIdPrefix,
     WithBeaconConfig<Placements> {}
 
@@ -315,8 +333,10 @@ export type UnresponsiveAction = BaseAction<UnresponsiveActionType, SpanMarker>
 export type SpanAction = RenderAction | UnresponsiveAction
 export type StageChangeActionType = (typeof ACTION_TYPE)['STAGE_CHANGE']
 
-export interface StageChangeAction
-  extends BaseAction<StageChangeActionType, PointMarker> {
+export interface StageChangeAction extends BaseAction<
+  StageChangeActionType,
+  PointMarker
+> {
   stage: string
   renderEntry?: CustomPerformanceEntry
 }

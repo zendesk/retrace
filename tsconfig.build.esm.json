@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "outDir": "esm",
+    "target": "es2023",
+    "emitDeclarationOnly": true
+  },
+  "exclude": ["src/**/*.stories.*", "src/stories/**"]
+}

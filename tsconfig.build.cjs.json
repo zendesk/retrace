@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "outDir": "cjs",
+    "target": "es2023",
+    "verbatimModuleSyntax": false
+  },
+  "exclude": ["src/**/*.stories.*", "src/stories/**"]
+}

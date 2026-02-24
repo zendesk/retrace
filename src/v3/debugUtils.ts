@@ -48,14 +48,14 @@ export function getConfigSummary<
   const timeout = variant?.timeout
   const debounce =
     (def.debounceOnSpans ?? []).length > 0
-      ? def.debounceWindow ?? DEFAULT_DEBOUNCE_DURATION
+      ? (def.debounceWindow ?? DEFAULT_DEBOUNCE_DURATION)
       : undefined
   const interactive =
     typeof def.captureInteractive === 'object'
       ? def.captureInteractive.timeout
       : def.captureInteractive
-      ? DEFAULT_INTERACTIVE_TIMEOUT_DURATION
-      : undefined
+        ? DEFAULT_INTERACTIVE_TIMEOUT_DURATION
+        : undefined
   return { timeout, debounce, interactive }
 }
 

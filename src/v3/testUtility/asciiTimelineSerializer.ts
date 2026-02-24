@@ -6,14 +6,12 @@ import { generateAsciiTimeline } from './generateAsciiTimeline'
 const isValid = (item: any): boolean =>
   Boolean(
     typeof item === 'object' &&
-      item !== null &&
-      ((typeof item.duration === 'number' &&
-        (typeof item.startTime === 'number' ||
-          (typeof item.startTime === 'object' &&
-            typeof item.startTime?.now === 'number'))) ||
-        ('span' in item &&
-          typeof item.span === 'object' &&
-          isValid(item.span))),
+    item !== null &&
+    ((typeof item.duration === 'number' &&
+      (typeof item.startTime === 'number' ||
+        (typeof item.startTime === 'object' &&
+          typeof item.startTime?.now === 'number'))) ||
+      ('span' in item && typeof item.span === 'object' && isValid(item.span))),
   )
 
 const asciiTimelineSerializer = {

@@ -422,8 +422,8 @@ export function createConsoleTraceLogger<
       traceInfo.hasErrorSpan
         ? colorize('❗', RED)
         : traceInfo.hasSuppressedErrorSpan
-        ? colorize('❗(suppressed)', RED)
-        : '',
+          ? colorize('❗(suppressed)', RED)
+          : '',
       traceInfo.definitionModifications.length > 0
         ? colorize('🔧', MAGENTA)
         : '',

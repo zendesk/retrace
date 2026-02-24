@@ -143,7 +143,7 @@ export const mapOperationForVisualization = (
       if (mapped.span.attributes?.initiatorType === 'xmlhttprequest') {
         overrideGroupName = collapseEmberResources
           ? 'ember-resource'
-          : overrideGroupName ?? shortenedName
+          : (overrideGroupName ?? shortenedName)
         type = 'resource-ember'
       }
       if (type === 'resource') {

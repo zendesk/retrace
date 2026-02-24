@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "jsx": "react",
+    "jsx": "react-jsx",
     "target": "es2023",
     "verbatimModuleSyntax": true,
     "strict": true,
@@ -35,6 +35,8 @@
     "esm/",
     "lib/",
     "mjs/",
-    "umd/"
+    "umd/",
+    "src/stories/**",
+    "src/**/*.stories.*"
   ]
 }

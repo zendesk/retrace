@@ -42,8 +42,8 @@ describe('Trace Definitions', () => {
       return type === 'span'
         ? `id-${seq}`
         : type === 'trace'
-        ? `trace-${seq}`
-        : `tick-${seq}`
+          ? `trace-${seq}`
+          : `tick-${seq}`
     })
     reportFn = vitest.fn()
     reportErrorFn = vitest.fn()
