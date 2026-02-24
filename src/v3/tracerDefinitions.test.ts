@@ -340,7 +340,6 @@ describe('Trace Definitions', () => {
             matches: [match.withName('feature'), match.withName('feature-2')],
             computeValueFromMatches: (feature, feature2) =>
               // @ts-expect-error unexpected TS error
-              // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
               feature.length + feature2.length,
           },
           'error-count': {

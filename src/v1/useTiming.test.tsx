@@ -1,5 +1,4 @@
 /* eslint-disable jest/no-conditional-in-test */
-/* eslint-disable @typescript-eslint/no-floating-promises */
 /**
  * Copyright Zendesk, Inc.
  *
