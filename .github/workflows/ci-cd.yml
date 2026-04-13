@@ -20,7 +20,7 @@ jobs:
         node: [22]
     steps:
       - uses: zendesk/checkout@v4
-      - uses: zendesk/setup-node@v4
+      - uses: zendesk/setup-node@v6
         with:
           node-version: ${{ matrix.node }}
           cache: 'yarn'
@@ -37,7 +37,7 @@ jobs:
     if: github.actor != 'github-actions[bot]' && github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/next')
     steps:
       - uses: zendesk/checkout@v4
-      - uses: zendesk/setup-node@v4
+      - uses: zendesk/setup-node@v6
         with:
           node-version: 20
           scope: zendesk
