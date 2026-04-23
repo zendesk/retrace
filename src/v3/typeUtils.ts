@@ -56,14 +56,12 @@ export type SelectBySomeKeys<K extends PropertyKey, U> = U extends unknown
  * For T, check if NonUndefinedKeys<T> is exactly equal to the set of keys in K.
  * "Exactly equal" means the two sets are mutual subsets of each other.
  */
-type HasExactKeys<
-  T,
-  K extends readonly PropertyKey[],
-> = NonUndefinedKeys<T> extends K[number] // T's keys ⊆ K
-  ? K[number] extends NonUndefinedKeys<T> // K ⊆ T's keys
-    ? true
+type HasExactKeys<T, K extends readonly PropertyKey[]> =
+  NonUndefinedKeys<T> extends K[number] // T's keys ⊆ K
+    ? K[number] extends NonUndefinedKeys<T> // K ⊆ T's keys
+      ? true
+      : false
     : false
-  : false
 
 // type TestAboveTrue = HasExactKeys<{ a: string; b?: number }, ['b', 'a']>
 // type TestAboveTrue2 = HasExactKeys<{ a: string; b?: undefined}, ['a']>
@@ -190,11 +188,12 @@ export type UnionToTuple<U, R extends any[] = []> = [U] extends [never]
   ? R
   : UnionToTuple<Exclude<U, LastOf<U>>, [LastOf<U>, ...R]>
 
-type LastOf<U> = UnionToIntersection<
-  U extends any ? (x: U) => void : never
-> extends (x: infer L) => void
-  ? L
-  : never
+type LastOf<U> =
+  UnionToIntersection<U extends any ? (x: U) => void : never> extends (
+    x: infer L,
+  ) => void
+    ? L
+    : never
 
 export type OpenPick<T, K extends string> = {
   [P in K & keyof T]: T[P]

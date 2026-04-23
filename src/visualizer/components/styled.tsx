@@ -1,3 +1,4 @@
+import type { ComponentType } from 'react'
 import styled from 'styled-components'
 import { TooltipWithBounds } from '@visx/tooltip'
 import { getColor } from '@zendeskgarden/react-theming'
@@ -6,7 +7,10 @@ export const StyledRect = styled.rect`
   shape-rendering: geometricPrecision;
 `
 
-export const StyledTooltip = styled(TooltipWithBounds)`
+const TooltipWithBoundsComponent =
+  TooltipWithBounds as unknown as ComponentType<Record<string, unknown>>
+
+export const StyledTooltip = styled(TooltipWithBoundsComponent)`
   font-family: ${(props) => props.theme.fonts.system};
   background-color: ${(props) =>
     getColor({ theme: props.theme, variable: 'background.raised' })};

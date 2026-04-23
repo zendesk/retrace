@@ -281,8 +281,8 @@ function RequiredSpansList<
                       span.isMatched
                         ? 'default'
                         : traceComplete
-                        ? 'missing'
-                        : 'pending'
+                          ? 'missing'
+                          : 'pending'
                     }
                   />
                 </div>
@@ -418,14 +418,14 @@ function RenderBeaconTimeline({
         typeof data === 'number'
           ? content - data
           : typeof loading === 'number'
-          ? content - loading
-          : content,
+            ? content - loading
+            : content,
       previousEvent:
         typeof data === 'number'
           ? 'data'
           : typeof loading === 'number'
-          ? 'loading'
-          : 'start',
+            ? 'loading'
+            : 'start',
       color: 'var(--tmdb-timeline-content-marker)',
     })
 
@@ -1632,7 +1632,7 @@ export default function TraceManagerDebugger<
     (trace) => !isTerminalState(trace.state),
   )
 
-  let content: JSX.Element
+  let content: React.ReactNode
 
   // eslint-disable-next-line unicorn/prefer-ternary
   if (float && isMinimized) {

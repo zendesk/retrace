@@ -55,6 +55,7 @@ export type UseBeacon<
 export type GetRelationSchemasTFromTraceManager<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   TraceManagerT extends TraceManager<any>,
-> = TraceManagerT extends TraceManager<infer RelationSchemasT>
-  ? RelationSchemasT
-  : never
+> =
+  TraceManagerT extends TraceManager<infer RelationSchemasT>
+    ? RelationSchemasT
+    : never

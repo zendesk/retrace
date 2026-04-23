@@ -20,7 +20,6 @@ function generateAsciiTimeline(
 #### Parameters
 
 - **entries**: `PerformanceEntry[]`
-
   - An array of objects where each `PerformanceEntry` has the following properties:
     - `name`: `string` - The label or name of the event.
     - `startTime`: `number` - The starting time of the event in milliseconds.
@@ -42,11 +41,9 @@ function generateAsciiTimeline(
 #### General Requirements
 
 1. **Timeline Representation**:
-
    - Each event is represented on a timeline using a scale, with options to specify the scale manually or auto-scale based on the maximum width.
 
 2. **Multi-Row Handling for Overlaps**:
-
    - If events overlap, they should be organized across multiple rows. `Events` rows should be filled from the row closest to the `Timeline` upward, and `Time` rows should be filled from the top down.
 
 3. **Label Prefix Alignment**:
@@ -55,7 +52,6 @@ function generateAsciiTimeline(
 #### Event Representation
 
 1. **Instantaneous Events (`duration = 0`)**:
-
    - Represented by a single `|` at the corresponding position on the timeline.
 
 2. **Events with Duration**:
@@ -66,15 +62,12 @@ function generateAsciiTimeline(
 #### Time Labels
 
 1. **Correspondence to Event Start Times**:
-
    - Each time label should correspond to an event’s start time, placed at the position calculated by the scale.
 
 2. **Multi-Row Time Labels for Overlap**:
-
    - If time labels overlap, they should be distributed across multiple rows, starting from the highest row and moving downward as needed.
 
 3. **Minimum Spacing Between Time Labels**:
-
    - Ensure at least one space between adjacent time labels within the same row. If spacing cannot be maintained, move the overlapping label to a lower row.
 
 4. **Overflow Indicators (`|`)**:
@@ -83,11 +76,9 @@ function generateAsciiTimeline(
 #### Scaling and Width
 
 1. **Scale Calculation**:
-
    - If no scale is provided, calculate a scale that maximizes the timeline's fit within the specified or default width (80 characters).
 
 2. **Auto-Scaling**:
-
    - Adjust the scale dynamically based on the total time span of events, ensuring that the timeline does not exceed the specified width.
 
 3. **Width Constraints**:

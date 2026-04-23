@@ -34,15 +34,18 @@ jobs:
     name: Publish package to NPM
     needs: test
     runs-on: ubuntu-latest
+    environment: npm-publish
     if: github.actor != 'github-actions[bot]' && github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/next')
     steps:
       - uses: zendesk/checkout@v4
       - uses: zendesk/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           scope: zendesk
           always-auth: 'true'
           cache: 'yarn'
+      - name: Install oathtool
+        run: sudo apt-get install --fix-broken --yes oathtool
       - name: Build and release
         run: |
           yarn install --immutable
@@ -50,4 +53,5 @@ jobs:
           yarn release
         env:
           NPM_TOKEN: ${{secrets.NPM_TOKEN}}
+          NPM_TOTP_DEVICE: ${{secrets.NPM_TOTP_DEVICE}}
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}

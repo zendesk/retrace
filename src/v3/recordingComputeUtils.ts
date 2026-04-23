@@ -268,7 +268,7 @@ function getComputedRenderBeaconSpans<
       spanTimes.firstContentfulRenderEnd =
         contentfulRenderEnd && spanTimes.firstContentfulRenderEnd
           ? Math.min(spanTimes.firstContentfulRenderEnd, contentfulRenderEnd)
-          : contentfulRenderEnd ?? spanTimes.firstContentfulRenderEnd
+          : (contentfulRenderEnd ?? spanTimes.firstContentfulRenderEnd)
 
       if (entry.span.type === 'component-render') {
         spanTimes.renderCount += 1
@@ -488,7 +488,7 @@ export function propagateStatusAndAttributes<
         const value =
           childValue === INHERIT_FROM_PARENT
             ? parentValue
-            : childValue ?? parentValue
+            : (childValue ?? parentValue)
 
         if (value !== undefined) {
           heritableAttributes[key] = value
@@ -697,8 +697,8 @@ export function createTraceRecording<
     status: isIncompleteTrace
       ? 'interrupted'
       : markTraceAsErrored
-      ? 'error'
-      : 'ok',
+        ? 'error'
+        : 'ok',
     error,
     computedSpans,
     computedRenderBeaconSpans,

@@ -81,19 +81,21 @@ interface SharedAnnotationProps {
 }
 
 interface InteractiveLineSpanProps
-  extends SharedAnnotationProps,
+  extends
+    SharedAnnotationProps,
     Omit<AddSVGProps<LineProps, SVGLineElement>, 'ref'> {
   type: 'line'
   onClick: () => void
-  scrollContainerRef: React.RefObject<HTMLDivElement>
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>
 }
 
 interface InteractiveBarSpanProps
-  extends SharedAnnotationProps,
+  extends
+    SharedAnnotationProps,
     Omit<AddSVGProps<BarProps, SVGRectElement>, 'ref'> {
   type: 'bar'
   onClick: () => void
-  scrollContainerRef: React.RefObject<HTMLDivElement>
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>
 }
 
 type InteractiveSpanProps = InteractiveLineSpanProps | InteractiveBarSpanProps

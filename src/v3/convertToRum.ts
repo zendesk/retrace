@@ -200,14 +200,14 @@ export function recursivelyRoundValues<T extends object>(
       typeof item === 'number'
         ? roundFunc(item)
         : typeof item === 'string'
-        ? item
-        : typeof item === 'boolean'
-        ? item
-        : item == null
-        ? item
-        : typeof item === 'object'
-        ? recursivelyRoundValues(item as T, roundFunc)
-        : item,
+          ? item
+          : typeof item === 'boolean'
+            ? item
+            : item == null
+              ? item
+              : typeof item === 'object'
+                ? recursivelyRoundValues(item as T, roundFunc)
+                : item,
     ) as T
   }
 

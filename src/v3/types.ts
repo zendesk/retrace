@@ -36,12 +36,12 @@ export type MapSchemaToTypesBase<T> = keyof T extends never
       [K in keyof T]: T[K] extends StringConstructor
         ? string
         : T[K] extends NumberConstructor
-        ? number
-        : T[K] extends BooleanConstructor
-        ? boolean
-        : T[K] extends readonly (infer U)[]
-        ? U
-        : never
+          ? number
+          : T[K] extends BooleanConstructor
+            ? boolean
+            : T[K] extends readonly (infer U)[]
+              ? U
+              : never
     }
 
 export type MapSchemaToTypes<RelationSchemasT> =
@@ -72,14 +72,14 @@ export type MapTypesToSchema<T> = {
   [K in keyof T]: T[K] extends boolean // 1) If it's (wide) boolean or effectively boolean => BooleanConstructor
     ? BooleanConstructor
     : T[K] extends string | number | boolean
-    ? string extends T[K]
-      ? StringConstructor
-      : number extends T[K]
-      ? NumberConstructor
-      : boolean extends T[K]
-      ? BooleanConstructor
-      : readonly [...UnionToTuple<T[K]>]
-    : never
+      ? string extends T[K]
+        ? StringConstructor
+        : number extends T[K]
+          ? NumberConstructor
+          : boolean extends T[K]
+            ? BooleanConstructor
+            : readonly [...UnionToTuple<T[K]>]
+      : never
 }
 
 export type RelationSchemasBase<RelationSchemasT> = {
@@ -347,10 +347,10 @@ export interface TraceModifications<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > extends TraceDefinitionModifications<
-    SelectedRelationNameT,
-    RelationSchemasT,
-    VariantsT
-  > {
+  SelectedRelationNameT,
+  RelationSchemasT,
+  VariantsT
+> {
   relatedTo: MapSchemaToTypes<RelationSchemasT[SelectedRelationNameT]>
   attributes?: Attributes
 }
@@ -392,10 +392,10 @@ export interface TraceVariant<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > extends TraceDefinitionModifications<
-    SelectedRelationNameT,
-    RelationSchemasT,
-    VariantsT
-  > {
+  SelectedRelationNameT,
+  RelationSchemasT,
+  VariantsT
+> {
   /**
    * How long before we give up and cancel the trace if the required spans have not been seen
    * In milliseconds.
@@ -568,13 +568,13 @@ export interface CompleteTraceDefinition<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
   VariantsT extends string,
 > extends Omit<
-    TraceDefinition<SelectedRelationNameT, RelationSchemasT, VariantsT, {}>,
-    | 'computedSpanDefinitions'
-    | 'computedValueDefinitions'
-    | 'requiredSpans'
-    | 'debounceOnSpans'
-    | 'interruptOnSpans'
-  > {
+  TraceDefinition<SelectedRelationNameT, RelationSchemasT, VariantsT, {}>,
+  | 'computedSpanDefinitions'
+  | 'computedValueDefinitions'
+  | 'requiredSpans'
+  | 'debounceOnSpans'
+  | 'interruptOnSpans'
+> {
   computedSpanDefinitions: Record<
     string,
     ComputedSpanDefinition<
