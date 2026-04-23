@@ -7,6 +7,7 @@ import webpackSources from 'webpack-sources'
 import type { Source } from 'webpack-sources'
 
 const { ReplaceSource } = webpackSources
+const projectRoot = process.cwd()
 
 type ExternalFn = Extract<
   NonNullable<Configuration['externals']>,
@@ -79,9 +80,9 @@ export default ({
     resolve: {
       extensions: ['.ts', '.tsx', '...'],
       alias: {
-        '#image_overlay': path.join(__dirname, 'src/dummy.png'),
-        // react: path.join(__dirname, 'src/reactInterop.js'),
-        // 'react-dom': path.join(__dirname, 'src/reactDomInterop'),
+        '#image_overlay': path.join(projectRoot, 'src/dummy.png'),
+        // react: path.join(projectRoot, 'src/reactInterop.js'),
+        // 'react-dom': path.join(projectRoot, 'src/reactDomInterop'),
         // 'external-react': 'react',
         // 'external-react-dom': 'react-dom',
         // 'external-react-dom-client': 'react-dom/client',
