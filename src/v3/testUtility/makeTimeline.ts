@@ -7,8 +7,9 @@ import type {
 } from '../spanTypes'
 import type { RelationSchemasBase } from '../types'
 
-export interface ComponentRenderStub
-  extends Partial<Omit<ComponentRenderSpan<any>, 'startTime' | 'duration'>> {
+export interface ComponentRenderStub extends Partial<
+  Omit<ComponentRenderSpan<any>, 'startTime' | 'duration'>
+> {
   entryType: 'component-render' | 'component-render-start'
   duration: number
   startTime?: number
@@ -22,8 +23,9 @@ export interface LongTaskStub {
   name?: string
 }
 
-export interface MarkStub
-  extends Partial<Omit<PerformanceEntrySpan<any>, 'startTime' | 'duration'>> {
+export interface MarkStub extends Partial<
+  Omit<PerformanceEntrySpan<any>, 'startTime' | 'duration'>
+> {
   entryType: 'mark'
   name: string
   startTime?: number
@@ -168,7 +170,7 @@ export function getSpansFromTimeline<
       fmpTime = currentTime
     }
     const now =
-      'startTime' in stub ? stub.startTime ?? currentTime : currentTime
+      'startTime' in stub ? (stub.startTime ?? currentTime) : currentTime
     spans.push({
       type: stub.entryType as SpanType,
       duration: 0,
@@ -182,22 +184,22 @@ export function getSpansFromTimeline<
         'isIdle' in stub
           ? stub.isIdle
           : 'name' in stub
-          ? stub.name?.includes('idle')
-          : undefined,
+            ? stub.name?.includes('idle')
+            : undefined,
       renderedOutput:
         'renderedOutput' in stub
           ? stub.renderedOutput
           : 'name' in stub
-          ? stub.name?.includes('idle')
-            ? 'content'
-            : 'loading'
-          : undefined,
+            ? stub.name?.includes('idle')
+              ? 'content'
+              : 'loading'
+            : undefined,
       performanceEntry: {
         duration: 0,
         name: `${stub.entryType}`,
         ...stub,
         startTime:
-          'startTime' in stub ? stub.startTime ?? currentTime : currentTime,
+          'startTime' in stub ? (stub.startTime ?? currentTime) : currentTime,
         toJSON: () => {},
       },
       id: `span-${i}-${now}-${stub.entryType}-${

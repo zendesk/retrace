@@ -12,6 +12,7 @@
     "declaration": true,
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "node",
+    "ignoreDeprecations": "6.0",
     "noImplicitOverride": true,
     "noImplicitReturns": true,
     "noUncheckedIndexedAccess": true,
@@ -21,12 +22,20 @@
   },
   "ts-node": {
     "compilerOptions": {
-      "module": "commonjs"
+      "module": "commonjs",
+      "types": ["node"],
+      "verbatimModuleSyntax": false
     }
   },
   "include": ["src/**/*"],
   "exclude": [
+    ".storybook/",
     "node_modules/",
+    "src/**/*.stories.ts",
+    "src/**/*.stories.tsx",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/stories/",
     "build/",
     "cjs/",
     "coverage/",

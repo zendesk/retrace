@@ -496,8 +496,8 @@ export class TraceManager<
       typeof endSpanAttributes.duration === 'number'
         ? endSpanAttributes.duration +
           Math.max(0, endSpanAttributes.startTime.now - startSpan.startTime.now)
-        : endSpanAttributes.duration ??
-          performance.now() - startSpan.startTime.now
+        : (endSpanAttributes.duration ??
+          performance.now() - startSpan.startTime.now)
 
     const originalGetParentSpan = startSpan.getParentSpan
 

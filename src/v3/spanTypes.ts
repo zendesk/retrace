@@ -57,19 +57,25 @@ export interface DraftTraceConfig<RelationSchemaT, VariantsT extends string> {
   baggage?: unknown
 }
 
-export interface StartTraceConfig<RelationSchemaT, VariantsT extends string>
-  extends DraftTraceConfig<RelationSchemaT, VariantsT> {
+export interface StartTraceConfig<
+  RelationSchemaT,
+  VariantsT extends string,
+> extends DraftTraceConfig<RelationSchemaT, VariantsT> {
   relatedTo: MapSchemaToTypes<RelationSchemaT>
 }
 
-export interface DraftTraceInput<RelationSchemaT, VariantsT extends string>
-  extends DraftTraceConfig<RelationSchemaT, VariantsT> {
+export interface DraftTraceInput<
+  RelationSchemaT,
+  VariantsT extends string,
+> extends DraftTraceConfig<RelationSchemaT, VariantsT> {
   id: string
   startTime: Timestamp
 }
 
-export interface ActiveTraceInput<RelationSchemaT, VariantsT extends string>
-  extends DraftTraceInput<RelationSchemaT, VariantsT> {
+export interface ActiveTraceInput<
+  RelationSchemaT,
+  VariantsT extends string,
+> extends DraftTraceInput<RelationSchemaT, VariantsT> {
   relatedTo: MapSchemaToTypes<RelationSchemaT>
 }
 
@@ -223,11 +229,12 @@ export interface GetParentSpanContext<
 }
 
 export interface ComponentRenderSpan<
-    RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
-  >
+  RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
+>
   // it would be more correct to use 'relatedTo' from BeaconConfig,
   // but we'd need to solve some type issues
-  extends Omit<SpanBase<RelationSchemasT>, 'attributes'>,
+  extends
+    Omit<SpanBase<RelationSchemasT>, 'attributes'>,
     Omit<BeaconConfig<RelationSchemasT>, 'relatedTo'> {
   type: ComponentLifecycleSpanType
   isIdle: boolean
@@ -283,7 +290,9 @@ export interface PerformanceEntrySpan<
  */
 export interface ChildOperationSpan<
   RelationSchemasT extends RelationSchemasBase<RelationSchemasT>,
-> extends Omit<SpanBase<RelationSchemasT>, 'id'>,
+>
+  extends
+    Omit<SpanBase<RelationSchemasT>, 'id'>,
     Omit<
       TraceRecording<keyof RelationSchemasT, RelationSchemasT>,
       // these come from the SpanBase type:

@@ -36,7 +36,7 @@ export const generateUseBeacon =
     const relatedTo =
       config.relatedTo as unknown as RelationsOnASpan<RelationSchemasT>
 
-    const parentSpanRef = useRef<Span<RelationSchemasT> | undefined>()
+    const parentSpanRef = useRef<Span<RelationSchemasT> | undefined>(undefined)
     if (config.parentSpan) {
       parentSpanRef.current = config.parentSpan
     }

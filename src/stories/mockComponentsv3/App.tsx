@@ -11,12 +11,12 @@ import {
   Nav,
 } from '@zendeskgarden/react-chrome'
 import { PALETTE, ThemeProvider } from '@zendeskgarden/react-theming'
+import { ReactComponent as ClearIcon } from '@zendeskgarden/svg-icons/src/16/arrow-reverse-stroke.svg'
+import { ReactComponent as ProductIcon } from '@zendeskgarden/svg-icons/src/16/box-3d-fill.svg'
 import { ReactComponent as MenuTrayIcon } from '@zendeskgarden/svg-icons/src/16/grid-2x2-stroke.svg'
+import { ReactComponent as HomeIcon } from '@zendeskgarden/svg-icons/src/16/home-fill.svg'
 import { ReactComponent as PersonIcon } from '@zendeskgarden/svg-icons/src/16/user-solo-stroke.svg'
-import { ReactComponent as ClearIcon } from '@zendeskgarden/svg-icons/src/26/arrow-right-left.svg'
-import { ReactComponent as ProductIcon } from '@zendeskgarden/svg-icons/src/26/garden.svg'
-import { ReactComponent as HomeIcon } from '@zendeskgarden/svg-icons/src/26/home-fill.svg'
-import { ReactComponent as ZendeskIcon } from '@zendeskgarden/svg-icons/src/26/zendesk.svg'
+import { ReactComponent as ZendeskIcon } from '@zendeskgarden/svg-icons/src/16/zendesk-fill.svg'
 // CYN: NEED UPDATE
 import { mockTickets } from './mockTickets'
 import { TicketList } from './TicketList'

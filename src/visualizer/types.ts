@@ -40,8 +40,10 @@ export interface HierarchicalSpanAndAnnotation extends MappedSpanAndAnnotation {
   parentId?: string
 }
 
-export interface HierarchicalOperation
-  extends Omit<MappedOperation, 'spansWithDuration'> {
+export interface HierarchicalOperation extends Omit<
+  MappedOperation,
+  'spansWithDuration'
+> {
   spans: HierarchicalSpanAndAnnotation[]
   expandedSpanIds: Set<string>
 }

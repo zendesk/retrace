@@ -19,8 +19,8 @@ export function ensureSpanHasInheritedAttributes<
       value === INHERIT_FROM_PARENT
         ? 'span-request'
         : heritableSpanAttributes?.includes(key)
-        ? 'always-requested'
-        : undefined
+          ? 'always-requested'
+          : undefined
 
     if (!inheritanceType) {
       // eslint-disable-next-line no-continue
@@ -86,8 +86,8 @@ export function createParentSpanResolver<
         !context.traceContext
           ? context.thisSpanAndAnnotation.span[TICK_META]
           : parentSpanMatcher.search === 'span-ended-tick'
-          ? context.thisSpanAndAnnotation.span[TICK_META_END]
-          : undefined
+            ? context.thisSpanAndAnnotation.span[TICK_META_END]
+            : undefined
 
       if (tickSource?.spansInCurrentTick.tickCompleted) {
         // do not attempt to resolve parent span again - if we haven't found in this iteration,
@@ -96,10 +96,10 @@ export function createParentSpanResolver<
       }
 
       const spanAndAnnotations = tickSource
-        ? tickSource?.spansInCurrentTick.map(
+        ? (tickSource?.spansInCurrentTick.map(
             (sp) =>
               context.traceContext?.recordedItems.get(sp.id) ?? { span: sp },
-          ) ?? []
+          ) ?? [])
         : // note: parentSpanMatcher.search === 'entire-recording' only works if the traceContext is available
           [...context.traceContext!.recordedItems.values()]
 
@@ -117,7 +117,7 @@ export function createParentSpanResolver<
           ? spanAndAnnotations.findIndex(
               (spanAndAnnotation) => spanAndAnnotation.span.id === span.id,
             )
-          : tickSource?.thisSpanInCurrentTickIndex ?? -1
+          : (tickSource?.thisSpanInCurrentTickIndex ?? -1)
 
       if (thisSpanIndex === -1) {
         // invalid

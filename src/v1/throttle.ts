@@ -5,7 +5,7 @@ export const throttle = <Args extends any[]>(
   waitFor: number,
 ): ((...args: Args) => void) => {
   let previouslyRun: number
-  let queuedToRun: NodeJS.Timeout
+  let queuedToRun: ReturnType<typeof setTimeout>
 
   return function invokeFn(...args: Args) {
     const now = Date.now()

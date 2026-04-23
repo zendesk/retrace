@@ -13,7 +13,8 @@ export interface GlobalRelationSchemasFixture {
 }
 
 export interface TicketAndUserAndGlobalRelationSchemasFixture
-  extends TicketIdRelationSchemasFixture,
+  extends
+    TicketIdRelationSchemasFixture,
     UserIdRelationSchemasFixture,
     GlobalRelationSchemasFixture {}
 

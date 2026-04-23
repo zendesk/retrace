@@ -312,8 +312,8 @@ const OperationVisualization: React.FC<OperationVisualizationProps> = ({
                         entry.annotation.markedPageInteractive
                           ? 'complete & interactive'
                           : entry.annotation.markedPageInteractive
-                          ? 'interactive'
-                          : 'complete'
+                            ? 'interactive'
+                            : 'complete'
                       }
                       opacity={0.8}
                       showTooltip={showTooltip}
