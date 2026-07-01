@@ -35,6 +35,11 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     environment: npm-publish
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write
     if: github.actor != 'github-actions[bot]' && github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/next')
     steps:
       - uses: zendesk/checkout@v6
@@ -44,14 +49,10 @@ jobs:
           scope: zendesk
           always-auth: 'true'
           cache: 'yarn'
-      - name: Install oathtool
-        run: sudo apt-get install --fix-broken --yes oathtool
       - name: Build and release
         run: |
           yarn install --immutable
           yarn build
           yarn release
         env:
-          NPM_TOKEN: ${{secrets.NPM_TOKEN}}
-          NPM_TOTP_DEVICE: ${{secrets.NPM_TOTP_DEVICE}}
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
