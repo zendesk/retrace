@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - uses: zendesk/checkout@v6
-      - uses: zendesk/setup-node@v6
+      - uses: zendesk/setup-node@v7
         with:
           node-version: 24
           scope: zendesk
