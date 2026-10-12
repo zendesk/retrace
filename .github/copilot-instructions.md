@@ -1,13 +1,5 @@
-## Test/Lint Commands
+# Copilot Instructions
 
-- Typecheck: `yarn test:types`
-- Test: `yarn exec vitest`
-- Run single test: `yarn exec vitest path/to/file.test.ts`
-
-## Code Style
-
-- TypeScript:
-  - Strict mode
-  - If a type exists, use it. Never use `any`, for external/unverified inputs use `unknown`.
-  - `verbatimModuleSyntax: true`, use `import type` or `import { type X }` whenever possible
-  - prefer `satisfies` if possible, avoid casting using `as`
+Read and follow all instructions in `AGENTS.md` — the source of truth for coding conventions.
+Read and follow all instructions in `SECURITY.md` — mandatory security requirements.
+See `ARCHITECTURE.md` for system architecture and design decisions.
