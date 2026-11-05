@@ -263,7 +263,7 @@
     "undici@npm:^6.23.0": "6.28.1",
     "undici@npm:^6.25.0": "6.28.1",
     "undici@npm:^7.0.0": "7.29.1",
-    "vite": "8.0.16",
+    "vite": "8.1.6",
     "ws": "8.21.0",
     "webpack@npm:5": "patch:webpack@npm%3A5.108.4#~/.yarn/patches/webpack-npm-5.108.4-a352d7b03f.patch",
     "webpack-dev-middleware@npm:^6.1.2": "7.4.6"
